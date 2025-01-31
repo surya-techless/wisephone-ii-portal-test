@@ -1,8 +1,10 @@
 ---
 import { actions } from "astro:actions";
+import { db, eq, Wisephone } from "astro:db";
 import Header from "@/components/Header.astro";
 import Layout from "@/layouts/Layout.astro";
 import Footer from "@/components/Footer.astro";
+import Icon from "astro-iconify";
 
 if (!Astro.locals.auth().userId) {
   return Astro.redirect("/");
@@ -13,6 +15,10 @@ const user = await Astro.locals.currentUser();
 if (!user) {
   return Astro.redirect("/");
 }
+
+const wisephones = await db.select().from(Wisephone).where(eq(Wisephone.userId, user.id));
+
+const derivedHasNoWisephone = wisephones.length === 0;
 
 const result = Astro.getActionResult(actions.wisephones.createWisephone);
 ---
@@ -31,73 +37,102 @@ const result = Astro.getActionResult(actions.wisephones.createWisephone);
     <Header activeTab="page" isProjectPublished={false} projectSlug={""} />
 
     <main class="py-12 flex flex-col gap-6">
-      <section
-        class="w-full flex flex-col items-center justify-center p-6 rounded-2xl bg-transparent border-2 border-slate-200"
-        x-show="!showForm"
-      >
-        <h1>Setup</h1>
-        <p class="m-0 text-center">Connect your Wisephone II to manage your device's experience.</p>
-        <button class="mt-8 btn btn-primary w-fit" @click="showForm = true">Get Started</button>
-      </section>
-      <section
-        class="w-full flex flex-col items-start justify-center p-6 rounded-2xl bg-white shadow"
-        x-show="showForm"
-        x-transition
-        x-cloak
-      >
-        <h1>Setup</h1>
-        <form method="POST" action={actions.wisephones.createWisephone} class="w-full flex flex-col gap-4">
-          <div class="form-control w-full">
-            <label class="label">
-              <span class="label-text">Wisephone II's IMEI (slot 1)</span>
-              <span class="label-text-alt">Required</span>
-            </label>
-            <input
-              type="text"
-              name="imei"
-              x-mask="999999999999999"
-              placeholder="350XXXXXXXXXXXX"
-              class="input input-bordered w-full"
-              required
-            />
-            <label class="label">
-              <span class="label-text text-slate-500 [&_strong]:text-slate-500">
-                On the WiseOS home screen, tap <strong>"Settings"</strong> &gt; tap <strong
-                  >"Open System Settings"</strong
-                > &gt; scroll to and tap <strong>"About phone"</strong> &gt; hold down on <strong
-                  >"IMEI (slot 1)"</strong
-                > to copy the number.
-              </span>
-            </label>
-          </div>
+      {
+        derivedHasNoWisephone ? (
+          <Fragment>
+            <section
+              class="w-full flex flex-col items-center justify-center p-6 rounded-2xl bg-transparent border-2 border-slate-200"
+              x-show="!showForm"
+            >
+              <h1>Setup</h1>
+              <p class="m-0 text-center">Connect your Wisephone II to manage your device's experience.</p>
+              <button class="mt-8 btn btn-primary w-fit" @click="showForm = true">
+                Get Started
+              </button>
+            </section>
+            <section
+              class="w-full flex flex-col items-start justify-center p-6 rounded-2xl bg-white shadow"
+              x-show="showForm"
+              x-transition
+              x-cloak
+            >
+              <h1>Setup</h1>
+              <form method="POST" action={actions.wisephones.createWisephone} class="w-full flex flex-col gap-4">
+                <div class="form-control w-full">
+                  <label class="label">
+                    <span class="label-text">Wisephone II's IMEI (slot 1)</span>
+                    <span class="label-text-alt">Required</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="imei"
+                    x-mask="999999999999999"
+                    placeholder="350XXXXXXXXXXXX"
+                    class="input input-bordered w-full"
+                    required
+                  />
+                  <label class="label">
+                    <span class="label-text text-slate-500 [&_strong]:text-slate-500">
+                      On the WiseOS home screen, tap <strong>"Settings"</strong> &gt; tap{" "}
+                      <strong>"Open System Settings"</strong> &gt; scroll to and tap <strong>"About phone"</strong> &gt;
+                      hold down on <strong>"IMEI (slot 1)"</strong> to copy the number.
+                    </span>
+                  </label>
+                </div>
 
-          <div class="form-control w-full">
-            <label class="label">
-              <span class="label-text">Phone Number</span>
-              <span class="label-text-alt">Required</span>
-            </label>
-            <input
-              type="text"
-              name="phoneNumber"
-              x-mask="999-999-9999"
-              placeholder="XXX-XXX-XXXX"
-              class="input input-bordered w-full"
-              required
-            />
-          </div>
+                <div class="form-control w-full">
+                  <label class="label">
+                    <span class="label-text">Phone Number</span>
+                    <span class="label-text-alt">Required</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="phoneNumber"
+                    x-mask="999-999-9999"
+                    placeholder="XXX-XXX-XXXX"
+                    class="input input-bordered w-full"
+                    required
+                  />
+                </div>
 
-          <div class="form-control w-full">
-            <label class="label">
-              <span class="label-text">Who is this device for?</span>
-            </label>
-            <input type="text" name="nickname" placeholder="John Doe" class="input input-bordered w-full" />
-          </div>
+                <div class="form-control w-full">
+                  <label class="label">
+                    <span class="label-text">Who is this device for?</span>
+                  </label>
+                  <input type="text" name="nickname" placeholder="John Doe" class="input input-bordered w-full" />
+                </div>
 
-          <input type="hidden" name="userId" value={user?.id} />
+                <input type="hidden" name="userId" value={user?.id} />
 
-          <button type="submit" class="btn btn-primary mt-4">Done</button>
-        </form>
-      </section>
+                <button type="submit" class="btn btn-primary mt-4">
+                  Done
+                </button>
+              </form>
+            </section>
+          </Fragment>
+        ) : (
+          <Fragment>
+            <h1 class="m-0 p-0">Your Devices</h1>
+            <section class="w-full flex flex-col items-center justify-center rounded-2xl bg-white shadow">
+              <ul class="m-0 p-0 w-full flex flex-col items-center justify-center rounded-2xl">
+                {wisephones.map((wisephone) => (
+                  <li class="m-0 p-0 py-4 px-6 w-full flex flex-row items-center justify-center [&:not(:last-child)]:border-b border-slate-200 hover:bg-slate-50 cursor-pointer active:scale-[98%] transition-all duration-150">
+                    <div class="flex flex-col w-full">
+                      <p class="p-0 m-0 font-semibold">{wisephone.nickname}</p>
+                      <p class="p-0 m-0 text-slate-500">{wisephone.phoneNumber}</p>
+                    </div>
+                    <Icon name="lucide:chevron-right" class="w-6 h-6" />
+                  </li>
+                ))}
+              </ul>
+            </section>
+            <button class="btn btn-ghost hover:bg-slate-200">
+              <Icon name="lucide:plus" class="w-6 h-6" />
+              Add Another Wisephone II
+            </button>
+          </Fragment>
+        )
+      }
     </main>
   </div>
 
