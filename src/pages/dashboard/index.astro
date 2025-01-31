@@ -1,5 +1,5 @@
 ---
-import "trix/dist/trix.css";
+import { actions } from "astro:actions";
 import Header from "@/components/Header.astro";
 import Layout from "@/layouts/Layout.astro";
 import Footer from "@/components/Footer.astro";
@@ -9,10 +9,25 @@ if (!Astro.locals.auth().userId) {
 }
 
 const user = await Astro.locals.currentUser();
+
+if (!user) {
+  return Astro.redirect("/");
+}
+
+const result = Astro.getActionResult(actions.wisephones.createWisephone);
 ---
 
 <Layout title="Dashboard">
-  <div class="prose p-6 container mx-auto" x-data="{ showForm: false }">
+  <div
+    class="prose p-6 container mx-auto"
+    x-data="{
+      showForm: false,
+    }"
+    x-init={`
+      toastErrorMessage = \`${result?.error?.message || ""}\`;
+      toastMessage = \`${result?.data?.success || ""}\`;
+    `}
+  >
     <Header activeTab="page" isProjectPublished={false} projectSlug={""} />
 
     <main class="py-12 flex flex-col gap-6">
@@ -31,7 +46,7 @@ const user = await Astro.locals.currentUser();
         x-cloak
       >
         <h1>Setup</h1>
-        <form method="POST" action="/api/wisephone" class="w-full flex flex-col gap-4">
+        <form method="POST" action={actions.wisephones.createWisephone} class="w-full flex flex-col gap-4">
           <div class="form-control w-full">
             <label class="label">
               <span class="label-text">Wisephone II's IMEI (slot 1)</span>
@@ -62,9 +77,10 @@ const user = await Astro.locals.currentUser();
               <span class="label-text-alt">Required</span>
             </label>
             <input
-              type="tel"
+              type="text"
               name="phoneNumber"
-              placeholder="+1-XXX-XXX-XXXX"
+              x-mask="999-999-9999"
+              placeholder="XXX-XXX-XXXX"
               class="input input-bordered w-full"
               required
             />
@@ -77,6 +93,8 @@ const user = await Astro.locals.currentUser();
             <input type="text" name="nickname" placeholder="John Doe" class="input input-bordered w-full" />
           </div>
 
+          <input type="hidden" name="userId" value={user?.id} />
+
           <button type="submit" class="btn btn-primary mt-4">Done</button>
         </form>
       </section>
@@ -85,86 +103,3 @@ const user = await Astro.locals.currentUser();
 
   <Footer showLogo={false} />
 </Layout>
-
-<script>
-  // @ts-ignore - no types available
-  import Trix from "trix";
-  import { setupKeyboardNavigation } from "../../libs/utils";
-
-  setupKeyboardNavigation();
-
-  type UploadInfo = {
-    id: string;
-    batchId: string;
-    asset_id: string;
-    public_id: string;
-    version: number;
-    version_id: string;
-    signature: string;
-    width: number;
-    height: number;
-    format: string;
-    resource_type: string;
-    created_at: string;
-    tags: string[];
-    bytes: number;
-    type: string;
-    etag: string;
-    placeholder: boolean;
-    url: string;
-    secure_url: string;
-    asset_folder: string;
-    display_name: string;
-    existing: boolean;
-    original_filename: string;
-    path: string;
-    thumbnail_url: string;
-  };
-
-  type UploadEvent = {
-    event: string;
-    info: UploadInfo;
-    UploadWidget: Record<string, unknown>;
-  };
-
-  document.addEventListener("trix-file-accept", function (event) {
-    event.preventDefault();
-  });
-
-  const widget = document.querySelector("#upload-banner");
-  const bannerImageIdInput = document.querySelector("#bannerImageId") as HTMLInputElement;
-  const bannerImageEl = document.querySelector("#bannerImageEl") as HTMLImageElement;
-  if (widget) {
-    widget.addEventListener("clduploadwidget:success", ((e: CustomEvent<UploadEvent>) => {
-      // Save the public_id to the hidden input
-      const publicId = e.detail.info.public_id;
-      if (bannerImageIdInput) {
-        bannerImageIdInput.value = publicId;
-        bannerImageIdInput.dispatchEvent(new Event("input", { bubbles: true }));
-      }
-
-      // Update the banner image
-      if (bannerImageEl) {
-        bannerImageEl.src = e.detail.info.url;
-      }
-    }) as EventListener);
-  }
-
-  const logoWidget = document.querySelector("#upload-logo");
-  const logoImageIdInput = document.querySelector("#logoImageId") as HTMLInputElement;
-  const logoImageEl = document.querySelector("#logoImageEl") as HTMLImageElement;
-  if (logoWidget) {
-    logoWidget.addEventListener("clduploadwidget:success", ((e: CustomEvent<UploadEvent>) => {
-      const publicId = e.detail.info.public_id;
-      if (logoImageIdInput) {
-        logoImageIdInput.value = publicId;
-        logoImageIdInput.dispatchEvent(new Event("input", { bubbles: true }));
-      }
-
-      // Update the logo image
-      if (logoImageEl) {
-        logoImageEl.src = e.detail.info.url;
-      }
-    }) as EventListener);
-  }
-</script>
