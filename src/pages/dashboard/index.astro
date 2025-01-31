@@ -12,18 +12,24 @@ const user = await Astro.locals.currentUser();
 ---
 
 <Layout title="Dashboard">
-  <div class="prose p-6 container mx-auto">
+  <div class="prose p-6 container mx-auto" x-data="{ showForm: false }">
     <Header activeTab="page" isProjectPublished={false} projectSlug={""} />
 
     <main class="py-12 flex flex-col gap-6">
       <section
         class="w-full flex flex-col items-center justify-center p-6 rounded-2xl bg-transparent border-2 border-slate-200"
+        x-show="!showForm"
       >
         <h1>Setup</h1>
         <p class="m-0 text-center">Connect your Wisephone II to manage your device's experience.</p>
-        <button class="mt-8 btn btn-primary w-fit">Get Started</button>
+        <button class="mt-8 btn btn-primary w-fit" @click="showForm = true">Get Started</button>
       </section>
-      <section class="w-full flex flex-col items-start justify-center p-6 rounded-2xl bg-white shadow">
+      <section
+        class="w-full flex flex-col items-start justify-center p-6 rounded-2xl bg-white shadow"
+        x-show="showForm"
+        x-transition
+        x-cloak
+      >
         <h1>Setup</h1>
         <form method="POST" action="/api/wisephone" class="w-full flex flex-col gap-4">
           <div class="form-control w-full">
@@ -39,7 +45,7 @@ const user = await Astro.locals.currentUser();
               required
             />
             <label class="label">
-              <span class="label-text text-slate-500">
+              <span class="label-text text-slate-500 [&_strong]:text-slate-500">
                 On the WiseOS home screen, tap <strong>"Settings"</strong> &gt; tap <strong
                   >"Open System Settings"</strong
                 > &gt; scroll to and tap <strong>"About phone"</strong> &gt; hold down on <strong
