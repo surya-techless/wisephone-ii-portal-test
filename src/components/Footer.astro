@@ -21,30 +21,22 @@ const isDashboard = Astro.url.pathname.startsWith("/dashboard");
     ) : null
   }
   <p class="py-0 mb-0 mt-4">
-    kit <em>(keep in touch)</em> © 2024 • a <a
-      class="text-inherit font-normal"
-      href="https://faith.tools"
-      target="_blank">faith.tools</a
-    > experiment
+    Wisephone, by Techless LLC © <span x-text="new Date().getFullYear()">2025</span>
   </p>
   <ul class="list-none p-0 m-0 flex gap-3 justify-center">
-    <li><a class="text-inherit font-normal" href="https://faith.tools/posts/terms" target="_blank">Terms</a></li>
     <li>
-      <a class="text-inherit font-normal" href="https://faith.tools/posts/privacy-policy" target="_blank">Privacy</a>
+      <a class="text-inherit font-normal" href="https://wisephone.com/policies/terms-of-service" target="_blank"
+        >Terms</a
+      >
     </li>
-    <li><a class="text-inherit font-normal" href="https://go.faith.tools/contact" target="_blank">Feedback</a></li>
     <li>
-      <a class="text-inherit font-normal" href="https://github.com/cameronapak/kit" target="_blank">Open Source</a>
+      <a class="text-inherit font-normal" href="https://wisephone.com/policies/privacy-policy" target="_blank"
+        >Privacy</a
+      >
     </li>
-    {
-      showHireCam ? (
-        <li>
-          <a class="text-inherit font-normal" href="https://cameronpak.com/freelance" target="_blank">
-            Hire Cam
-          </a>
-        </li>
-      ) : null
-    }
+    <li>
+      <a class="text-inherit font-normal" href="https://techless.zendesk.com/hc/en-us" target="_blank">Help Center</a>
+    </li>
     <SignInOrOpenDashboard isDashboard={isDashboard} server:defer />
   </ul>
 </footer>
