@@ -38,8 +38,9 @@ const user = await Astro.locals.currentUser();
               <span class="label-text-alt">Required</span>
             </label>
             <input
-              type="number"
+              type="text"
               name="imei"
+              x-mask="999999999999999"
               placeholder="350XXXXXXXXXXXX"
               class="input input-bordered w-full"
               required
