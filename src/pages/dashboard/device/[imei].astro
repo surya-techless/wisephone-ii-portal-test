@@ -1,5 +1,5 @@
 ---
-import { Wisephone, eq, db } from "astro:db";
+import { Wisephone, eq, db, Features } from "astro:db";
 import Layout from "@/layouts/Layout.astro";
 import Header from "@/components/Header.astro";
 
@@ -9,23 +9,48 @@ if (isNaN(Number(imei))) {
   return Astro.redirect("/dashboard");
 }
 
-const wisephone = await db
+const wisephones = await db
   .select()
   .from(Wisephone)
-  .where(eq(Wisephone.imei, Number(imei)));
+  .where(eq(Wisephone.imei, Number(imei)))
+  .limit(1);
 
-if (!wisephone) {
+const features = await db.select().from(Features);
+
+if (!wisephones || !wisephones.length) {
   return Astro.redirect("/dashboard");
 }
+
+const wisephone = wisephones[0];
 ---
 
 <Layout title="Device">
-  <div class="prose p-6 container mx-auto">
+  <div
+    class="prose p-6 container mx-auto"
+    x-data={`{
+      isAiEnabled: false,
+    }`}
+  >
     <Header activeTab="page" isProjectPublished={false} projectSlug={""} />
 
     <main class="py-12 flex flex-col gap-6">
-      <section class="flex flex-col gap-6">
-        {JSON.stringify(wisephone)}
+      <section class="not-prose flex flex-col gap-6">
+        <h2 class="text-2xl font-bold">{wisephone.nickname}</h2>
+        <ul class="list-item-container">
+          {
+            features.map((feature) => (
+              <li class="list-item bg-white shadow w-full">
+                <div class="w-full grid grid-cols-[1fr_auto] items-center justify-between gap-4">
+                  <div class="flex flex-col">
+                    <p>{feature.name}</p>
+                    <p class="text-sm text-gray-500">{feature.description}</p>
+                  </div>
+                  <input x-ref="aiToggle" type="checkbox" class="toggle pointer-events-none" x-model="isAiEnabled" />
+                </div>
+              </li>
+            ))
+          }
+        </ul>
       </section>
     </main>
   </div>
