@@ -1,44 +1,13 @@
 ---
 import { UserButton } from "@clerk/astro/components";
-import { Icon } from "astro-iconify";
 import Logo from "@/components/Logo.astro";
-
-interface Props {
-  activeTab: "page" | "posts" | "contacts";
-  projectSlug?: string;
-  isProjectPublished?: boolean;
-}
-
-const { activeTab, projectSlug, isProjectPublished }: Props = Astro.props;
 ---
 
 <header class="not-prose flex flex-col gap-6 w-full">
-  <div class="grid max-sm:grid-cols-2 grid-cols-3">
+  <div class="grid grid-cols-2">
     <Logo />
 
-    <div
-      role="tablist"
-      class="max-sm:hidden grid grid-cols-3 justify-self-center self-center not-prose tabs tabs-boxed w-fit bg-slate-200"
-    >
-      <a role="tab" href="/dashboard" class={`tab ${activeTab === "page" ? "tab-active" : ""}`}>Page</a>
-      <a role="tab" href="/dashboard/posts" class={`tab ${activeTab === "posts" ? "tab-active" : ""}`}>Posts</a>
-      <a role="tab" href="/dashboard/contacts" class={`tab ${activeTab === "contacts" ? "tab-active" : ""}`}>Contacts</a
-      >
-    </div>
-
     <div class="flex justify-self-end self-center gap-2 items-center">
-      {
-        projectSlug && isProjectPublished ? (
-          <a
-            class="flex btn btn-sm shrink-0 btn-outline border-slate-200 hover:bg-slate-200 hover:text-slate-900 hover:border-slate-300 border-2 shadow-none"
-            href={`/app/${projectSlug}`}
-            target="_blank"
-          >
-            <Icon pack="lucide" name="globe" height={16} width={16} class="shrink-0" />
-            View Site
-          </a>
-        ) : null
-      }
       <div class="relative bg-slate-200 h-8 w-8 rounded-full">
         <div
           x-cloak
@@ -53,13 +22,5 @@ const { activeTab, projectSlug, isProjectPublished }: Props = Astro.props;
         </div>
       </div>
     </div>
-  </div>
-  <div
-    role="tablist"
-    class="sm:hidden w-full grid grid-cols-3 justify-self-center self-center not-prose tabs tabs-boxed w-fit bg-slate-200"
-  >
-    <a role="tab" href="/dashboard" class={`tab ${activeTab === "page" ? "tab-active" : ""}`}>Page</a>
-    <a role="tab" href="/dashboard/posts" class={`tab ${activeTab === "posts" ? "tab-active" : ""}`}>Posts</a>
-    <a role="tab" href="/dashboard/contacts" class={`tab ${activeTab === "contacts" ? "tab-active" : ""}`}>Contacts</a>
   </div>
 </header>

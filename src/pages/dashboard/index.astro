@@ -15,596 +15,109 @@ if (!Astro.locals.auth().userId) {
 }
 
 const user = await Astro.locals.currentUser();
-const projects = await db
-  .select()
-  .from(Projects)
-  .where(eq(Projects.userId, user?.id || ""))
-  .limit(1);
-
-let project = projects[0];
-
-// If no project exists, create one
-if (!project && user) {
-  const uuid = crypto.randomUUID();
-  const formData = new FormData();
-  formData.append("title", "My Project");
-  formData.append("content", "Write about your project...");
-  formData.append("userId", user.id);
-  formData.append("authors", user?.fullName || user?.firstName || "John Doe");
-  formData.append("slug", uuid);
-
-  const { data, error } = await Astro.callAction(actions.projects.createProject, formData);
-
-  if (error) {
-    console.error("Failed to create project:", error);
-  } else {
-    project = data.project;
-  }
-}
-
-// Handle form submission result
-const result = Astro.getActionResult(actions.projects.updateProject);
-
-if (result?.data?.project && result?.data?.success) {
-  project = result.data.project;
-}
-
-const bannerImageUrl = getCldImageUrl({
-  src: project?.bannerImageId || "",
-  width: 1200,
-  crop: "fill",
-  format: "webp"
-});
-
-const logoImageUrl = getCldImageUrl({
-  src: project?.logoImageId || "",
-  width: 256,
-  crop: "fill",
-  format: "webp"
-});
-
-// Create QR code for the project
-const qrCode = renderSVG(Astro.url.origin + `/app/${project?.slug}`);
 ---
 
 <Layout title="Dashboard">
-  <div
-    x-data={`{
-      svg: \`${qrCode}\`,
-      downloadQRCode() {
-        const blob = new Blob([this.svg], { type: 'image/svg+xml' });
-        const url = URL.createObjectURL(blob);
-
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = 'qr-code.svg';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-
-        URL.revokeObjectURL(url);
-      },
-      handleCopy() {
-        const url = \`${Astro.url.origin}/app/${project?.slug}\`;
-        navigator.clipboard.writeText(url).then(() => {
-          toastMessage = "Copied to clipboard!";
-        }).catch((err) => {
-          console.error('Failed to copy text: ', err);
-        });
-      },
-      async handleShare() {
-        try {
-          await navigator.share({
-            title: this.title,
-            url: window.location.origin + \`/app/${project?.slug}\`
-          });
-        } catch (error) {
-          console.error("Error sharing post:", error);
-        }
-      },
-      authors: \`${project?.authors || ""}\`,
-      projectId: \`${project?.id || ""}\`,
-      title: \`${project?.title || ""}\`,
-      slug: \`${project?.slug || ""}\`,
-      callToActionText: \`${project?.callToActionText || ""}\`,
-      callToActionUrl: \`${project?.callToActionUrl || ""}\`,
-      maxLength: 100,
-      get previewUrl() {
-        return '/app/' + this.slug;
-      },
-      showSlugInput: false,
-      handleSlugClick() {
-        if (confirm("Would you like to update your path? Do this at your own risk.")) {
-          this.showSlugInput = true;
-        }
-      },
-      formChanged: false,
-      initialFormData: {},
-      checkFormChanges() {
-        const currentFormData = {
-          title: this.title,
-          slug: this.slug,
-          authors: this.authors,
-          content: $refs.contentInputEl?.value || '',
-          bannerImageId: $refs.bannerImageIdInputEl?.value || '',
-          logoImageId: $refs.logoImageIdInputEl?.value || '',
-          youtubeVideoUrl: this.youtubeVideoUrl,
-          callToActionUrl: this.callToActionUrl,
-          callToActionText: this.callToActionText
-        };
-        this.formChanged = JSON.stringify(currentFormData) !== JSON.stringify(this.initialFormData);
-      },
-      init() {
-        this.initialFormData = {
-          title: this.title,
-          slug: this.slug,
-          authors: this.authors,
-          content: $refs.contentInputEl?.value || '',
-          bannerImageId: $refs.bannerImageIdInputEl?.value || '',
-          logoImageId: $refs.logoImageIdInputEl?.value || '',
-          youtubeVideoUrl: this.youtubeVideoUrl,
-          callToActionUrl: this.callToActionUrl,
-          callToActionText: this.callToActionText
-        };
-
-        // This allows the path input to animate in.
-        setTimeout(() => {
-          this.showSlugInput = ${!Boolean(project?.isPublished || false)};
-        }, 500);
-
-        $el.removeAttribute('x-data');
-      }
-    }`}
-    x-init={`
-      toastErrorMessage = \`${result?.error?.message || ""}\`;
-      toastMessage = \`${result?.data?.success || ""}\`;
-    `}
-    class="prose p-6 container mx-auto"
-  >
-    <dialog x-ref="qrCodeModal" id="qrCodeCanvas" class="modal">
-      <div class="modal-box bg-white flex flex-col gap-6 p-6 max-w-md">
-        <div class="flex flex-col gap-2">
-          <div class="max-sm:flex-col flex items-center justify-between">
-            <h2 class="text-2xl font-bold my-0 items-center w-full">
-              <Icon pack="lucide" name="qr-code" class="max-sm:w-6 max-sm:h-6 w-8 h-8 inline-block mr-1 align-top" />
-              <span>QR Code</span>
-            </h2>
-            <button @click="downloadQRCode()" class="max-sm:w-full btn btn-sm btn-primary"> Download </button>
-          </div>
-          <p class="m-0">Use this QR code to easily share your project.</p>
-        </div>
-        <div set:html={qrCode} />
-      </div>
-      <form method="dialog" class="modal-backdrop">
-        <button>close</button>
-      </form>
-    </dialog>
-
-    <Header activeTab="page" isProjectPublished={project?.isPublished} projectSlug={project?.slug} />
+  <div class="prose p-6 container mx-auto">
+    <Header activeTab="page" isProjectPublished={false} projectSlug={""} />
 
     <main class="py-12 flex flex-col gap-6">
-      <section class="w-full flex flex-col gap-6">
-        {
-          project?.isPublished ? (
-            <div
-              x-init="setTimeout(() => $el.classList.add('-rotate-1'), 200)"
-              role="alert"
-              class="mb-6 alert text-white bg-cyan-700 flex flex-col gap-4 transition-translate duration-500 ease-in-out border-none rounded-2xl"
-            >
-              <div class="grid grid-cols-[auto_1fr] items-center gap-2 w-full">
-                <Icon pack="lucide" name="check-circle" height={20} width={20} class="shrink-0" />
-                <p class="w-full text-left m-0 p-0 font-bold">{project?.title} is live!</p>
-              </div>
-              <div class="grid grid-cols-[1fr_auto_auto] items-center gap-2 w-full">
-                <div class="grid grid-cols-[1fr_auto] items-center gap-2 w-full pr-0 input border-none bg-cyan-800 shadow-inner text-cyan-50">
-                  <input
-                    type="text"
-                    value={Astro.url.origin + `/app/${project?.slug}`}
-                    readonly
-                    class="w-full h-full outline-none bg-transparent active:outline-none border-none"
-                    @click="$el.select()"
-                  />
-                  <button @click="handleSlugClick()" class="btn btn-md btn-ghost">
-                    <Icon pack="lucide" name="pencil" height={16} width={16} class="shrink-0" />
-                  </button>
-                </div>
-                <div>
-                  <button @click="handleShare()" class="btn btn-md btn-secondary">
-                    <Icon pack="lucide" name="share" height={16} width={16} class="shrink-0" />
-                  </button>
-                  <button @click="handleCopy()" class="btn btn-md btn-ghost">
-                    <Icon pack="lucide" name="copy" height={16} width={16} class="shrink-0" />
-                  </button>
-                </div>
-                <button @click="$refs.qrCodeModal.showModal()" class="btn btn-md btn-ghost">
-                  <Icon pack="lucide" name="qr-code" height={16} width={16} class="shrink-0" />
-                </button>
-              </div>
-            </div>
-          ) : (
-            <section class="w-full bg-slate-200 p-6 rounded-2xl">
-              <h2 class="text-slate-600 flex items-center gap-2">
-                <Icon pack="lucide" name="pencil-ruler" height={24} width={24} />
-                Draft
-              </h2>
-              <p class="text-slate-500 max-w-md m-0">
-                Publishing your project will make it live on the web. But, before you do, make sure you save any
-                changes.
-              </p>
-            </section>
-          )
-        }
-
-        <form
-          x-ref="form"
-          method="POST"
-          action={actions.projects.updateProject}
-          @submit="formChanged = false"
-          @change.debounce.500ms="checkFormChanges()"
-        >
-          <div class="p-6 rounded-2xl bg-white w-full shadow flex flex-col gap-12">
-            <div x-cloak x-show="showSlugInput" x-collapse>
-              <h2 class="text-slate-700 !mb-0">Path</h2>
-              <p class="text-slate-500 m-0">
-                This is the path that will be used to access your project. It can be changed at any time, but use
-                caution, as this will change the URL of your project.
-              </p>
-              <p class="text-sm m-0 my-4 text-slate-500 flex items-baseline gap-1">
-                kit.faith.tools/app/<span class="inline-block badge text-slate-800 line-clamp-1" x-text="slug || '-'">
-                  {project?.slug || "-"}
-                </span>
-              </p>
-              <input
-                name="slug"
-                x-model="slug"
-                value={project?.slug || ""}
-                @input="slug = $event.target.value.toLowerCase().replace(/\\s+/g, '-').replace(/[^a-z0-9-]/g, '')"
-                type="text"
-                class="input text-xl input-lg input-bordered w-full rounded-lg bg-white"
-                required
-                maxlength="100"
-                placeholder="example-project-name"
-              />
-              <p x-show="showSlugInput" class="text-xs text-slate-500 mt-2 mb-0">
-                <span x-text="slug.length">{project?.slug?.length || 0}</span>/<span x-text="maxLength">100</span> characters
-              </p>
-            </div>
-
-            <input type="hidden" name="id" value={project?.id} />
-            <input type="hidden" name="webhookUrl" value={project?.webhookUrl || ""} />
-
-            <div>
-              <h2 class="text-slate-700">Logo</h2>
-              <p class="text-slate-500">Logo or app icon at 1:1 aspect ratio.</p>
-              <CldUploadWidget
-                id="upload-logo"
-                uploadPreset="ml_default"
-                options={{
-                  sources: ["local"],
-                  multiple: false,
-                  maxFiles: 1,
-                  cropping: true,
-                  croppingAspectRatio: 1 / 1,
-                  folder: user?.id || "default"
-                }}
-              >
-                <button type="button" class="w-full">
-                  <img
-                    id="logoImageEl"
-                    src={logoImageUrl || "/assets/square-placeholder.svg"}
-                    alt=""
-                    class="max-h-32 max-w-32 my-0 rounded-xl border-2 border-slate-200 aspect-square object-cover object-center w-full"
-                  />
-                </button>
-              </CldUploadWidget>
-            </div>
-
-            <div
-              x-data={`{
-                youtubeVideoUrl: '${project?.youtubeVideoUrl || ""}',
-                shouldShowYouTubeVideoInput: ${Boolean(project?.youtubeVideoUrl || false)},
-                validateYouTubeVideoUrl(url) {
-                  if (url.includes("youtube.com") || url.includes("youtu.be") && url.includes("v=")) {
-                    return true;
-                  }
-
-                  return false;
-                },
-                get youtubeVideoId() {
-                  if (!this.youtubeVideoUrl) {
-                    return '';
-                  }
-
-                  const url = new URL(this.youtubeVideoUrl);
-
-                  return url.searchParams.get("v");
-                }
-              }`}
-            >
-              <h2 class="text-slate-700">Banner</h2>
-              <CldUploadWidget
-                id="upload-banner"
-                uploadPreset="ml_default"
-                options={{
-                  sources: ["local"],
-                  multiple: false,
-                  maxFiles: 1,
-                  cropping: true,
-                  croppingAspectRatio: 16 / 9,
-                  folder: user?.id || "default"
-                }}
-              >
-                <button type="button" class="w-full" :class="youtubeVideoUrl ? 'hidden' : ''">
-                  <img
-                    id="bannerImageEl"
-                    src={bannerImageUrl || "/assets/placeholder.svg"}
-                    alt=""
-                    class="my-0 rounded-xl border-2 border-slate-200 aspect-video object-cover object-center w-full"
-                  />
-                </button>
-              </CldUploadWidget>
-              <!-- YouTube Embed Iframe -->
-              <div x-show="youtubeVideoUrl" x-cloak class="mb-2">
-                <iframe
-                  class="my-0 rounded-xl border-2 border-slate-200 aspect-video object-cover object-center w-full"
-                  width="100%"
-                  height="100%"
-                  x-bind:src="'https://www.youtube.com/embed/' + youtubeVideoId"
-                  frameborder="0"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowfullscreen></iframe>
-              </div>
-              <input
-                x-ref="bannerImageIdInputEl"
-                type="hidden"
-                name="bannerImageId"
-                @input="formChanged = true"
-                id="bannerImageId"
-                value={project?.bannerImageId || ""}
-              />
-              <input
-                x-ref="logoImageIdInputEl"
-                type="hidden"
-                name="logoImageId"
-                id="logoImageId"
-                @input="formChanged = true"
-                value={project?.logoImageId || ""}
-              />
-
-              <div x-collapse x-cloak x-show="shouldShowYouTubeVideoInput" class="mt-4 flex flex-col gap-2">
-                <div class="grid grid-cols-[1fr_auto] gap-2 items-center">
-                  <input
-                    class="input input-bordered w-full rounded-lg bg-white"
-                    x-bind:type="shouldShowYouTubeVideoInput ? 'text' : 'hidden'"
-                    name="youtubeVideoUrl"
-                    id="youtubeVideoUrl"
-                    placeholder="https://www.youtube.com/watch?v=dQw4w9WgXcQ"
-                    x-model="youtubeVideoUrl"
-                  />
-                  <button
-                    type="button"
-                    @click="youtubeVideoUrl = ''; shouldShowYouTubeVideoInput = false"
-                    class="btn btn-md btn-ghost btn-circle"
-                  >
-                    <Icon pack="lucide" name="x" height={24} width={24} />
-                  </button>
-                </div>
-                <p class="text-slate-500 text-sm mt-2">
-                  Given the video is set, it will be used instead of your banner image.
-                </p>
-              </div>
-
-              <button
-                type="button"
-                x-show="!shouldShowYouTubeVideoInput"
-                class="mt-4 btn btn-sm btn-outline border-slate-200 hover:bg-slate-200 hover:text-slate-900 hover:border-slate-300 border-2 shadow-none"
-                @click="shouldShowYouTubeVideoInput = true"
-              >
-                Or, paste a YouTube video URL
-              </button>
-            </div>
-
-            <div>
-              <h2 class="text-slate-700 !mb-0">Name of Project</h2>
-              <p class="text-slate-500">This can be changed at any time.</p>
-              <div>
-                <input
-                  name="title"
-                  x-model="title"
-                  @input="title = $event.target.value.slice(0, maxLength)"
-                  type="text"
-                  class="input text-xl input-lg input-bordered w-full rounded-lg bg-white"
-                  required
-                  maxlength="100"
-                />
-                <p class="text-xs text-slate-500 mt-2 mb-0">
-                  <span x-text="title.length"></span>/<span x-text="maxLength"></span> characters
-                </p>
-              </div>
-            </div>
-
-            <div>
-              <h2 class="text-slate-700 !mb-0">Author(s)</h2>
-              <p class="text-slate-500">You can set this as yourself, a team, or a company.</p>
-              <div>
-                <input
-                  name="authors"
-                  x-model="authors"
-                  type="text"
-                  class="input text-xl input-lg input-bordered w-full rounded-lg bg-white"
-                  required
-                  maxlength="256"
-                  placeholder="Jane Doe & John Doe"
-                />
-              </div>
-            </div>
-
-            <div>
-              <h2 class="text-slate-700">Description</h2>
-              <input id="x" x-ref="contentInputEl" value={project?.content || ""} type="hidden" name="content" />
-              <trix-editor @input.debounce.500ms="checkFormChanges()" class="text-xl px-6 py-4" input="x"></trix-editor>
-            </div>
-
-            <div>
-              <h2 class="text-slate-700 !mb-0">Call to Action</h2>
-              <p class="text-slate-500 m-0">Set up a call-to-action button for your project page.</p>
-              <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                <label class="form-control w-full max-w-xs">
-                  <div class="label">
-                    <span class="label-text">Button Text</span>
-                  </div>
-                  <input
-                    type="text"
-                    id="callToActionText"
-                    name="callToActionText"
-                    x-model="callToActionText"
-                    class="input text-xl input-lg input-bordered w-full rounded-lg bg-white"
-                    placeholder="Learn More"
-                    value={project?.callToActionText || ""}
-                  />
-                </label>
-
-                <label class="form-control w-full max-w-xs">
-                  <div class="label">
-                    <span class="label-text">Button URL</span>
-                  </div>
-                  <input
-                    type="url"
-                    id="callToActionUrl"
-                    name="callToActionUrl"
-                    x-model="callToActionUrl"
-                    class="input text-xl input-lg input-bordered w-full rounded-lg bg-white"
-                    placeholder="https://example.com"
-                    value={project?.callToActionUrl || ""}
-                  />
-                </label>
-              </div>
-            </div>
-
-            <div class="flex gap-2">
-              <button x-bind:disabled="!formChanged" type="submit" class="btn btn-primary">Save Changes</button>
-              {
-                project?.isPublished ? (
-                  <button
-                    @click="confirm('Are you sure you want to unpublish this project?') ? $refs.unpublishForm.submit() : null"
-                    type="button"
-                    class="btn btn-ghost hover:bg-slate-200 hover:text-red-700"
-                    x-bind:disabled="formChanged"
-                  >
-                    Unpublish
-                  </button>
-                ) : (
-                  <button
-                    @click="confirm('Are you sure you want to publish this project?') ? $refs.publishForm.submit() : null"
-                    type="button"
-                    class="btn btn-secondary shadow-none border-slate-100 hover:border-slate-200 bg-slate-100 hover:bg-slate-200"
-                    x-bind:disabled="formChanged"
-                  >
-                    Publish Site
-                  </button>
-                )
-              }
-            </div>
-          </div>
-        </form>
+      <section class="w-full flex flex-col gap-2">
+        <h1 class="text-2xl font-bold">Your Wisephone</h1>
+        <section class="w-full flex flex-col gap-6 p-6 rounded-2xl bg-white shadow">
+          <h2 class="text-xl font-bold">Your Projects</h2>
+          <p class="text-sm text-gray-500">View and manage your projects here.</p>
+        </section>
+        <section class="w-full flex flex-col gap-6 p-6 rounded-2xl bg-transparent border-2 border-slate-200">
+          <h2 class="text-xl font-bold">Add a Wisephone II</h2>
+          <p class="text-sm text-gray-500">View and manage your projects here.</p>
+        </section>
       </section>
     </main>
-
-    {
-      project?.isPublished ? (
-        <form x-ref="unpublishForm" action={actions.projects.unpublishProject} method="POST">
-          <input type="hidden" name="id" value={project?.id} />
-        </form>
-      ) : (
-        <form x-ref="publishForm" action={actions.projects.publishProject} method="POST">
-          <input type="hidden" name="id" value={project?.id} />
-        </form>
-      )
-    }
-
-    <Footer />
   </div>
 
-  <script>
-    // @ts-ignore - no types available
-    import Trix from "trix";
-    import { setupKeyboardNavigation } from "../../libs/utils";
-
-    setupKeyboardNavigation();
-
-    type UploadInfo = {
-      id: string;
-      batchId: string;
-      asset_id: string;
-      public_id: string;
-      version: number;
-      version_id: string;
-      signature: string;
-      width: number;
-      height: number;
-      format: string;
-      resource_type: string;
-      created_at: string;
-      tags: string[];
-      bytes: number;
-      type: string;
-      etag: string;
-      placeholder: boolean;
-      url: string;
-      secure_url: string;
-      asset_folder: string;
-      display_name: string;
-      existing: boolean;
-      original_filename: string;
-      path: string;
-      thumbnail_url: string;
-    };
-
-    type UploadEvent = {
-      event: string;
-      info: UploadInfo;
-      UploadWidget: Record<string, unknown>;
-    };
-
-    document.addEventListener("trix-file-accept", function (event) {
-      event.preventDefault();
-    });
-
-    const widget = document.querySelector("#upload-banner");
-    const bannerImageIdInput = document.querySelector("#bannerImageId") as HTMLInputElement;
-    const bannerImageEl = document.querySelector("#bannerImageEl") as HTMLImageElement;
-    if (widget) {
-      widget.addEventListener("clduploadwidget:success", ((e: CustomEvent<UploadEvent>) => {
-        // Save the public_id to the hidden input
-        const publicId = e.detail.info.public_id;
-        if (bannerImageIdInput) {
-          bannerImageIdInput.value = publicId;
-          bannerImageIdInput.dispatchEvent(new Event("input", { bubbles: true }));
-        }
-
-        // Update the banner image
-        if (bannerImageEl) {
-          bannerImageEl.src = e.detail.info.url;
-        }
-      }) as EventListener);
-    }
-
-    const logoWidget = document.querySelector("#upload-logo");
-    const logoImageIdInput = document.querySelector("#logoImageId") as HTMLInputElement;
-    const logoImageEl = document.querySelector("#logoImageEl") as HTMLImageElement;
-    if (logoWidget) {
-      logoWidget.addEventListener("clduploadwidget:success", ((e: CustomEvent<UploadEvent>) => {
-        const publicId = e.detail.info.public_id;
-        if (logoImageIdInput) {
-          logoImageIdInput.value = publicId;
-          logoImageIdInput.dispatchEvent(new Event("input", { bubbles: true }));
-        }
-
-        // Update the logo image
-        if (logoImageEl) {
-          logoImageEl.src = e.detail.info.url;
-        }
-      }) as EventListener);
-    }
-  </script>
+  <Footer />
 </Layout>
+
+<script>
+  // @ts-ignore - no types available
+  import Trix from "trix";
+  import { setupKeyboardNavigation } from "../../libs/utils";
+
+  setupKeyboardNavigation();
+
+  type UploadInfo = {
+    id: string;
+    batchId: string;
+    asset_id: string;
+    public_id: string;
+    version: number;
+    version_id: string;
+    signature: string;
+    width: number;
+    height: number;
+    format: string;
+    resource_type: string;
+    created_at: string;
+    tags: string[];
+    bytes: number;
+    type: string;
+    etag: string;
+    placeholder: boolean;
+    url: string;
+    secure_url: string;
+    asset_folder: string;
+    display_name: string;
+    existing: boolean;
+    original_filename: string;
+    path: string;
+    thumbnail_url: string;
+  };
+
+  type UploadEvent = {
+    event: string;
+    info: UploadInfo;
+    UploadWidget: Record<string, unknown>;
+  };
+
+  document.addEventListener("trix-file-accept", function (event) {
+    event.preventDefault();
+  });
+
+  const widget = document.querySelector("#upload-banner");
+  const bannerImageIdInput = document.querySelector("#bannerImageId") as HTMLInputElement;
+  const bannerImageEl = document.querySelector("#bannerImageEl") as HTMLImageElement;
+  if (widget) {
+    widget.addEventListener("clduploadwidget:success", ((e: CustomEvent<UploadEvent>) => {
+      // Save the public_id to the hidden input
+      const publicId = e.detail.info.public_id;
+      if (bannerImageIdInput) {
+        bannerImageIdInput.value = publicId;
+        bannerImageIdInput.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+
+      // Update the banner image
+      if (bannerImageEl) {
+        bannerImageEl.src = e.detail.info.url;
+      }
+    }) as EventListener);
+  }
+
+  const logoWidget = document.querySelector("#upload-logo");
+  const logoImageIdInput = document.querySelector("#logoImageId") as HTMLInputElement;
+  const logoImageEl = document.querySelector("#logoImageEl") as HTMLImageElement;
+  if (logoWidget) {
+    logoWidget.addEventListener("clduploadwidget:success", ((e: CustomEvent<UploadEvent>) => {
+      const publicId = e.detail.info.public_id;
+      if (logoImageIdInput) {
+        logoImageIdInput.value = publicId;
+        logoImageIdInput.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+
+      // Update the logo image
+      if (logoImageEl) {
+        logoImageEl.src = e.detail.info.url;
+      }
+    }) as EventListener);
+  }
+</script>
