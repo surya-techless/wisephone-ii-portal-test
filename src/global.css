@@ -43,7 +43,11 @@ trix-toolbar .trix-button {
   border: none;
 }
 
-trix-toolbar .trix-button-group, trix-editor, input[type="text"] {
+trix-toolbar .trix-button-group,
+trix-editor,
+input[type="text"],
+input[type="number"],
+input[type="tel"] {
   @apply border-2 border-slate-200 rounded-lg;
 }
 
@@ -71,7 +75,6 @@ trix-toolbar [data-trix-attribute="quote"] {
 [data-floating-ui-portal] button.cl-formButtonPrimary {
   @apply rounded-full;
 }
-
 
 .btn-primary {
   @apply text-white;

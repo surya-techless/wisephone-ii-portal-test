@@ -19,12 +19,11 @@ export default {
           secondary: "#f5f5f4",
           accent: "#6d28d9",
           neutral: "#d1d5db",
-          "base-100": "#f3f4f6",
+          "base-100": "#FFFFFF",
           info: "#a5f3fc",
           success: "#86efac",
           warning: "#fca5a5",
-          error: "#fb7185",
-          "--rounded-btn": "99px"
+          error: "#fb7185"
         }
       }
     ]
