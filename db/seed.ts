@@ -5,8 +5,8 @@ export default async function seed() {
   await db.insert(Wisephone).values([
     {
       imei: 350256485931533,
-      nickname: "Cam's Wisephone II",
-      phoneNumber: "+14052060654",
+      nickname: "Cam Pak",
+      phoneNumber: "405-206-0654",
       userId: "user_2sLc5BX4F7qRUklqQ2UTUJXSipf" // Cam's Clerk ID
     }
   ]);
@@ -17,8 +17,7 @@ export default async function seed() {
       lucideIcon: "wrench",
       isEnabled: true,
       name: "Enable Tool Drawer",
-      description:
-        "Get access to safe, vetted third-party apps that are tools to help you get a job done. Need a ride? There's Uber. Owe a friend? There's Cash App. Apps in the Tool Drawer are free from social media, internet browsers, pornography, games, and shopping to keep you safe and help you have a healthier relationship with technology."
+      description: "Get access to safe, vetted third-party apps that are tools to help you get a job done."
     },
     {
       isEnabled: true,

@@ -1,7 +1,30 @@
-/* Add CSS styles below. */
-.example-class {
-  /* You can even apply Tailwind classes here. */
-  @apply bg-red-500 text-white;
+:root {
+  /* WiseOS Colors — Akin to Samsung One UI */
+  --surface-primary: #f6f6f8;
+  --surface-secondary: #fcfcfe;
+  --surface-tertiary: #e9e9eb;
+  --text-primary: #010101;
+  --text-secondary: #88878c;
+  --toggle-default: #9a999d;
+  --toggle-checked: #4978f7;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* --surface-primary: #18181A; */
+    --surface-primary: #010101;
+    /* --surface-secondary: #2C2C30; */
+    --surface-secondary: #171719;
+    --surface-tertiary: #3a3a3c;
+    --text-primary: #eeeeee;
+    --text-secondary: #949398;
+    --toggle-default: #5e5d61;
+    --toggle-checked: #4878f7;
+  }
+}
+
+* {
+  @apply shrink-0 select-none;
 }
 
 [x-cloak] {
@@ -78,4 +101,34 @@ trix-toolbar [data-trix-attribute="quote"] {
 
 .btn-primary {
   @apply text-white;
+}
+
+ul.list-item-container {
+  @apply rounded-3xl bg-[var(--surface-secondary)] border border-[var(--surface-secondary)];
+}
+
+li.list-item {
+  @apply bg-[var(--surface-secondary)] transition-transform py-4 px-6 text-base border-b border-[var(--surface-tertiary)];
+}
+
+li.list-item:first-child {
+  @apply rounded-t-2xl;
+}
+
+li.list-item:active {
+  @apply scale-[98%] bg-[var(--surface-tertiary)];
+}
+
+li.list-item:last-child {
+  @apply border-b-0 rounded-b-2xl;
+}
+
+.toggle {
+  --tglbg: var(--toggle-default);
+  @apply text-white border-[var(--tglbg)];
+}
+
+.toggle:checked {
+  --tglbg: var(--toggle-checked);
+  @apply text-white border-[var(--tglbg)];
 }
