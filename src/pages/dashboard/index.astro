@@ -1,11 +1,5 @@
 ---
 import "trix/dist/trix.css";
-import { CldUploadWidget } from "astro-cloudinary";
-import { getCldImageUrl } from "astro-cloudinary/helpers";
-import { db, Projects, eq } from "astro:db";
-import { actions } from "astro:actions";
-import { renderSVG } from "uqr";
-import Icon from "astro-iconify";
 import Header from "@/components/Header.astro";
 import Layout from "@/layouts/Layout.astro";
 import Footer from "@/components/Footer.astro";
@@ -22,21 +16,67 @@ const user = await Astro.locals.currentUser();
     <Header activeTab="page" isProjectPublished={false} projectSlug={""} />
 
     <main class="py-12 flex flex-col gap-6">
-      <section class="w-full flex flex-col gap-2">
-        <h1 class="text-2xl font-bold">Your Wisephone</h1>
-        <section class="w-full flex flex-col gap-6 p-6 rounded-2xl bg-white shadow">
-          <h2 class="text-xl font-bold">Your Projects</h2>
-          <p class="text-sm text-gray-500">View and manage your projects here.</p>
-        </section>
-        <section class="w-full flex flex-col gap-6 p-6 rounded-2xl bg-transparent border-2 border-slate-200">
-          <h2 class="text-xl font-bold">Add a Wisephone II</h2>
-          <p class="text-sm text-gray-500">View and manage your projects here.</p>
-        </section>
+      <section
+        class="w-full flex flex-col items-center justify-center p-6 rounded-2xl bg-transparent border-2 border-slate-200"
+      >
+        <h1>Setup</h1>
+        <p class="m-0 text-center">Connect your Wisephone II to manage your device's experience.</p>
+        <button class="mt-8 btn btn-primary w-fit">Get Started</button>
+      </section>
+      <section class="w-full flex flex-col items-start justify-center p-6 rounded-2xl bg-white shadow">
+        <h1>Setup</h1>
+        <form method="POST" action="/api/wisephone" class="w-full flex flex-col gap-4">
+          <div class="form-control w-full">
+            <label class="label">
+              <span class="label-text">Wisephone II's IMEI (slot 1)</span>
+              <span class="label-text-alt">Required</span>
+            </label>
+            <input
+              type="number"
+              name="imei"
+              placeholder="350XXXXXXXXXXXX"
+              class="input input-bordered w-full"
+              required
+            />
+            <label class="label">
+              <span class="label-text text-slate-500">
+                On the WiseOS home screen, tap <strong>"Settings"</strong> &gt; tap <strong
+                  >"Open System Settings"</strong
+                > &gt; scroll to and tap <strong>"About phone"</strong> &gt; hold down on <strong
+                  >"IMEI (slot 1)"</strong
+                > to copy the number.
+              </span>
+            </label>
+          </div>
+
+          <div class="form-control w-full">
+            <label class="label">
+              <span class="label-text">Phone Number</span>
+              <span class="label-text-alt">Required</span>
+            </label>
+            <input
+              type="tel"
+              name="phoneNumber"
+              placeholder="+1-XXX-XXX-XXXX"
+              class="input input-bordered w-full"
+              required
+            />
+          </div>
+
+          <div class="form-control w-full">
+            <label class="label">
+              <span class="label-text">Who is this device for?</span>
+            </label>
+            <input type="text" name="nickname" placeholder="John Doe" class="input input-bordered w-full" />
+          </div>
+
+          <button type="submit" class="btn btn-primary mt-4">Add Device</button>
+        </form>
       </section>
     </main>
   </div>
 
-  <Footer />
+  <Footer showLogo={false} />
 </Layout>
 
 <script>
