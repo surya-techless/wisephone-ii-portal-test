@@ -1,11 +1,5 @@
-import { leads } from './leads';
-import { posts } from './posts';
-import { projects } from './projects';
-import { pageView } from './pageView';
+import { wisephones } from "./wisephones";
 
 export const server = {
-  leads,
-  posts,
-  projects,
-  pageView
-}
+  wisephones
+};
