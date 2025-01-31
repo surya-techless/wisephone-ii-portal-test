@@ -1,0 +1,32 @@
+---
+import { Wisephone, eq, db } from "astro:db";
+import Layout from "@/layouts/Layout.astro";
+import Header from "@/components/Header.astro";
+
+const { imei } = Astro.params;
+
+if (isNaN(Number(imei))) {
+  return Astro.redirect("/dashboard");
+}
+
+const wisephone = await db
+  .select()
+  .from(Wisephone)
+  .where(eq(Wisephone.imei, Number(imei)));
+
+if (!wisephone) {
+  return Astro.redirect("/dashboard");
+}
+---
+
+<Layout title="Device">
+  <div class="prose p-6 container mx-auto">
+    <Header activeTab="page" isProjectPublished={false} projectSlug={""} />
+
+    <main class="py-12 flex flex-col gap-6">
+      <section class="flex flex-col gap-6">
+        {JSON.stringify(wisephone)}
+      </section>
+    </main>
+  </div>
+</Layout>
