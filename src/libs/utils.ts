@@ -24,12 +24,14 @@ export const setupKeyboardNavigation = () => {
   });
 };
 
-type Feature = {
+export type Feature = {
   knoxManageId: string;
   lucideIcon: string;
   isEnabled: boolean;
   name: string;
   description: string;
+  enableMessage: string;
+  disableMessage: string;
 };
 
 export const FEATURES: Record<string, Feature> = {
@@ -38,7 +40,10 @@ export const FEATURES: Record<string, Feature> = {
     lucideIcon: "wrench",
     isEnabled: true,
     name: "Enable Tool Drawer",
-    description: "Get access to safe, vetted third-party apps that are tools to help you get a job done."
+    description: "Get access to safe, vetted third-party apps that are tools to help you get a job done.",
+    enableMessage: "I acknowledge turning on this feature will allow access to third-party apps on this device.",
+    disableMessage:
+      "I acknowledge turning off this feature will remove access to third-party apps on this device. Any installed third-party apps will be uninstalled."
   },
   FAITH_TOOLS: {
     isEnabled: true,
@@ -46,13 +51,18 @@ export const FEATURES: Record<string, Feature> = {
     lucideIcon: "fish-symbol",
     name: "Enable faith.tools",
     description:
-      "Get access to your favorite faith-based apps on the Tool Drawer, like the YouVersion Bible app and Hallow Prayer app."
+      "Get access to your favorite faith-based apps on the Tool Drawer, like the YouVersion Bible app and Hallow Prayer app.",
+    enableMessage: "I acknowledge turning on this feature allows access to faith-based apps on this device.",
+    disableMessage:
+      "I acknowledge turning off this feature will remove access to faith-based apps on this device. Any installed faith-based apps will be uninstalled."
   },
   NO_HOTSPOT: {
     isEnabled: true,
     knoxManageId: "f463ade53b1f43f5bf2f540a99395c2d",
     lucideIcon: "signal",
     name: "Disable Hotspot",
-    description: "Disable the hotspot feature on your device."
+    description: "Disable the hotspot feature on your device.",
+    enableMessage: "I acknowledge turning on this feature disables the hotspot feature on this device.",
+    disableMessage: "I acknowledge turning off this feature allows hotspot to be used on this device."
   }
 };

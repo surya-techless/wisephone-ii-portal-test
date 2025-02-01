@@ -2,6 +2,7 @@
 import { Wisephone, eq, db, Features } from "astro:db";
 import Layout from "@/layouts/Layout.astro";
 import Header from "@/components/Header.astro";
+import { FEATURES } from "@/libs/utils";
 
 const { imei } = Astro.params;
 
@@ -15,7 +16,7 @@ const wisephones = await db
   .where(eq(Wisephone.imei, Number(imei)))
   .limit(1);
 
-const features = await db.select().from(Features);
+const features = Object.values(FEATURES);
 
 if (!wisephones || !wisephones.length) {
   return Astro.redirect("/dashboard");
@@ -43,7 +44,11 @@ const wisephone = wisephones[0];
               <li
                 class="list-item bg-white shadow w-full"
                 role="button"
+                @click="toggleFeature(feature, getSwitchElement())"
                 x-data={`{
+                  getSwitchElement() {
+                    return this.$refs.switch;
+                  },
                   feature: ${JSON.stringify(feature, null, 2)},
                 }`}
               >
@@ -55,7 +60,7 @@ const wisephone = wisephones[0];
                   <div class="relative h-[24px]">
                     <input
                       x-bind:class="isLoading ? 'pointer-events-none' : ''"
-                      x-ref="aiToggle"
+                      x-ref="switch"
                       type="checkbox"
                       class="toggle pointer-events-none"
                       x-bind:checked="isFeatureEnabled(feature.knoxManageId)"
@@ -78,6 +83,7 @@ const wisephone = wisephones[0];
 
 <script>
   import Alpine from "alpinejs";
+  import { type Feature } from "@/libs/utils";
 
   Alpine.data("device", () => ({
     isAiEnabled: false,
@@ -95,6 +101,26 @@ const wisephone = wisephones[0];
       const res = await fetch(url, { method: "GET" });
       const features = await res.json();
       this.features = features;
+    },
+    async toggleFeature(feature: Feature, switchElement: HTMLInputElement) {
+      const isEnabled = this.isFeatureEnabled(feature.knoxManageId);
+      if (!confirm(isEnabled ? feature.disableMessage : feature.enableMessage)) {
+        return;
+      }
+
+      switchElement.checked = !switchElement.checked;
+      const url = new URL(`/api/samsung-knox.json`, window.location.origin);
+
+      if (this.isFeatureEnabled(feature.knoxManageId)) {
+        url.searchParams.set("action", "remove-feature");
+      } else {
+        url.searchParams.set("action", "apply-feature");
+      }
+
+      url.searchParams.set("imei", this.imei);
+      url.searchParams.set("knoxManageId", feature.knoxManageId);
+
+      await fetch(url, { method: "POST" });
     },
     async init() {
       this.$watch("imei", async () => {

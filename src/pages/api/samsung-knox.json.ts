@@ -43,33 +43,33 @@ export const GET: APIRoute = async ({ params, request }) => {
 };
 
 export const POST: APIRoute = async ({ request }) => {
-  const data = await request.json();
+  const url = new URL(request.url);
+  const action = url.searchParams.get("action");
+  const imei = url.searchParams.get("imei");
+  const knoxManageId = url.searchParams.get("knoxManageId");
+
+  if (!imei || !knoxManageId) {
+    return new Response(JSON.stringify({ error: "IMEI and groupId are required" }), { status: 400 });
+  }
 
   try {
-    switch (data.action) {
-      case "apply-feature":
-        return new Response(
-          JSON.stringify({
-            result: await SamsungKnoxService.applyFeature(data.groupId, data.imei)
-          }),
-          { status: 200 }
-        );
-
-      case "remove-feature":
-        return new Response(
-          JSON.stringify({
-            result: await SamsungKnoxService.removeFeature(data.groupId, data.imei)
-          }),
-          { status: 200 }
-        );
-
-      default:
+    switch (action) {
+      case "apply-feature": {
+        const response = await SamsungKnoxService.applyFeature(knoxManageId, imei);
+        return new Response(JSON.stringify(response), { status: 200 });
+      }
+      case "remove-feature": {
+        const response = await SamsungKnoxService.removeFeature(knoxManageId, imei);
+        return new Response(JSON.stringify(response), { status: 200 });
+      }
+      default: {
         return new Response(
           JSON.stringify({
             error: "Invalid action parameter"
           }),
           { status: 400 }
         );
+      }
     }
   } catch (error) {
     return new Response(
