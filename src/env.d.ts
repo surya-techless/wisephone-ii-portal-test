@@ -47,6 +47,8 @@ interface ImportMetaEnv {
   readonly PUBLIC_ASSETS_DIRECTORY: string;
   /** https://groq.com/ */
   readonly GROQ_API_KEY: string;
+  readonly KNOX_CLIENT_ID: string;
+  readonly KNOX_CLIENT_SECRET: string;
 }
 
 interface ImportMeta {
