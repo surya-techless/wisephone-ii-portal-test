@@ -24,7 +24,15 @@ export const setupKeyboardNavigation = () => {
   });
 };
 
-export const FEATURES = {
+type Feature = {
+  knoxManageId: string;
+  lucideIcon: string;
+  isEnabled: boolean;
+  name: string;
+  description: string;
+};
+
+export const FEATURES: Record<string, Feature> = {
   TOOL_DRAWER: {
     knoxManageId: "300830f61c574b9db37dabbae1e79aa9",
     lucideIcon: "wrench",
