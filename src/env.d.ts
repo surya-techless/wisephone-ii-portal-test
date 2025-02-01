@@ -47,8 +47,12 @@ interface ImportMetaEnv {
   readonly PUBLIC_ASSETS_DIRECTORY: string;
   /** https://groq.com/ */
   readonly GROQ_API_KEY: string;
+  /** https://docs.samsungknox.com/dev/knox-manage/api */
   readonly KNOX_CLIENT_ID: string;
+  /** https://docs.samsungknox.com/dev/knox-manage/api */
   readonly KNOX_CLIENT_SECRET: string;
+  /** https://docs.samsungknox.com/dev/knox-manage/api */
+  readonly KNOX_REGION: string;
 }
 
 interface ImportMeta {
