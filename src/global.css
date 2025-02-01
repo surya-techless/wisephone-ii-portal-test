@@ -9,20 +9,6 @@
   --toggle-checked: #4978f7;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    /* --surface-primary: #18181A; */
-    --surface-primary: #010101;
-    /* --surface-secondary: #2C2C30; */
-    --surface-secondary: #171719;
-    --surface-tertiary: #3a3a3c;
-    --text-primary: #eeeeee;
-    --text-secondary: #949398;
-    --toggle-default: #5e5d61;
-    --toggle-checked: #4878f7;
-  }
-}
-
 * {
   @apply shrink-0 select-none;
 }
