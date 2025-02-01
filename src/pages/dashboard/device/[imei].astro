@@ -43,6 +43,7 @@ if (isSubscribedText.includes("bypass") || isSubscribedText.includes("is subscri
     x-data="device"
     x-init={`
       imei = "${imei}";
+      isSubscribed = ${isSubscribed};
     `}
   >
     <Header activeTab="page" isProjectPublished={false} projectSlug={""} />
@@ -57,24 +58,39 @@ if (isSubscribedText.includes("bypass") || isSubscribedText.includes("is subscri
           <h1 class="text-3xl font-bold">Features</h1>
           <p class="text-slate-500 inline-flex items-baseline gap-2">
             {wisephone.nickname} • {wisephone.phoneNumber}
-            {
-              isSubscribed ? (
-                <div class="tooltip tooltip-bottom" data-tip="This device has an active Techless Subscription.">
-                  <div class="ms-2 badge bg-slate-200 badge-ghost gap-2 pe-4">
-                    <Icon name="lucide:check" class="w-4 h-4" />
-                    Subscribed
-                  </div>
-                </div>
-              ) : null
-            }
+
+            <span class="inline-flex items-center gap-1" x-show="isSubscribed" x-cloak x-transition>
+              <Icon name="lucide:check" class="w-4 h-4" />
+              • Subscribed
+            </span>
+
+            <a
+              x-show="!isSubscribed"
+              x-cloak
+              x-transition
+              target="_blank"
+              href="https://wisephone.com/pages/activate"
+              class="link font-medium text-slate-800"
+            >
+              Activate Subscription
+            </a>
           </p>
         </div>
+
+        <div
+          class="alert bg-slate-200 border-slate-300 text-slate-800 -rotate-1 hover:rotate-0 transition-transform duration-150"
+        >
+          <Icon name="lucide:info" class="w-4 h-4" />
+          <p>Activate a Techless Subscription to update this device's features.</p>
+        </div>
+
         <ul class="list-item-container">
           {
             features.map((feature) => (
               <li
                 class="list-item bg-white shadow w-full"
                 role="button"
+                x-bind:class="{ 'pointer-events-none': isLoading, 'opacity-50': !isSubscribed }"
                 @click="toggleFeature(feature, getSwitchElement())"
                 x-data={`{
                   getSwitchElement() {
@@ -90,7 +106,6 @@ if (isSubscribedText.includes("bypass") || isSubscribedText.includes("is subscri
                   </div>
                   <div class="relative h-[24px]">
                     <input
-                      x-bind:class="isLoading ? 'pointer-events-none' : ''"
                       x-ref="switch"
                       type="checkbox"
                       class="toggle pointer-events-none"
@@ -120,6 +135,7 @@ if (isSubscribedText.includes("bypass") || isSubscribedText.includes("is subscri
     isAiEnabled: false,
     features: [] as string[],
     imei: "",
+    isSubscribed: false,
     isFeatureEnabled(knoxManageId: string) {
       return this.features.includes(knoxManageId);
     },
@@ -134,6 +150,11 @@ if (isSubscribedText.includes("bypass") || isSubscribedText.includes("is subscri
       this.features = features;
     },
     async toggleFeature(feature: Feature, switchElement: HTMLInputElement) {
+      if (!this.isSubscribed) {
+        alert("Oops! You must have an active Techless Subscription to enable features.");
+        return;
+      }
+
       const isEnabled = this.isFeatureEnabled(feature.knoxManageId);
       if (!confirm(isEnabled ? feature.disableMessage : feature.enableMessage)) {
         return;
