@@ -1,5 +1,6 @@
 ---
 import { Wisephone, eq, db, Features } from "astro:db";
+import Icon from "astro-iconify";
 import Layout from "@/layouts/Layout.astro";
 import Header from "@/components/Header.astro";
 import { FEATURES } from "@/libs/utils";
@@ -37,7 +38,14 @@ const wisephone = wisephones[0];
 
     <main class="py-12 flex flex-col gap-6">
       <section class="not-prose flex flex-col gap-6">
-        <h2 class="text-2xl font-bold">{wisephone.nickname}</h2>
+        <div>
+          <a href="/dashboard" class="w-fit btn btn-link p-0 text-slate-500 no-underline">
+            <Icon name="lucide:arrow-left" class="w-4 h-4" />
+            Devices
+          </a>
+          <h1 class="text-3xl font-bold">Features</h1>
+          <p class="text-slate-500">{wisephone.nickname} • {wisephone.phoneNumber}</p>
+        </div>
         <ul class="list-item-container">
           {
             features.map((feature) => (
