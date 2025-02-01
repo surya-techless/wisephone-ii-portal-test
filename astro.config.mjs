@@ -1,4 +1,4 @@
-import { defineConfig } from "astro/config";
+import { defineConfig, envField } from "astro/config";
 import tailwind from "@astrojs/tailwind";
 import alpinejs from "@astrojs/alpinejs";
 import netlify from "@astrojs/netlify";
@@ -44,6 +44,13 @@ export default defineConfig({
   output: "server",
   adapter: netlify(),
   experimental: {
-    serverIslands: true
+    serverIslands: true,
+    env: {
+      schema: {
+        KNOX_REGION: envField.string({ context: "server", access: "public" }),
+        KNOX_CLIENT_ID: envField.string({ context: "server", access: "secret" }),
+        KNOX_CLIENT_SECRET: envField.string({ context: "server", access: "secret" })
+      }
+    }
   }
 });
