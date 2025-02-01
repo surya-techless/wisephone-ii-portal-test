@@ -60,8 +60,8 @@ if (isSubscribedText.includes("bypass") || isSubscribedText.includes("is subscri
             {wisephone.nickname} • {wisephone.phoneNumber}
 
             <span class="inline-flex items-center gap-1" x-show="isSubscribed" x-cloak x-transition>
-              <Icon name="lucide:check" class="w-4 h-4" />
-              • Subscribed
+              • <Icon name="lucide:check" class="w-4 h-4" />
+              Subscribed
             </span>
 
             <a
@@ -78,6 +78,9 @@ if (isSubscribedText.includes("bypass") || isSubscribedText.includes("is subscri
         </div>
 
         <div
+          x-show="!isSubscribed"
+          x-cloak
+          x-transition
           class="alert bg-slate-200 border-slate-300 text-slate-800 -rotate-1 hover:rotate-0 transition-transform duration-150"
         >
           <Icon name="lucide:info" class="w-4 h-4" />
