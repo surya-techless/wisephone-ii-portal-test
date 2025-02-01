@@ -3,6 +3,7 @@ import { Wisephone, eq, db, Features } from "astro:db";
 import Icon from "astro-iconify";
 import Layout from "@/layouts/Layout.astro";
 import Header from "@/components/Header.astro";
+import Footer from "@/components/Footer.astro";
 import { FEATURES } from "@/libs/utils";
 
 const { imei } = Astro.params;
@@ -127,6 +128,10 @@ if (isSubscribedText.includes("bypass") || isSubscribedText.includes("is subscri
         </ul>
       </section>
     </main>
+  </div>
+
+  <div class="mb-12">
+    <Footer showLogo={false} />
   </div>
 </Layout>
 
