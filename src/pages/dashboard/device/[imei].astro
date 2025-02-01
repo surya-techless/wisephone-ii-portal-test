@@ -27,9 +27,10 @@ const wisephone = wisephones[0];
 <Layout title="Device">
   <div
     class="prose p-6 container mx-auto"
-    x-data={`{
-      isAiEnabled: false,
-    }`}
+    x-data="device"
+    x-init={`
+      imei = "${imei}";
+    `}
   >
     <Header activeTab="page" isProjectPublished={false} projectSlug={""} />
 
@@ -39,8 +40,14 @@ const wisephone = wisephones[0];
         <ul class="list-item-container">
           {
             features.map((feature) => (
-              <li class="list-item bg-white shadow w-full">
-                <div class="w-full grid grid-cols-[1fr_auto] items-center justify-between gap-4">
+              <li
+                class="list-item bg-white shadow w-full"
+                role="button"
+                x-data={`{
+                  feature: ${JSON.stringify(feature, null, 2)},
+                }`}
+              >
+                <div class="w-full grid grid-cols-[1fr_auto] items-center justify-between gap-6">
                   <div class="flex flex-col">
                     <p>{feature.name}</p>
                     <p class="text-sm text-gray-500">{feature.description}</p>
@@ -55,3 +62,30 @@ const wisephone = wisephones[0];
     </main>
   </div>
 </Layout>
+
+<script>
+  import Alpine from "alpinejs";
+
+  Alpine.data("device", () => ({
+    isAiEnabled: false,
+    features: [] as string[],
+    imei: "",
+    async init() {
+      this.$watch("imei", async () => {
+        const url = new URL(`/api/samsung-knox.json`, window.location.origin);
+        url.searchParams.set("action", "get-device-groups");
+        url.searchParams.set("imei", this.imei);
+        console.log(url);
+        const res = await fetch(url, {
+          method: "GET"
+        });
+
+        const data = await res.json();
+
+        console.log(data);
+
+        this.features = data.groups;
+      });
+    }
+  }));
+</script>

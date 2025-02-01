@@ -1,74 +1,53 @@
+import { KNOX_CLIENT_SECRET, KNOX_CLIENT_ID, KNOX_REGION } from "astro:env/server";
+
 export class SamsungKnoxService {
-  private static instance: SamsungKnoxService | null = null;
-  private token: string | null = null;
-  private tokenExpiry: number | null = null;
-  private region: string | null = null;
-  private clientId: string | null = null;
-  private clientSecret: string | null = null;
-
-  private constructor(region: string, clientId: string, clientSecret: string) {
-    this.region = region;
-    this.clientId = clientId;
-    this.clientSecret = clientSecret;
-  }
-
-  public static getInstance({
-    region,
-    clientId,
-    clientSecret
-  }: {
-    region: string;
-    clientId: string;
-    clientSecret: string;
-  }): SamsungKnoxService {
-    if (!SamsungKnoxService.instance) {
-      SamsungKnoxService.instance = new SamsungKnoxService(region, clientId, clientSecret);
-    }
-    return SamsungKnoxService.instance;
-  }
+  private static token: string | null = null;
+  private static tokenExpiry: number | null = null;
 
   /**
    * Get a Knox token. This token is used to authenticate requests to the Knox API.
    * Token renews every 900 seconds (15 minutes).
    * @returns Knox token
    */
-  public async getKnoxToken(): Promise<string> {
+  public static async getKnoxToken(): Promise<string> {
     const now = Math.floor(Date.now() / 1000);
-    if (this.token && this.tokenExpiry && now < this.tokenExpiry) {
-      return this.token;
+    if (SamsungKnoxService.token && SamsungKnoxService.tokenExpiry && now < SamsungKnoxService.tokenExpiry) {
+      return SamsungKnoxService.token;
     }
 
-    const apiUrl = `https://${this.region}.manage.samsungknox.com/emm/oauth/token`;
+    const apiUrl = `https://${KNOX_REGION}.manage.samsungknox.com/emm/oauth/token`;
 
-    const response = await fetch(apiUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded"
-      },
-      body: new URLSearchParams({
-        grant_type: "client_credentials",
-        client_id: this.clientId ?? "",
-        client_secret: this.clientSecret ?? ""
-      })
-    });
+    try {
+      const response = await fetch(apiUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded"
+        },
+        body: new URLSearchParams({
+          grant_type: "client_credentials",
+          client_id: KNOX_CLIENT_ID,
+          client_secret: KNOX_CLIENT_SECRET
+        })
+      });
 
-    if (!response.ok) {
+      if (!response.ok) {
+        throw new Error("Failed to get Knox token");
+      }
+
+      const data = (await response.json()) as { access_token: string };
+
+      if (!data.access_token) {
+        throw new Error("Failed to get Knox token");
+      }
+
+      return data.access_token;
+    } catch (error) {
+      console.error(error);
       throw new Error("Failed to get Knox token");
     }
-
-    const data = (await response.json()) as { access_token: string };
-
-    if (!data.access_token) {
-      throw new Error("Failed to get Knox token");
-    }
-
-    this.token = data.access_token;
-    this.tokenExpiry = now + 900;
-
-    return this.token;
   }
 
-  public async applyFeature(
+  public static async applyFeature(
     groupId: string,
     imei: string = "",
     applyProfile: boolean = true
@@ -83,7 +62,7 @@ export class SamsungKnoxService {
       ...(imei && { userIds: imei })
     });
 
-    const apiUrl = `https://${this.region}.manage.samsungknox.com/emm/oapi/group/insertGroupUnits`;
+    const apiUrl = `https://${KNOX_REGION}.manage.samsungknox.com/emm/oapi/group/insertGroupUnits`;
 
     const response = await fetch(apiUrl, {
       method: "POST",
@@ -102,12 +81,12 @@ export class SamsungKnoxService {
     return response.json();
   }
 
-  public async removeFeature(
+  public static async removeFeature(
     groupId: string,
     imei: string = "",
     applyProfile: boolean = true
   ): Promise<Record<string, any> | null> {
-    const apiUrl = `https://${this.region}.manage.samsungknox.com/emm/oapi/group/deleteGroupUnits`;
+    const apiUrl = `https://${KNOX_REGION}.manage.samsungknox.com/emm/oapi/group/deleteGroupUnits`;
 
     const response = await fetch(apiUrl, {
       method: "POST",
@@ -130,8 +109,8 @@ export class SamsungKnoxService {
     return response.json();
   }
 
-  public async selectGroups(): Promise<Record<string, any> | null> {
-    const apiUrl = `https://${this.region}.manage.samsungknox.com/emm/oapi/group/selectGroups`;
+  public static async selectGroups(): Promise<Record<string, any> | null> {
+    const apiUrl = `https://${KNOX_REGION}.manage.samsungknox.com/emm/oapi/group/selectGroups`;
 
     const response = await fetch(apiUrl, {
       headers: {
@@ -148,7 +127,7 @@ export class SamsungKnoxService {
     return response.json();
   }
 
-  public async getListOfFeatures(): Promise<Record<string, string>> {
+  public static async getListOfFeatures(): Promise<Record<string, string>> {
     const groups = await this.selectGroups();
     const simpleGroups: Record<string, string> = {};
 
@@ -161,8 +140,8 @@ export class SamsungKnoxService {
     return simpleGroups;
   }
 
-  public async getGroupsForDevice(imei: string): Promise<string[]> {
-    const apiUrl = `https://${this.region}.manage.samsungknox.com/emm/oapi/device/selectDeviceInfoByImei`;
+  public static async getGroupsForDevice(imei: string): Promise<string[]> {
+    const apiUrl = `https://${KNOX_REGION}.manage.samsungknox.com/emm/oapi/device/selectDeviceInfoByImei`;
 
     const response = await fetch(apiUrl, {
       method: "POST",

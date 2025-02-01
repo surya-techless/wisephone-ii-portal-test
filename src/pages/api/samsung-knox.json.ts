@@ -1,13 +1,5 @@
 import type { APIRoute } from "astro";
 import { SamsungKnoxService } from "@/libs/samsung-knox-service";
-import { KNOX_REGION, KNOX_CLIENT_ID, KNOX_CLIENT_SECRET } from "astro:env/server";
-
-const getKnoxService = () =>
-  SamsungKnoxService.getInstance({
-    region: KNOX_REGION,
-    clientId: KNOX_CLIENT_ID,
-    clientSecret: KNOX_CLIENT_SECRET
-  });
 
 export const GET: APIRoute = async ({ params, request }) => {
   const url = new URL(request.url);
@@ -19,16 +11,19 @@ export const GET: APIRoute = async ({ params, request }) => {
       case "get-token":
         return new Response(
           JSON.stringify({
-            token: await getKnoxService().getKnoxToken()
+            token: await SamsungKnoxService.getKnoxToken()
           }),
           { status: 200 }
         );
 
       case "get-device-groups":
-        if (!imei) throw new Error("IMEI parameter required");
+        if (!imei) {
+          throw new Error("IMEI parameter required");
+        }
+
         return new Response(
           JSON.stringify({
-            groups: await getKnoxService().getGroupsForDevice(imei)
+            result: await SamsungKnoxService.getGroupsForDevice(imei)
           }),
           { status: 200 }
         );
@@ -59,7 +54,7 @@ export const POST: APIRoute = async ({ request }) => {
       case "apply-feature":
         return new Response(
           JSON.stringify({
-            result: await getKnoxService().applyFeature(data.groupId, data.imei)
+            result: await SamsungKnoxService.applyFeature(data.groupId, data.imei)
           }),
           { status: 200 }
         );
@@ -67,7 +62,7 @@ export const POST: APIRoute = async ({ request }) => {
       case "remove-feature":
         return new Response(
           JSON.stringify({
-            result: await getKnoxService().removeFeature(data.groupId, data.imei)
+            result: await SamsungKnoxService.removeFeature(data.groupId, data.imei)
           }),
           { status: 200 }
         );
