@@ -22,7 +22,17 @@ const isDashboard = Astro.url.pathname.startsWith("/dashboard");
   <p class="py-0 mb-0 mt-4">
     Wisephone, by Techless LLC © <span x-text="new Date().getFullYear()">2025</span>
   </p>
-  <ul class="list-none p-0 m-0 flex gap-3 justify-center">
+  <ul class="list-none p-0 m-0 flex gap-3 flex-wrap justify-center">
+    <li>
+      <a class="text-inherit font-normal" href="https://getwisephone.com/my-subscription" target="_blank">
+        Techless Subscription
+      </a>
+    </li>
+    <li>
+      <a class="text-inherit font-normal" href="https://plans.techless.com/" target="_blank"> Techless Carrier Plan </a>
+    </li>
+  </ul>
+  <ul class="list-none p-0 m-0 flex gap-3 flex-wrap justify-center">
     <li>
       <a class="text-inherit font-normal" href="https://wisephone.com/policies/terms-of-service" target="_blank"
         >Terms</a
