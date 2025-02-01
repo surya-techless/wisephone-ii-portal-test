@@ -111,7 +111,7 @@ const result = Astro.getActionResult(actions.wisephones.createWisephone);
 
           <div class="form-control w-full">
             <label class="label">
-              <span class="label-text">Phone Number</span>
+              <span class="label-text">Wisephone II's Phone Number</span>
               <span class="label-text-alt">Required</span>
             </label>
             <input
@@ -126,9 +126,10 @@ const result = Astro.getActionResult(actions.wisephones.createWisephone);
 
           <div class="form-control w-full">
             <label class="label">
-              <span class="label-text">Who is this device for?</span>
+              <span class="label-text">Who is this Wisephone II for?</span>
+              <span class="label-text-alt">Required</span>
             </label>
-            <input type="text" name="nickname" placeholder="John Doe" class="input input-bordered w-full" />
+            <input type="text" name="nickname" placeholder="John Doe" class="input input-bordered w-full" required />
           </div>
 
           <input type="hidden" name="userId" value={user?.id} />
