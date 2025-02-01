@@ -17,7 +17,6 @@ if (!user) {
 }
 
 const wisephones = await db.select().from(Wisephone).where(eq(Wisephone.userId, user.id));
-
 const derivedHasNoWisephone = wisephones.length === 0;
 
 const result = Astro.getActionResult(actions.wisephones.createWisephone);

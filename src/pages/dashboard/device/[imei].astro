@@ -24,6 +24,17 @@ if (!wisephones || !wisephones.length) {
 }
 
 const wisephone = wisephones[0];
+
+const subscribedUrl = new URL(`/webhook-is-user-subscribed`, "https://cameronpak-wisephoneii.web.val.run");
+subscribedUrl.searchParams.set("phoneNumber", wisephone.phoneNumber);
+subscribedUrl.searchParams.set("imei", String(wisephone.imei));
+
+const result = await fetch(subscribedUrl, { method: "GET" });
+const isSubscribedText = await result.text();
+let isSubscribed = false;
+if (isSubscribedText.includes("bypass") || isSubscribedText.includes("is subscribed")) {
+  isSubscribed = true;
+}
 ---
 
 <Layout title="Device">
@@ -44,7 +55,19 @@ const wisephone = wisephones[0];
             Devices
           </a>
           <h1 class="text-3xl font-bold">Features</h1>
-          <p class="text-slate-500">{wisephone.nickname} • {wisephone.phoneNumber}</p>
+          <p class="text-slate-500 inline-flex items-baseline gap-2">
+            {wisephone.nickname} • {wisephone.phoneNumber}
+            {
+              isSubscribed ? (
+                <div class="tooltip tooltip-bottom" data-tip="This device has an active Techless Subscription.">
+                  <div class="ms-2 badge bg-slate-200 badge-ghost gap-2 pe-4">
+                    <Icon name="lucide:check" class="w-4 h-4" />
+                    Subscribed
+                  </div>
+                </div>
+              ) : null
+            }
+          </p>
         </div>
         <ul class="list-item-container">
           {
