@@ -13,8 +13,7 @@ export class SamsungKnoxService {
       return this.token;
     }
 
-    const region = "us03";
-    const apiUrl = `https://${region}.manage.samsungknox.com/emm/oauth/token`;
+    const apiUrl = `https://${import.meta.env.KNOX_REGION}.manage.samsungknox.com/emm/oauth/token`;
 
     const response = await fetch(apiUrl, {
       method: "POST",
@@ -57,8 +56,7 @@ export class SamsungKnoxService {
       ...(imei && { userIds: imei })
     });
 
-    const region = "us03";
-    const apiUrl = `https://${region}.manage.samsungknox.com/emm/oapi/group/insertGroupUnits`;
+    const apiUrl = `https://${import.meta.env.KNOX_REGION}.manage.samsungknox.com/emm/oapi/group/insertGroupUnits`;
 
     const response = await fetch(apiUrl, {
       method: "POST",
@@ -82,8 +80,7 @@ export class SamsungKnoxService {
     imei: string = "",
     applyProfile: boolean = true
   ): Promise<Record<string, any> | null> {
-    const region = "us03";
-    const apiUrl = `https://${region}.manage.samsungknox.com/emm/oapi/group/deleteGroupUnits`;
+    const apiUrl = `https://${import.meta.env.KNOX_REGION}.manage.samsungknox.com/emm/oapi/group/deleteGroupUnits`;
 
     const response = await fetch(apiUrl, {
       method: "POST",
@@ -107,8 +104,7 @@ export class SamsungKnoxService {
   }
 
   public static async selectGroups(): Promise<Record<string, any> | null> {
-    const region = "us03";
-    const apiUrl = `https://${region}.manage.samsungknox.com/emm/oapi/group/selectGroups`;
+    const apiUrl = `https://${import.meta.env.KNOX_REGION}.manage.samsungknox.com/emm/oapi/group/selectGroups`;
 
     const response = await fetch(apiUrl, {
       headers: {
@@ -139,8 +135,7 @@ export class SamsungKnoxService {
   }
 
   public static async getGroupsForDevice(imei: string): Promise<string[]> {
-    const region = "us03";
-    const apiUrl = `https://${region}.manage.samsungknox.com/emm/oapi/device/selectDeviceInfoByImei`;
+    const apiUrl = `https://${import.meta.env.KNOX_REGION}.manage.samsungknox.com/emm/oapi/device/selectDeviceInfoByImei`;
 
     const response = await fetch(apiUrl, {
       method: "POST",
