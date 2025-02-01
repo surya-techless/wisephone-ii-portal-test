@@ -2,7 +2,7 @@
 const isSignedIn = Astro.locals.auth().userId;
 ---
 
-<script define:vars={{ isSignedIn }}>
+<script is:inline define:vars={{ isSignedIn }}>
   if (isSignedIn) {
     window.location.href = "/dashboard";
   }

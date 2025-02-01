@@ -1,7 +1,8 @@
 import type { APIRoute } from "astro";
 import { SamsungKnoxService } from "@/libs/samsung-knox-service";
 
-export const GET: APIRoute = async ({ params, request }) => {
+export const GET: APIRoute = async (props) => {
+  const { request } = props;
   const url = new URL(request.url);
   const action = url.searchParams.get("action");
   const imei = url.searchParams.get("imei");
