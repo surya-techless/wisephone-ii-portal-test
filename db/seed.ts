@@ -1,5 +1,5 @@
 import { db, Features, Wisephone } from "astro:db";
-import { WISEPHONE_FEATURES } from "../src/libs/utils";
+import { FEATURES } from "../src/libs/utils";
 
 // https://astro.build/db/seed
 export default async function seed() {
@@ -12,5 +12,5 @@ export default async function seed() {
     }
   ]);
 
-  await db.insert(Features).values(WISEPHONE_FEATURES);
+  await db.insert(Features).values(Object.values(FEATURES));
 }

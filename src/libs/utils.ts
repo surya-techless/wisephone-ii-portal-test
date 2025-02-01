@@ -24,15 +24,15 @@ export const setupKeyboardNavigation = () => {
   });
 };
 
-export const WISEPHONE_FEATURES = [
-  {
+export const FEATURES = {
+  TOOL_DRAWER: {
     knoxManageId: "300830f61c574b9db37dabbae1e79aa9",
     lucideIcon: "wrench",
     isEnabled: true,
     name: "Enable Tool Drawer",
     description: "Get access to safe, vetted third-party apps that are tools to help you get a job done."
   },
-  {
+  FAITH_TOOLS: {
     isEnabled: true,
     knoxManageId: "5ae84219a2ea4372a42f9da57c00d325",
     lucideIcon: "fish-symbol",
@@ -40,11 +40,11 @@ export const WISEPHONE_FEATURES = [
     description:
       "Get access to your favorite faith-based apps on the Tool Drawer, like the YouVersion Bible app and Hallow Prayer app."
   },
-  {
+  NO_HOTSPOT: {
     isEnabled: true,
     knoxManageId: "f463ade53b1f43f5bf2f540a99395c2d",
     lucideIcon: "signal",
     name: "Disable Hotspot",
     description: "Disable the hotspot feature on your device."
   }
-];
+};
