@@ -52,7 +52,20 @@ const wisephone = wisephones[0];
                     <p>{feature.name}</p>
                     <p class="text-sm text-gray-500">{feature.description}</p>
                   </div>
-                  <input x-ref="aiToggle" type="checkbox" class="toggle pointer-events-none" x-model="isAiEnabled" />
+                  <div class="relative h-[24px]">
+                    <input
+                      x-bind:class="isLoading ? 'pointer-events-none' : ''"
+                      x-ref="aiToggle"
+                      type="checkbox"
+                      class="toggle pointer-events-none"
+                      x-bind:checked="isFeatureEnabled(feature.knoxManageId)"
+                    />
+                    <div
+                      x-show="isLoading"
+                      x-transition
+                      class="loading loading-spinner loading-sm absolute top-0 left-0 bottom-0 right-0 ms-0.5 my-auto flex items-center justify-center"
+                    />
+                  </div>
                 </div>
               </li>
             ))
@@ -70,21 +83,23 @@ const wisephone = wisephones[0];
     isAiEnabled: false,
     features: [] as string[],
     imei: "",
+    isFeatureEnabled(knoxManageId: string) {
+      return this.features.includes(knoxManageId);
+    },
+    isLoading: true,
+    async getFeatures() {
+      const url = new URL(`/api/samsung-knox.json`, window.location.origin);
+      url.searchParams.set("action", "get-device-groups");
+      url.searchParams.set("imei", this.imei);
+
+      const res = await fetch(url, { method: "GET" });
+      const features = await res.json();
+      this.features = features;
+    },
     async init() {
       this.$watch("imei", async () => {
-        const url = new URL(`/api/samsung-knox.json`, window.location.origin);
-        url.searchParams.set("action", "get-device-groups");
-        url.searchParams.set("imei", this.imei);
-        console.log(url);
-        const res = await fetch(url, {
-          method: "GET"
-        });
-
-        const data = await res.json();
-
-        console.log(data);
-
-        this.features = data.groups;
+        await this.getFeatures();
+        this.isLoading = false;
       });
     }
   }));
