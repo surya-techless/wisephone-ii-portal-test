@@ -9,8 +9,16 @@ const Wisephone = defineTable({
   }
 });
 
+const BypassTechlessSubscription = defineTable({
+  columns: {
+    imei: column.number({ primaryKey: true }),
+    reason: column.text()
+  }
+});
+
 export default defineDb({
   tables: {
-    Wisephone
+    Wisephone,
+    BypassTechlessSubscription
   }
 });

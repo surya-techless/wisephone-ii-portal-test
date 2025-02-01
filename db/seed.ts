@@ -1,4 +1,4 @@
-import { db, Wisephone } from "astro:db";
+import { db, Wisephone, BypassTechlessSubscription } from "astro:db";
 
 // https://astro.build/db/seed
 export default async function seed() {
@@ -8,6 +8,13 @@ export default async function seed() {
       nickname: "Cam Pak",
       phoneNumber: "405-206-0654",
       userId: "user_2sLc5BX4F7qRUklqQ2UTUJXSipf" // Cam's Clerk ID
+    }
+  ]);
+
+  await db.insert(BypassTechlessSubscription).values([
+    {
+      imei: 350256485931533,
+      reason: "Works at Techless"
     }
   ]);
 }

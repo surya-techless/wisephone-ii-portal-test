@@ -1,5 +1,5 @@
 ---
-import { Wisephone, eq, db } from "astro:db";
+import { Wisephone, eq, db, BypassTechlessSubscription } from "astro:db";
 import Icon from "astro-iconify";
 import Layout from "@/layouts/Layout.astro";
 import Header from "@/components/Header.astro";
@@ -30,11 +30,19 @@ const subscribedUrl = new URL(`/webhook-is-user-subscribed`, "https://cameronpak
 subscribedUrl.searchParams.set("phoneNumber", wisephone.phoneNumber);
 subscribedUrl.searchParams.set("imei", String(wisephone.imei));
 
-const result = await fetch(subscribedUrl, { method: "GET" });
-const isSubscribedText = await result.text();
-let isSubscribed = false;
-if (isSubscribedText.includes("bypass") || isSubscribedText.includes("is subscribed")) {
-  isSubscribed = true;
+const bypassTechlessSubscription = await db
+  .select()
+  .from(BypassTechlessSubscription)
+  .where(eq(BypassTechlessSubscription.imei, Number(imei)))
+  .limit(1);
+
+let isSubscribed = bypassTechlessSubscription.length > 0 || false;
+if (!isSubscribed) {
+  const result = await fetch(subscribedUrl, { method: "GET" });
+  const isSubscribedText = await result.text();
+  if (isSubscribedText.includes("bypass") || isSubscribedText.includes("is subscribed")) {
+    isSubscribed = true;
+  }
 }
 ---
 
