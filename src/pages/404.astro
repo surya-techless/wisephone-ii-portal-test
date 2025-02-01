@@ -6,10 +6,7 @@ import Footer from "@/components/Footer.astro";
 const message = Astro.url.searchParams.get("message") || "Whoops! This page is not available right now.";
 ---
 
-<Layout
-  title="faith.tools kit"
-  description="Helping Christian creatives keep in touch with their community and helping Christians discover what's new in the faith and tech space."
->
+<Layout title="Wisephone II Portal" description="Helping you have a healthier relationship with technology.">
   <main class="min-h-screen h-full relative overflow-hidden not-prose">
     <h1
       x-init={`toastErrorMessage = \`${message || ""}\``}
@@ -29,7 +26,7 @@ const message = Astro.url.searchParams.get("message") || "Whoops! This page is n
           </SignInButton>
         </div>
       </div>
-      <Footer />
+      <Footer showLogo={false} />
     </div>
   </main>
 </Layout>
