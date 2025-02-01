@@ -16,18 +16,10 @@ const isSentryEnabled = SENTRY_DSN && SENTRY_AUTH_TOKEN && SENTRY_PROJECT;
 export default defineConfig({
   integrations: [
     db(),
-    tailwind(), // This entrypoint file is where Alpine plugins are registered.
+    tailwind(),
     alpinejs({
       entrypoint: "/src/entrypoint"
     }),
-    // To enable Sentry monitoring, add the following environment variables.
-    // Learn more at https://docs.sentry.io/platforms/javascript/guides/astro/#prerequisites.
-    isSentryEnabled &&
-      sentry({
-        dsn: SENTRY_DSN,
-        auth: SENTRY_AUTH_TOKEN,
-        project: SENTRY_PROJECT
-      }),
     clerk(),
     lottie()
   ],
@@ -35,11 +27,6 @@ export default defineConfig({
     optimizeDeps: {
       exclude: ["astro:db"]
     }
-  },
-  redirects: {
-    "/app/1-introducing-faith-tools-kit": "/app/kit",
-    "/app/1/posts/kit-update-1": "/app/kit/posts/kit-update-1",
-    "/app/1/posts/introducing-kit": "/app/kit/posts/introducing-kit"
   },
   output: "server",
   adapter: netlify(),
