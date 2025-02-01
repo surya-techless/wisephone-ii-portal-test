@@ -14,6 +14,7 @@ const isSentryEnabled = SENTRY_DSN && SENTRY_AUTH_TOKEN && SENTRY_PROJECT;
 
 // https://astro.build/config
 export default defineConfig({
+  site: "https://portal.getwisephone.com",
   integrations: [
     db(),
     tailwind(),
