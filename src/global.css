@@ -118,3 +118,7 @@ li.list-item:last-child {
   --tglbg: var(--toggle-checked);
   @apply text-white border-[var(--tglbg)];
 }
+
+.btn-circle {
+  @apply rounded-full text-[var(--text-secondary)] bg-[var(--surface-secondary)] border-[var(--surface-tertiary)] hover:border-[var(--surface-tertiary)] hover:bg-[var(--surface-secondary)] active:bg-[var(--surface-secondary)] disabled:bg-[var(--surface-primary)];
+}

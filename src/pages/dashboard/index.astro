@@ -85,7 +85,29 @@ const result = Astro.getActionResult(actions.wisephones.createWisephone);
         x-transition
         x-cloak
       >
-        <h2 class="text-2xl font-bold">Setup</h2>
+        <!-- <div class="flex flex-col gap-4">
+          <h2 class="text-2xl font-bold">Setup</h2>
+
+        </div> -->
+        <div class="flex flex-row w-full gap-4 justify-between">
+          <h2 class="text-2xl font-bold">Setup</h2>
+
+          <button @click="showForm = false" class="btn btn-sm btn-circle">
+            <span class="sr-only">Close Settings</span>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              class="lucide lucide-x"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg
+            >
+          </button>
+        </div>
         <form method="POST" action={actions.wisephones.createWisephone} class="w-full flex flex-col gap-4">
           <div class="form-control w-full">
             <label class="label">
