@@ -41,7 +41,8 @@ export const FEATURES: Record<string, Feature> = {
     isEnabled: true,
     name: "Enable Tool Drawer",
     description: "Get access to safe, vetted third-party apps that are tools to help you get a job done.",
-    enableMessage: "I acknowledge turning on this feature will allow access to third-party apps on this device.",
+    enableMessage:
+      "I acknowledge turning on this feature will allow access to third-party apps on this device. Be aware, we do not recommend this for those battling sexual addiction.",
     disableMessage:
       "I acknowledge turning off this feature will remove access to third-party apps on this device. Any installed third-party apps will be uninstalled."
   },
@@ -50,18 +51,28 @@ export const FEATURES: Record<string, Feature> = {
     knoxManageId: "5ae84219a2ea4372a42f9da57c00d325",
     lucideIcon: "fish-symbol",
     name: "Enable faith.tools",
-    description:
-      "Get access to your favorite faith-based apps on the Tool Drawer, like the YouVersion Bible app and Hallow Prayer app.",
+    description: "Get access to your favorite faith-based apps in the Tool Drawer, curated by faith.tools.",
     enableMessage: "I acknowledge turning on this feature allows access to faith-based apps on this device.",
     disableMessage:
       "I acknowledge turning off this feature will remove access to faith-based apps on this device. Any installed faith-based apps will be uninstalled."
+  },
+  GOOGLE_APPS: {
+    isEnabled: true,
+    knoxManageId: "2023496b363e4a639a379fe5efedd171",
+    lucideIcon: "layout-grid",
+    name: "Enable Google Apps",
+    description: "Get access to Google Messages, Google Maps, and Google Photos.",
+    enableMessage:
+      "I acknowledge turning on this feature allows access to Google Messages, Maps, and Photos on this device. At this time Google Messages has Gemini AI available to chat with, so please use caution when making this decision.",
+    disableMessage:
+      "I acknowledge turning off this feature removes access to Google Messages, Maps, and Photos on this device immediately."
   },
   NO_HOTSPOT: {
     isEnabled: true,
     knoxManageId: "f463ade53b1f43f5bf2f540a99395c2d",
     lucideIcon: "signal",
     name: "Disable Hotspot",
-    description: "Disable the hotspot feature on your device.",
+    description: "Disable the hotspot feature on this device.",
     enableMessage: "I acknowledge turning on this feature disables the hotspot feature on this device.",
     disableMessage: "I acknowledge turning off this feature allows hotspot to be used on this device."
   }
