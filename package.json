@@ -1,7 +1,7 @@
 {
-  "name": "freedom-stack",
+  "name": "wisephone-ii-portal",
   "type": "module",
-  "version": "1.0.2",
+  "version": "1.0.0",
   "scripts": {
     "dev": "astro dev",
     "dev:remote": "astro dev --remote",
@@ -55,28 +55,10 @@
     "tailwindcss": "^3.4.10",
     "typescript": "^5.6.2"
   },
-  "private": false,
-  "description": "A modern stack for building Christian tech products in public, created with Astro",
+  "private": true,
+  "description": "A portal for the Wisephone II",
   "author": "Cameron Pak",
-  "homepage": "https://kit.faith.tools",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/cameronapak/kit"
-  },
-  "bugs": {
-    "url": "https://github.com/cameronapak/kit/issues"
-  },
-  "keywords": [
-    "astro",
-    "christian",
-    "faith",
-    "tech",
-    "blog",
-    "cms",
-    "alpinejs",
-    "htmx",
-    "tailwindcss"
-  ],
+  "homepage": "https://portal.getwisephone.com",
   "engines": {
     "node": ">=20.3.0",
     "npm": ">=10.0.0"
