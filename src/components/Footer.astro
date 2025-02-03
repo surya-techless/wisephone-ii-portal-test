@@ -1,5 +1,4 @@
 ---
-import SignInOrOpenDashboard from "@/components/server-islands/SignInOrOpenDashboard.astro";
 import Logo from "@/components/Logo.astro";
 
 interface Props {
@@ -7,8 +6,6 @@ interface Props {
 }
 
 const { showLogo = true } = Astro.props as Props;
-
-const isDashboard = Astro.url.pathname.startsWith("/dashboard");
 ---
 
 <footer class="not-prose text-center text-slate-500 text-sm py-0 my-0 flex flex-col gap-2">
@@ -46,6 +43,5 @@ const isDashboard = Astro.url.pathname.startsWith("/dashboard");
     <li>
       <a class="text-inherit font-normal" href="https://techless.zendesk.com/hc/en-us" target="_blank">Help Center</a>
     </li>
-    <SignInOrOpenDashboard isDashboard={isDashboard} server:defer />
   </ul>
 </footer>
