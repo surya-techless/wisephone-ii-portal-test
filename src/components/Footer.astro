@@ -1,6 +1,6 @@
 ---
 import Logo from "@/components/Logo.astro";
-
+import { Icon } from "astro-iconify";
 interface Props {
   showLogo?: boolean;
 }
@@ -8,7 +8,7 @@ interface Props {
 const { showLogo = true } = Astro.props as Props;
 ---
 
-<footer class="not-prose text-center text-slate-500 text-sm py-0 my-0 flex flex-col gap-2">
+<footer class="not-prose text-center text-sm py-0 my-0 flex flex-col gap-2">
   {
     showLogo ? (
       <a href="/" class="flex justify-center">
@@ -16,20 +16,26 @@ const { showLogo = true } = Astro.props as Props;
       </a>
     ) : null
   }
-  <p class="py-0 mb-0 mt-4">
-    Wisephone, by Techless LLC © <span x-text="new Date().getFullYear()">2025</span>
-  </p>
-  <ul class="list-none p-0 m-0 flex gap-3 flex-wrap justify-center">
+
+  <ul class="list-none p-0 m-0 flex items-center gap-0 justify-center">
     <li>
-      <a class="text-inherit font-normal" href="https://getwisephone.com/my-subscription" target="_blank">
-        Techless Subscription
+      <a class="btn btn-sm btn-ghost" href="https://getwisephone.com/my-subscription" target="_blank">
+        Subscription
+        <Icon name="lucide:external-link" class="w-4 h-4 opacity-50" />
       </a>
     </li>
     <li>
-      <a class="text-inherit font-normal" href="https://plans.techless.com/" target="_blank"> Techless Carrier Plan </a>
+      <a class="btn btn-sm text-slate-800 btn-ghost" href="https://plans.techless.com/" target="_blank">
+        Carrier Plan
+        <Icon name="lucide:external-link" class="w-4 h-4 opacity-50" />
+      </a>
     </li>
   </ul>
-  <ul class="list-none p-0 m-0 flex gap-3 flex-wrap justify-center">
+
+  <p class="py-0 mb-0 opacity-50">
+    Wisephone, by Techless LLC © <span x-text="new Date().getFullYear()">2025</span>
+  </p>
+  <ul class="list-none opacity-50 p-0 m-0 flex gap-3 flex-wrap justify-center">
     <li>
       <a class="text-inherit font-normal" href="https://wisephone.com/policies/terms-of-service" target="_blank"
         >Terms</a
@@ -41,7 +47,7 @@ const { showLogo = true } = Astro.props as Props;
       >
     </li>
     <li>
-      <a class="text-inherit font-normal" href="https://techless.zendesk.com/hc/en-us" target="_blank">Help Center</a>
+      <a class="text-inherit font-normal" href="https://techless.notion.site" target="_blank">Help Docs</a>
     </li>
   </ul>
 </footer>
