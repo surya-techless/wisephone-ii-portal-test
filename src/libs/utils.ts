@@ -42,7 +42,7 @@ export const FEATURES: Record<string, Feature> = {
     name: "Enable Tool Drawer",
     description: "Get access to safe, vetted third-party apps that are tools to help you get a job done.",
     enableMessage:
-      "I acknowledge turning on this feature will allow access to third-party apps on this device. Be aware, we do not recommend this for those battling sexual addiction.",
+      "I acknowledge turning on this feature will allow access to third-party apps on this device. (Be aware, we do not recommend this for those battling sexual addiction.)",
     disableMessage:
       "I acknowledge turning off this feature will remove access to third-party apps on this device. Any installed third-party apps will be uninstalled."
   },
