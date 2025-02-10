@@ -54,8 +54,33 @@ export const wisephones = {
     accept: "form",
     input: z.object({
       imei: z.number(),
-      nickname: z.string().optional(),
-      phoneNumber: z.string().optional(),
+      nickname: z
+        .string()
+        .optional()
+        .refine(
+          (val: string | undefined) => {
+            if (!val) return true;
+            const name = val.trim();
+            return name.length > 0;
+          },
+          {
+            message: "Device nickname cannot be empty"
+          }
+        ),
+      phoneNumber: z
+        .string()
+        .optional()
+        .refine(
+          (val) => {
+            if (val) {
+              return /^\d{3}-\d{3}-\d{4}$/.test(val);
+            }
+            return true;
+          },
+          {
+            message: "Phone number must be in the format 123-456-7890"
+          }
+        ),
       userId: z.string().optional()
     }),
     handler: async (input) => {

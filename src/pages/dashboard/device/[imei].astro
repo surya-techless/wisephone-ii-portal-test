@@ -1,6 +1,6 @@
 ---
 import { Wisephone, eq, db, BypassTechlessSubscription } from "astro:db";
-import { actions } from "astro:actions";
+import { actions, type ActionInputError } from "astro:actions";
 import Icon from "astro-iconify";
 import Layout from "@/layouts/Layout.astro";
 import Header from "@/components/Header.astro";
@@ -45,6 +45,11 @@ if (!isSubscribed) {
     isSubscribed = true;
   }
 }
+
+const result = Astro.getActionResult(actions.wisephones.updateWisephone);
+const error = (result?.error as ActionInputError<typeof actions.wisephones.updateWisephone>)?.issues
+  .map((issue) => issue.message)
+  .join("\n");
 ---
 
 <Layout title="Device Features" description="Manage the features of your Wisephone II device.">
@@ -58,6 +63,8 @@ if (!isSubscribed) {
       phoneNumber = "${wisephone.phoneNumber}";
       originalNickname = "${wisephone.nickname}";
       originalPhoneNumber = "${wisephone.phoneNumber}";
+      toastErrorMessage = \`${error || ""}\`;
+      toastMessage = \`${result?.data?.success || ""}\`;
     `}
   >
     <Header activeTab="page" isProjectPublished={false} projectSlug={""} />
@@ -95,10 +102,18 @@ if (!isSubscribed) {
                   class="[&>*]:max-sm:w-full flex flex-wrap max-sm:flex-col w-full items-baseline gap-2"
                   action={actions.wisephones.updateWisephone}
                 >
-                  <input type="text" name="nickname" x-model="nickname" class="input input-bordered" required />
+                  <input
+                    placeholder="Device Nickname"
+                    type="text"
+                    name="nickname"
+                    x-model="nickname"
+                    class="input input-bordered"
+                    required
+                  />
                   <input
                     type="text"
                     name="phoneNumber"
+                    placeholder="123-456-7890"
                     x-model="phoneNumber"
                     x-mask="999-999-9999"
                     class="input input-bordered"
