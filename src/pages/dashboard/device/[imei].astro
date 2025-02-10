@@ -1,5 +1,6 @@
 ---
 import { Wisephone, eq, db, BypassTechlessSubscription } from "astro:db";
+import { actions } from "astro:actions";
 import Icon from "astro-iconify";
 import Layout from "@/layouts/Layout.astro";
 import Header from "@/components/Header.astro";
@@ -53,6 +54,10 @@ if (!isSubscribed) {
     x-init={`
       imei = "${imei}";
       isSubscribed = ${isSubscribed};
+      nickname = "${wisephone.nickname}";
+      phoneNumber = "${wisephone.phoneNumber}";
+      originalNickname = "${wisephone.nickname}";
+      originalPhoneNumber = "${wisephone.phoneNumber}";
     `}
   >
     <Header activeTab="page" isProjectPublished={false} projectSlug={""} />
@@ -65,25 +70,57 @@ if (!isSubscribed) {
             Devices
           </a>
           <h1 class="text-3xl font-bold">Features</h1>
-          <p class="text-slate-500 inline-flex items-baseline gap-2">
-            {wisephone.nickname} • {wisephone.phoneNumber}
 
-            <span class="inline-flex items-center gap-1" x-show="isSubscribed" x-cloak x-transition>
-              • <Icon name="lucide:check" class="w-4 h-4" />
-              Subscribed
-            </span>
+          <div class="text-slate-500 w-full inline-flex flex-wrap items-baseline gap-2">
+            <div>
+              <div x-show="!isEditing">
+                <div class="flex items-baseline gap-2">
+                  <span
+                    class="hover:underline hover:cursor-pointer underline-offset-4"
+                    @click="isEditing = true"
+                    x-text="nickname">{wisephone.nickname}</span
+                  >
+                  •
+                  <span
+                    class="hover:underline hover:cursor-pointer underline-offset-4"
+                    @click="isEditing = true"
+                    x-text="phoneNumber">{wisephone.phoneNumber}</span
+                  >
+                </div>
+              </div>
 
-            <a
-              x-show="!isSubscribed"
-              x-cloak
-              x-transition
-              target="_blank"
-              href="https://wisephone.com/pages/activate"
-              class="link font-medium text-slate-800"
-            >
-              Activate Subscription
-            </a>
-          </p>
+              <div x-cloak x-show="isEditing" class="w-full" x-collapse>
+                <form
+                  method="POST"
+                  class="[&>*]:max-sm:w-full flex flex-wrap max-sm:flex-col w-full items-baseline gap-2"
+                  action={actions.wisephones.updateWisephone}
+                >
+                  <input type="text" name="nickname" x-model="nickname" class="input input-bordered" required />
+                  <input
+                    type="text"
+                    name="phoneNumber"
+                    x-model="phoneNumber"
+                    x-mask="999-999-9999"
+                    class="input input-bordered"
+                    required
+                  />
+                  <input type="hidden" name="imei" :value="imei" />
+                  <div class="flex gap-1">
+                    <button type="submit" class="btn btn-primary btn-circle">
+                      <Icon name="lucide:check" class="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      @click="isEditing = false"
+                      class="btn hover:!bg-slate-50 btn-ghost btn-circle"
+                    >
+                      <Icon name="lucide:x" class="w-4 h-4" />
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div
@@ -93,7 +130,11 @@ if (!isSubscribed) {
           class="alert bg-slate-200 border-slate-300 text-slate-800 -rotate-1 hover:rotate-0 transition-transform duration-150"
         >
           <Icon name="lucide:info" class="w-4 h-4" />
-          <p>Activate a Techless Subscription to update this device's features.</p>
+          <p>
+            <a href="https://wisephone.com/pages/activate" class="link font-medium text-slate-800"
+              >Activate a Techless Subscription</a
+            > to update this device's features.
+          </p>
         </div>
 
         <ul class="list-item-container">
@@ -149,6 +190,11 @@ if (!isSubscribed) {
 
   Alpine.data("device", () => ({
     isAiEnabled: false,
+    isEditing: false,
+    nickname: "",
+    phoneNumber: "",
+    originalNickname: "",
+    originalPhoneNumber: "",
     features: [] as string[],
     imei: "",
     isSubscribed: false,
@@ -194,6 +240,13 @@ if (!isSubscribed) {
       this.$watch("imei", async () => {
         await this.getFeatures();
         this.isLoading = false;
+      });
+
+      this.$watch("isEditing", (value) => {
+        if (!value) {
+          this.nickname = this.originalNickname;
+          this.phoneNumber = this.originalPhoneNumber;
+        }
       });
     }
   }));

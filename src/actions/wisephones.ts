@@ -55,8 +55,8 @@ export const wisephones = {
     input: z.object({
       imei: z.number(),
       nickname: z.string().optional(),
-      phoneNumber: z.string(),
-      userId: z.string()
+      phoneNumber: z.string().optional(),
+      userId: z.string().optional()
     }),
     handler: async (input) => {
       try {

@@ -57,7 +57,7 @@ trix-editor,
 input[type="text"],
 input[type="number"],
 input[type="tel"] {
-  @apply border-2 border-slate-200 rounded-lg;
+  @apply border-2 border-[var(--surface-tertiary)] rounded-lg;
 }
 
 trix-toolbar .trix-button.trix-active {
@@ -120,7 +120,7 @@ li.list-item:last-child {
 }
 
 .btn-circle {
-  @apply rounded-full text-[var(--text-secondary)] bg-[var(--surface-secondary)] border-[var(--surface-tertiary)] hover:border-[var(--surface-tertiary)] hover:bg-[var(--surface-secondary)] active:bg-[var(--surface-secondary)] disabled:bg-[var(--surface-primary)];
+  @apply border-2 rounded-full text-[var(--text-secondary)] bg-[var(--surface-secondary)] border-[var(--surface-tertiary)] hover:border-[var(--surface-tertiary)] hover:bg-[var(--surface-secondary)] active:bg-[var(--surface-secondary)] disabled:bg-[var(--surface-primary)];
 }
 
 .btn-ghost:hover {
