@@ -56,11 +56,11 @@ export const POST: APIRoute = async ({ request }) => {
   try {
     switch (action) {
       case "apply-feature": {
-        const response = await SamsungKnoxService.applyFeature(knoxManageId, imei);
+        const response = await SamsungKnoxService.applyFeature(knoxManageId, imei, true);
         return new Response(JSON.stringify(response), { status: 200 });
       }
       case "remove-feature": {
-        const response = await SamsungKnoxService.removeFeature(knoxManageId, imei);
+        const response = await SamsungKnoxService.removeFeature(knoxManageId, imei, true);
         return new Response(JSON.stringify(response), { status: 200 });
       }
       default: {
