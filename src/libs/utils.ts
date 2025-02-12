@@ -50,8 +50,9 @@ export const FEATURES: Record<string, Feature> = {
     isEnabled: true,
     knoxManageId: "5ae84219a2ea4372a42f9da57c00d325",
     lucideIcon: "fish-symbol",
-    name: "Enable faith.tools",
-    description: "Get access to your favorite faith-based apps in the Tool Drawer, curated by faith.tools.",
+    name: "Enable faith.tools (beta)",
+    description:
+      "Get access to faith-based apps in the Tool Drawer, curated by faith.tools. YouVersion, Hallow, Dwell, and more.",
     enableMessage: "I acknowledge turning on this feature allows access to faith-based apps on this device.",
     disableMessage:
       "I acknowledge turning off this feature will remove access to faith-based apps on this device. Any installed faith-based apps will be uninstalled."
