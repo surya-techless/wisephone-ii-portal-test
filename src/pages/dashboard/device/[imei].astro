@@ -21,6 +21,15 @@ const wisephones = await db
 
 const features = Object.values(FEATURES);
 
+const resultDelete = Astro.getActionResult(actions.wisephones.deleteWisephone);
+const errorDelete = (resultDelete?.error as ActionInputError<typeof actions.wisephones.deleteWisephone>)?.issues
+  .map((issue) => issue.message)
+  .join("\n");
+
+if (errorDelete) {
+  return Astro.redirect("/dashboard?error=" + encodeURIComponent(errorDelete));
+}
+
 if (!wisephones || !wisephones.length) {
   return Astro.redirect("/dashboard");
 }
@@ -63,8 +72,8 @@ const error = (result?.error as ActionInputError<typeof actions.wisephones.updat
       phoneNumber = "${wisephone.phoneNumber}";
       originalNickname = "${wisephone.nickname}";
       originalPhoneNumber = "${wisephone.phoneNumber}";
-      toastErrorMessage = \`${error || ""}\`;
-      toastMessage = \`${result?.data?.success || ""}\`;
+      toastErrorMessage = "${error || ""}" || toastErrorMessage;
+      toastMessage = "${result?.data?.success || ""}" || toastMessage;
     `}
   >
     <Header activeTab="page" isProjectPublished={false} projectSlug={""} />
@@ -100,6 +109,17 @@ const error = (result?.error as ActionInputError<typeof actions.wisephones.updat
                     @click="isEditing = true"
                     x-text="phoneNumber">{wisephone.phoneNumber}</span
                   >
+                  <form
+                    method="POST"
+                    action={actions.wisephones.deleteWisephone}
+                    onsubmit="return confirm('Are you sure you want to delete this device? This action cannot be undone.')"
+                  >
+                    <input type="hidden" name="imei" :value="imei" />
+                    <button type="submit" class="btn btn-ghost btn-sm text-error hover:bg-error/10">
+                      <Icon name="lucide:trash-2" class="w-4 h-4" />
+                      Delete Device
+                    </button>
+                  </form>
                 </div>
               </div>
 

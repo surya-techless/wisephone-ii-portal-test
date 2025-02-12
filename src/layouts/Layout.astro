@@ -12,6 +12,9 @@ interface Props {
   ogImageUrl?: string;
 }
 
+const message = Astro.url.searchParams.get("message") || "";
+const error = Astro.url.searchParams.get("error") || "";
+
 const {
   title,
   description = "Equipping believers with technology to help them live their God-given calling every single day, together",
@@ -25,8 +28,8 @@ const {
 <!doctype html>
 <html
   x-data={`{
-    toastMessage: '',
-    toastErrorMessage: ''
+    toastMessage: '${message}',
+    toastErrorMessage: '${error}'
   }`}
   lang="en"
   class="bg-slate-50 min-h-screen"
@@ -91,6 +94,10 @@ const {
       x-data={`{
         backupOfToastMessage: '',
         init() {
+          if (toastMessage) {
+            this.backupOfToastMessage = toastMessage
+          }
+
           $watch('toastMessage', () => {
             if (toastMessage) {
               this.backupOfToastMessage = toastMessage
@@ -119,6 +126,10 @@ const {
       x-data={`{
         backupOfToastErrorMessage: '',
         init() {
+          if (toastErrorMessage) {
+            this.backupOfToastErrorMessage = toastErrorMessage
+          }
+
           $watch('toastErrorMessage', () => {
             if (toastErrorMessage) {
               this.backupOfToastErrorMessage = toastErrorMessage

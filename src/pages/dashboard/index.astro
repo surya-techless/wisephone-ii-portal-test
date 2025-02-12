@@ -29,8 +29,8 @@ const result = Astro.getActionResult(actions.wisephones.createWisephone);
       showForm: false,
     }"
     x-init={`
-      toastErrorMessage = \`${result?.error?.message || ""}\`;
-      toastMessage = \`${result?.data?.success || ""}\`;
+      toastErrorMessage = '${result?.error?.message || ""}' || toastErrorMessage;
+      toastMessage = '${result?.data?.success || ""}' || toastMessage;
     `}
   >
     <Header activeTab="page" isProjectPublished={false} projectSlug={""} />
