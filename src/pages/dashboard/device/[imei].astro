@@ -13,6 +13,12 @@ if (isNaN(Number(imei))) {
   return Astro.redirect("/dashboard");
 }
 
+const resultDelete = Astro.getActionResult(actions.wisephones.deleteWisephone);
+const resultDeleteMessage = resultDelete?.data?.success || "";
+if (resultDeleteMessage) {
+  return Astro.redirect("/dashboard?message=" + encodeURIComponent(resultDeleteMessage));
+}
+
 const wisephones = await db
   .select()
   .from(Wisephone)
@@ -20,15 +26,6 @@ const wisephones = await db
   .limit(1);
 
 const features = Object.values(FEATURES);
-
-const resultDelete = Astro.getActionResult(actions.wisephones.deleteWisephone);
-const errorDelete = (resultDelete?.error as ActionInputError<typeof actions.wisephones.deleteWisephone>)?.issues
-  .map((issue) => issue.message)
-  .join("\n");
-
-if (errorDelete) {
-  return Astro.redirect("/dashboard?error=" + encodeURIComponent(errorDelete));
-}
 
 if (!wisephones || !wisephones.length) {
   return Astro.redirect("/dashboard");

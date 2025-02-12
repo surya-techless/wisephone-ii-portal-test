@@ -31,6 +31,10 @@ const {
     toastMessage: '${message}',
     toastErrorMessage: '${error}'
   }`}
+  x-init={`
+    // remove URL params from the URL for message and error
+    history.replaceState({}, '', window.location.pathname);
+  `}
   lang="en"
   class="bg-slate-50 min-h-screen"
 >
