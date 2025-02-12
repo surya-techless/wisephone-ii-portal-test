@@ -160,4 +160,95 @@ export class SamsungKnoxService {
     const data = await response.json();
     return data.resultValue?.groupIdList ?? [];
   }
+
+  /**
+   * Send a notification to a device
+   * @param imei - The IMEI number of the device
+   * @param title - The notification title (max 30 characters)
+   * @param message - The notification message (max 200 characters)
+   * @param options - Additional options for the notification
+   * @returns The response from the Knox API
+   */
+  public static async sendNotification(
+    imei: string,
+    title: string,
+    message: string,
+    options?: {
+      containerFlag?: boolean;
+      sendType?: "Notification" | "Popup";
+    }
+  ): Promise<Record<string, any>> {
+    if (title.length > 30) {
+      throw new Error("Notification title cannot exceed 30 characters");
+    }
+    if (message.length > 200) {
+      throw new Error("Notification message cannot exceed 200 characters");
+    }
+
+    const deviceId = await this.getDeviceIdFromImei(imei);
+
+    if (!deviceId) {
+      throw new Error("Device not found");
+    }
+
+    const apiUrl = `https://${KNOX_REGION}.manage.samsungknox.com/emm/oapi/mdm/commonOTCServiceWrapper/sendDeviceControlForNotification `;
+
+    const params = new URLSearchParams({
+      deviceId,
+      title,
+      message,
+      ...(options?.containerFlag !== undefined && { containerFlag: options.containerFlag.toString() }),
+      ...(options?.sendType && { sendType: options.sendType })
+    });
+
+    const response = await fetch(apiUrl, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${await this.getKnoxToken()}`,
+        "cache-control": "no-cache",
+        "content-type": "application/x-www-form-urlencoded"
+      },
+      body: params
+    });
+
+    if (!response.ok) {
+      const data = await response.json();
+      console.error(data);
+      throw new Error("Failed to send notification to device");
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Get device ID from IMEI number
+   * @param imei - The IMEI number of the device
+   * @returns The device ID or null if not found
+   */
+  public static async getDeviceIdFromImei(imei: string): Promise<string | null> {
+    const apiUrl = `https://${KNOX_REGION}.manage.samsungknox.com/emm/oapi/device/selectDeviceInfoByImei`;
+
+    try {
+      const response = await fetch(apiUrl, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${await this.getKnoxToken()}`,
+          "cache-control": "no-cache",
+          "content-type": "application/x-www-form-urlencoded"
+        },
+        body: new URLSearchParams({ imei })
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch device info");
+      }
+
+      const data = await response.json();
+
+      return data.resultValue?.deviceId ?? null;
+    } catch (error) {
+      console.error("Error fetching device ID:", error);
+      return null;
+    }
+  }
 }

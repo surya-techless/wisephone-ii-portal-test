@@ -57,10 +57,26 @@ export const POST: APIRoute = async ({ request }) => {
     switch (action) {
       case "apply-feature": {
         const response = await SamsungKnoxService.applyFeature(knoxManageId, imei, true);
+        await SamsungKnoxService.sendNotification(
+          imei,
+          "Syncing Wisephone II",
+          "Please wait a moment for your device to reflect the changes.",
+          {
+            sendType: "Notification"
+          }
+        );
         return new Response(JSON.stringify(response), { status: 200 });
       }
       case "remove-feature": {
         const response = await SamsungKnoxService.removeFeature(knoxManageId, imei, true);
+        await SamsungKnoxService.sendNotification(
+          imei,
+          "Syncing Wisephone II",
+          "Please wait a moment for your device to reflect the changes.",
+          {
+            sendType: "Notification"
+          }
+        );
         return new Response(JSON.stringify(response), { status: 200 });
       }
       default: {
@@ -73,6 +89,7 @@ export const POST: APIRoute = async ({ request }) => {
       }
     }
   } catch (error) {
+    console.error(error);
     return new Response(
       JSON.stringify({
         error: error instanceof Error ? error.message : "Unknown error"
