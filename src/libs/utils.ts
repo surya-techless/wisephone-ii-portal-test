@@ -78,3 +78,5 @@ export const FEATURES: Record<string, Feature> = {
     disableMessage: "I acknowledge turning off this feature allows hotspot to be used on this device."
   }
 };
+
+export const UNPAID_GROUP_ID = "caf62603de4646a784cddb4e63e653d1";

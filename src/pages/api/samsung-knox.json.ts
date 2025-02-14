@@ -1,5 +1,6 @@
 import type { APIRoute } from "astro";
 import { SamsungKnoxService } from "@/libs/samsung-knox-service";
+import { FEATURES, UNPAID_GROUP_ID } from "@/libs/utils";
 
 export const GET: APIRoute = async (props) => {
   const { request } = props;
@@ -43,6 +44,22 @@ export const GET: APIRoute = async (props) => {
   }
 };
 
+/**
+ * @description Removes the Unpaid user group from the device if the feature is being applied.
+ * This is needed because Unpaid user group conflicts with these user groups.
+ * @param knoxManageId - Samsung Knox Manage Group ID of the feature being applied.
+ * @param imei - IMEI of the device.
+ */
+async function removeUnpaidGroup(knoxManageId: string, imei: string) {
+  if (
+    knoxManageId === FEATURES.TOOL_DRAWER.knoxManageId ||
+    knoxManageId === FEATURES.FAITH_TOOLS.knoxManageId ||
+    knoxManageId === FEATURES.GOOGLE_APPS.knoxManageId
+  ) {
+    await SamsungKnoxService.removeFeature(UNPAID_GROUP_ID, imei, false);
+  }
+}
+
 export const POST: APIRoute = async ({ request }) => {
   const url = new URL(request.url);
   const action = url.searchParams.get("action");
@@ -56,6 +73,9 @@ export const POST: APIRoute = async ({ request }) => {
   try {
     switch (action) {
       case "apply-feature": {
+        // @TODO: Make it where Unpaid user group isn't even needed one day.
+        await removeUnpaidGroup(knoxManageId, imei);
+
         const response = await SamsungKnoxService.applyFeature(knoxManageId, imei, true);
         await SamsungKnoxService.sendNotification(
           imei,
