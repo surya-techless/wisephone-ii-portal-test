@@ -1,6 +1,6 @@
 import type { APIRoute } from "astro";
 import { SamsungKnoxService } from "@/libs/samsung-knox-service";
-import { FEATURES, UNPAID_GROUP_ID } from "@/libs/utils";
+import { oldKnoxUserGroupsForSubscription } from "@/libs/utils";
 
 export const GET: APIRoute = async (props) => {
   const { request } = props;
@@ -45,18 +45,19 @@ export const GET: APIRoute = async (props) => {
 };
 
 /**
- * @description Removes the Unpaid user group from the device if the feature is being applied.
- * This is needed because Unpaid user group conflicts with these user groups.
+ * @description Removes all exclusive groups except the one being applied.
+ * For example, a user in the Unpaid and Pro group will ultimately experience conflicts.
+ * This function will remove the Unpaid group, allowing the Pro group to be applied.
  * @param knoxManageId - Samsung Knox Manage Group ID of the feature being applied.
  * @param imei - IMEI of the device.
  */
-async function removeUnpaidGroup(knoxManageId: string, imei: string) {
-  if (
-    knoxManageId === FEATURES.TOOL_DRAWER.knoxManageId ||
-    knoxManageId === FEATURES.FAITH_TOOLS.knoxManageId ||
-    knoxManageId === FEATURES.GOOGLE_APPS.knoxManageId
-  ) {
-    await SamsungKnoxService.removeFeature(UNPAID_GROUP_ID, imei, false);
+async function removeExclusiveGroupConflicts(knoxManageId: string, imei: string) {
+  if (oldKnoxUserGroupsForSubscription.has(knoxManageId)) {
+    for (const groupId of oldKnoxUserGroupsForSubscription) {
+      if (groupId !== knoxManageId) {
+        await SamsungKnoxService.removeFeature(groupId, imei, false);
+      }
+    }
   }
 }
 
@@ -74,7 +75,7 @@ export const POST: APIRoute = async ({ request }) => {
     switch (action) {
       case "apply-feature": {
         // @TODO: Make it where Unpaid user group isn't even needed one day.
-        await removeUnpaidGroup(knoxManageId, imei);
+        await removeExclusiveGroupConflicts(knoxManageId, imei);
 
         const response = await SamsungKnoxService.applyFeature(knoxManageId, imei, true);
         await SamsungKnoxService.sendNotification(

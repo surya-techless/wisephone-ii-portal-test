@@ -34,9 +34,21 @@ export type Feature = {
   disableMessage: string;
 };
 
+const KNOX_USER_GROUPS = {
+  ADD_ON_DEV: "e469793fe25349a78ac3a73f71029099",
+  ADD_ON_FOSSIFY_APPS: "c7ab2ff7da4b47ea86bc13ff173109a0",
+  ADD_ON_FAITH_TOOLS: "5ae84219a2ea4372a42f9da57c00d325",
+  ADD_ON_DISABLE_HOTSPOT: "f463ade53b1f43f5bf2f540a99395c2d",
+  ADD_ON_GOOGLE_APPS: "2023496b363e4a639a379fe5efedd171",
+  HEALTHY: "b3a3157829d94bf4bbbcd229c137ffbe",
+  MINIMAL: "1bd53a63998245e69d190612e7ae5b39",
+  PRO: "300830f61c574b9db37dabbae1e79aa9",
+  UNPAID: "caf62603de4646a784cddb4e63e653d1"
+} as Record<string, string>;
+
 export const FEATURES: Record<string, Feature> = {
   TOOL_DRAWER: {
-    knoxManageId: "300830f61c574b9db37dabbae1e79aa9",
+    knoxManageId: KNOX_USER_GROUPS.PRO,
     lucideIcon: "wrench",
     isEnabled: true,
     name: "Enable Tool Drawer",
@@ -48,7 +60,7 @@ export const FEATURES: Record<string, Feature> = {
   },
   FAITH_TOOLS: {
     isEnabled: true,
-    knoxManageId: "5ae84219a2ea4372a42f9da57c00d325",
+    knoxManageId: KNOX_USER_GROUPS.ADD_ON_FAITH_TOOLS,
     lucideIcon: "fish-symbol",
     name: "Enable faith.tools (beta)",
     description:
@@ -59,7 +71,7 @@ export const FEATURES: Record<string, Feature> = {
   },
   GOOGLE_APPS: {
     isEnabled: true,
-    knoxManageId: "2023496b363e4a639a379fe5efedd171",
+    knoxManageId: KNOX_USER_GROUPS.ADD_ON_GOOGLE_APPS,
     lucideIcon: "layout-grid",
     name: "Enable Google Apps",
     description: "Get access to Google Messages, Google Maps, and Google Photos.",
@@ -70,7 +82,7 @@ export const FEATURES: Record<string, Feature> = {
   },
   NO_HOTSPOT: {
     isEnabled: true,
-    knoxManageId: "f463ade53b1f43f5bf2f540a99395c2d",
+    knoxManageId: KNOX_USER_GROUPS.ADD_ON_DISABLE_HOTSPOT,
     lucideIcon: "signal",
     name: "Disable Hotspot",
     description: "Disable the hotspot feature on this device.",
@@ -79,7 +91,19 @@ export const FEATURES: Record<string, Feature> = {
   }
 };
 
-export const UNPAID_GROUP_ID = "caf62603de4646a784cddb4e63e653d1";
+/**
+ * These groups are exclusive, meaning they cannot be used in conjunction with one another without conflicts.
+ */
+export const oldKnoxUserGroupsForSubscription = new Set<string>([
+  // @TODO: Pro will later become "Add-on - WPII - Tool Drawer"
+  KNOX_USER_GROUPS.PRO,
+  // @TODO: Minimal will later become "Add-on - WPII - Subscribed"
+  KNOX_USER_GROUPS.MINIMAL,
+  // @TODO: Everyone in healthy will need to be moved to "Add-on - WPII - Tool Drawer". Then, remove it.
+  KNOX_USER_GROUPS.HEALTHY,
+  // @TODO: Can this be removed entirely because the Organization has Unpaid rules by default?
+  KNOX_USER_GROUPS.UNPAID
+]);
 
 export const getAlpineDataObject = (sourceDataElement: HTMLElement) => {
   return window.Alpine.$data(sourceDataElement) as Record<string, unknown>;
