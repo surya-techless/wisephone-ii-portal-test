@@ -34,7 +34,7 @@ export type Feature = {
   disableMessage: string;
 };
 
-const KNOX_USER_GROUPS = {
+export const KNOX_USER_GROUPS = {
   ADD_ON_DEV: "e469793fe25349a78ac3a73f71029099",
   ADD_ON_FOSSIFY_APPS: "c7ab2ff7da4b47ea86bc13ff173109a0",
   ADD_ON_FAITH_TOOLS: "5ae84219a2ea4372a42f9da57c00d325",

@@ -74,9 +74,6 @@ export const POST: APIRoute = async ({ request }) => {
   try {
     switch (action) {
       case "apply-feature": {
-        // @TODO: Make it where Unpaid user group isn't even needed one day.
-        await removeExclusiveGroupConflicts(knoxManageId, imei);
-
         const response = await SamsungKnoxService.applyFeature(knoxManageId, imei, true);
         await SamsungKnoxService.sendNotification(
           imei,

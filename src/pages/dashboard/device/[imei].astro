@@ -225,7 +225,12 @@ const error = (result?.error as ActionInputError<typeof actions.wisephones.updat
 
 <script>
   import Alpine from "alpinejs";
-  import { type Feature, updateUnreachableAlpineState } from "@/libs/utils";
+  import {
+    type Feature,
+    updateUnreachableAlpineState,
+    KNOX_USER_GROUPS,
+    oldKnoxUserGroupsForSubscription
+  } from "@/libs/utils";
 
   Alpine.data("device", () => ({
     isAiEnabled: false,
@@ -281,6 +286,57 @@ const error = (result?.error as ActionInputError<typeof actions.wisephones.updat
         value: `Your device is being updated. ${feature.name} will be ${isEnabled ? "disabled" : "enabled"} shortly.`
       });
     },
+    async removeExclusiveGroups(userGroups: string[]) {
+      if (!userGroups.length) {
+        return;
+      }
+
+      if (!this.isSubscribed) {
+        return;
+      }
+
+      const hasMoreThanOneExclusiveGroup =
+        userGroups.filter((group) => oldKnoxUserGroupsForSubscription.has(group)).length > 1;
+
+      if (!hasMoreThanOneExclusiveGroup) {
+        return;
+      }
+
+      if (userGroups.includes(KNOX_USER_GROUPS.UNPAID)) {
+        const url = new URL(`/api/samsung-knox.json`, window.location.origin);
+
+        url.searchParams.set("action", "remove-feature");
+        url.searchParams.set("imei", this.imei);
+        url.searchParams.set("knoxManageId", KNOX_USER_GROUPS.UNPAID);
+
+        await fetch(url, { method: "POST" });
+      }
+
+      if (userGroups.includes(KNOX_USER_GROUPS.PRO) && userGroups.includes(KNOX_USER_GROUPS.HEALTHY)) {
+        const url = new URL(`/api/samsung-knox.json`, window.location.origin);
+
+        url.searchParams.set("action", "remove-feature");
+        url.searchParams.set("imei", this.imei);
+        url.searchParams.set("knoxManageId", KNOX_USER_GROUPS.HEALTHY);
+
+        await fetch(url, { method: "POST" });
+      }
+
+      if (
+        (userGroups.includes(KNOX_USER_GROUPS.PRO) || userGroups.includes(KNOX_USER_GROUPS.HEALTHY)) &&
+        userGroups.includes(KNOX_USER_GROUPS.MINIMAL)
+      ) {
+        const url = new URL(`/api/samsung-knox.json`, window.location.origin);
+
+        url.searchParams.set("action", "remove-feature");
+        url.searchParams.set("imei", this.imei);
+        url.searchParams.set("knoxManageId", KNOX_USER_GROUPS.MINIMAL);
+
+        await fetch(url, { method: "POST" });
+      }
+
+      window.location.reload();
+    },
     async init() {
       this.$watch("imei", async () => {
         await this.getFeatures();
@@ -292,6 +348,10 @@ const error = (result?.error as ActionInputError<typeof actions.wisephones.updat
           this.nickname = this.originalNickname;
           this.phoneNumber = this.originalPhoneNumber;
         }
+      });
+
+      this.$watch("features", async (userGroups: string[]) => {
+        await this.removeExclusiveGroups(userGroups);
       });
     }
   }));
