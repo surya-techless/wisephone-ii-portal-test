@@ -80,3 +80,20 @@ export const FEATURES: Record<string, Feature> = {
 };
 
 export const UNPAID_GROUP_ID = "caf62603de4646a784cddb4e63e653d1";
+
+export const getAlpineDataObject = (sourceDataElement: HTMLElement) => {
+  return window.Alpine.$data(sourceDataElement) as Record<string, unknown>;
+};
+
+export const updateUnreachableAlpineState = ({
+  sourceDataElement,
+  key,
+  value
+}: {
+  sourceDataElement: HTMLElement;
+  key: string;
+  value: any;
+}) => {
+  const dataObject = getAlpineDataObject(sourceDataElement);
+  dataObject[key] = value;
+};

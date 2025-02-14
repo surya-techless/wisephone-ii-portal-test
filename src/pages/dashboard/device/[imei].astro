@@ -225,7 +225,7 @@ const error = (result?.error as ActionInputError<typeof actions.wisephones.updat
 
 <script>
   import Alpine from "alpinejs";
-  import { type Feature } from "@/libs/utils";
+  import { type Feature, updateUnreachableAlpineState } from "@/libs/utils";
 
   Alpine.data("device", () => ({
     isAiEnabled: false,
@@ -274,6 +274,12 @@ const error = (result?.error as ActionInputError<typeof actions.wisephones.updat
       url.searchParams.set("knoxManageId", feature.knoxManageId);
 
       await fetch(url, { method: "POST" });
+
+      updateUnreachableAlpineState({
+        sourceDataElement: document.documentElement,
+        key: "toastMessage",
+        value: `Your device is being updated. ${feature.name} will be ${isEnabled ? "disabled" : "enabled"} shortly.`
+      });
     },
     async init() {
       this.$watch("imei", async () => {
