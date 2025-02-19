@@ -170,27 +170,30 @@ const error = (result?.error as ActionInputError<typeof actions.wisephones.updat
           {
             features.map((feature) => (
               <li
-                class="w-full bg-white shadow list-item"
+                class="w-full shadow list-item"
                 role="button"
                 x-bind:class="{ 'pointer-events-none': isLoading, 'opacity-50': !isSubscribed }"
                 @click="handleToggle()"
                 x-data={`{
-                  getSwitchElement() {
-                    return this.$refs.switch;
-                  },
-                  handleToggle() {
-                    if (this.feature.knoxManageId === '${KNOX_USER_GROUPS.PRO}') {
-                      toggleProAndMinimalFeature(this.feature, this.getSwitchElement());
-                    } else {
-                      toggleFeature(this.feature, this.getSwitchElement());
-                    }
-                  },
-                  feature: ${JSON.stringify(feature, null, 2)},
-                }`}
+                    getSwitchElement() {
+                      return this.$refs.switch;
+                    },
+                    handleToggle() {
+                      if (this.feature.knoxManageId === '${KNOX_USER_GROUPS.PRO}') {
+                        toggleProAndMinimalFeature(this.feature, this.getSwitchElement());
+                      } else {
+                        toggleFeature(this.feature, this.getSwitchElement());
+                      }
+                    },
+                    feature: ${JSON.stringify(feature, null, 2)},
+                  }`}
               >
                 <div class="w-full grid grid-cols-[1fr_auto] items-center justify-between gap-6">
                   <div class="flex flex-col">
-                    <p>{feature.name}</p>
+                    <div class="inline-flex items-center gap-2">
+                      <p>{feature.name}</p>
+                      {feature.isBeta && <span class="text-xs text-gray-500">(Beta)</span>}
+                    </div>
                     <p class="text-sm text-gray-500">{feature.description}</p>
                   </div>
                   <div class="relative h-[24px]">
@@ -211,6 +214,20 @@ const error = (result?.error as ActionInputError<typeof actions.wisephones.updat
             ))
           }
         </ul>
+
+        <div class="flex flex-col gap-4 p-6 -translate-y-2 rounded-2xl ps-8 bg-slate-100 rounded-b-2xl">
+          <p class="text-xs text-gray-500">
+            * Third-party apps may display in-app ads, and these ads are not affiliated with or supported by Techless.
+            Accessing the Tool Drawer apps and its contents is up to your discretion. If you are battling sexual
+            addiction, we kindly recommend not using the Tool Drawer.
+          </p>
+
+          <p class="text-xs text-gray-500">
+            ** Faith-based apps may display in-app ads, and these ads are not affiliated with or supported by Techless.
+            Accessing the apps for Christians, curated by our partner faith.tools, and its contents is up to your
+            discretion.
+          </p>
+        </div>
       </section>
       <form
         method="POST"

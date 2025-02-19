@@ -32,6 +32,7 @@ export type Feature = {
   description: string;
   enableMessage: string;
   disableMessage: string;
+  isBeta?: boolean;
 };
 
 export const KNOX_USER_GROUPS = {
@@ -51,10 +52,10 @@ export const FEATURES: Record<string, Feature> = {
     knoxManageId: KNOX_USER_GROUPS.PRO,
     lucideIcon: "wrench",
     isEnabled: true,
-    name: "Enable Tool Drawer",
+    isBeta: true,
+    name: "Enable Tool Drawer*",
     description: "Get access to safe, vetted third-party apps that are tools to help you get a job done.",
-    enableMessage:
-      "I acknowledge turning on this feature will allow access to third-party apps on this device. (Be aware, we do not recommend this for those battling sexual addiction.)",
+    enableMessage: "I acknowledge turning on this feature will allow access to third-party apps on this device.",
     disableMessage:
       "I acknowledge turning off this feature will remove access to third-party apps on this device. Any installed third-party apps will be uninstalled."
   },
@@ -62,7 +63,8 @@ export const FEATURES: Record<string, Feature> = {
     isEnabled: true,
     knoxManageId: KNOX_USER_GROUPS.ADD_ON_FAITH_TOOLS,
     lucideIcon: "fish-symbol",
-    name: "Enable faith.tools (beta)",
+    name: "Enable faith.tools**",
+    isBeta: true,
     description:
       "Get access to faith-based apps in the Tool Drawer, curated by faith.tools. YouVersion, Hallow, Dwell, and more.",
     enableMessage: "I acknowledge turning on this feature allows access to faith-based apps on this device.",
