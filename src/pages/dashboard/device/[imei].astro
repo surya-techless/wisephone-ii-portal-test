@@ -319,6 +319,28 @@ const error = (result?.error as ActionInputError<typeof actions.wisephones.updat
           userGroups.filter((group) => oldKnoxUserGroupsForSubscription.has(group)).length > 1;
 
         if (!hasMoreThanOneExclusiveGroup) {
+          // Do they have any exclusive groups? If not, we need to add Minimal.
+          const hasAtLeastOneExclusiveGroup = userGroups.some((group) => oldKnoxUserGroupsForSubscription.has(group));
+          if (!hasAtLeastOneExclusiveGroup) {
+            if (this.isSubscribed) {
+              const url = new URL(`/api/samsung-knox.json`, window.location.origin);
+
+              url.searchParams.set("action", "add-feature");
+              url.searchParams.set("imei", this.imei);
+              url.searchParams.set("knoxManageId", KNOX_USER_GROUPS.MINIMAL);
+
+              await fetch(url, { method: "POST" });
+            } else {
+              const url = new URL(`/api/samsung-knox.json`, window.location.origin);
+
+              url.searchParams.set("action", "add-feature");
+              url.searchParams.set("imei", this.imei);
+              url.searchParams.set("knoxManageId", KNOX_USER_GROUPS.UNPAID);
+
+              await fetch(url, { method: "POST" });
+            }
+          }
+
           return;
         }
 
