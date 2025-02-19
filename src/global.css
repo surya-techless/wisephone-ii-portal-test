@@ -147,3 +147,8 @@ li.list-item:last-child {
 .cl-formFieldLabel__phoneNumber-field {
   @apply grid grid-rows-2 justify-items-start;
 }
+
+/* Fixes Clerk modal from shinking weird... */
+.cl-modalContent * {
+  @apply flex-shrink-[unset];
+}
