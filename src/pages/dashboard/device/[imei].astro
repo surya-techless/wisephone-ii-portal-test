@@ -5,7 +5,7 @@ import Icon from "astro-iconify";
 import Layout from "@/layouts/Layout.astro";
 import Header from "@/components/Header.astro";
 import Footer from "@/components/Footer.astro";
-import { FEATURES } from "@/libs/utils";
+import { FEATURES, KNOX_USER_GROUPS } from "@/libs/utils";
 
 const { imei } = Astro.params;
 
@@ -173,10 +173,17 @@ const error = (result?.error as ActionInputError<typeof actions.wisephones.updat
                 class="w-full bg-white shadow list-item"
                 role="button"
                 x-bind:class="{ 'pointer-events-none': isLoading, 'opacity-50': !isSubscribed }"
-                @click="toggleFeature(feature, getSwitchElement())"
+                @click="handleToggle()"
                 x-data={`{
                   getSwitchElement() {
                     return this.$refs.switch;
+                  },
+                  handleToggle() {
+                    if (this.feature.knoxManageId === '${KNOX_USER_GROUPS.PRO}') {
+                      toggleProAndMinimalFeature(this.feature, this.getSwitchElement());
+                    } else {
+                      toggleFeature(this.feature, this.getSwitchElement());
+                    }
                   },
                   feature: ${JSON.stringify(feature, null, 2)},
                 }`}
@@ -274,6 +281,50 @@ const error = (result?.error as ActionInputError<typeof actions.wisephones.updat
         const res = await fetch(url, { method: "GET" });
         const features = await res.json();
         this.features = features;
+      },
+      /**
+       * This function is used to toggle the Pro and Minimal features. We must have one of these enabled.
+       * @param feature - The feature to toggle.
+       * @param switchElement - The switch element to toggle.
+       */
+      async toggleProAndMinimalFeature(feature: Feature, switchElement: HTMLInputElement) {
+        if (!this.isSubscribed) {
+          alert("Oops! You must have an active Techless Subscription to enable features.");
+          return;
+        }
+
+        const isEnabled = this.isFeatureEnabled(feature.knoxManageId);
+        if (!confirm(isEnabled ? feature.disableMessage : feature.enableMessage)) {
+          return;
+        }
+
+        switchElement.checked = !switchElement.checked;
+        const removeUrl = new URL(`/api/samsung-knox.json`, window.location.origin);
+        const addUrl = new URL(`/api/samsung-knox.json`, window.location.origin);
+
+        removeUrl.searchParams.set("imei", this.imei);
+        addUrl.searchParams.set("imei", this.imei);
+
+        if (isEnabled) {
+          removeUrl.searchParams.set("knoxManageId", KNOX_USER_GROUPS.PRO);
+          removeUrl.searchParams.set("action", "remove-feature");
+          addUrl.searchParams.set("knoxManageId", KNOX_USER_GROUPS.MINIMAL);
+          addUrl.searchParams.set("action", "apply-feature");
+        } else {
+          removeUrl.searchParams.set("knoxManageId", KNOX_USER_GROUPS.MINIMAL);
+          removeUrl.searchParams.set("action", "apply-feature");
+          addUrl.searchParams.set("knoxManageId", KNOX_USER_GROUPS.PRO);
+          addUrl.searchParams.set("action", "remove-feature");
+        }
+
+        await fetch(removeUrl, { method: "POST" });
+        await fetch(addUrl, { method: "POST" });
+
+        updateUnreachableAlpineState({
+          sourceDataElement: document.documentElement,
+          key: "toastMessage",
+          value: `Your device is being updated. ${feature.name} will be ${isEnabled ? "disabled" : "enabled"} shortly.`
+        });
       },
       async toggleFeature(feature: Feature, switchElement: HTMLInputElement) {
         if (!this.isSubscribed) {
