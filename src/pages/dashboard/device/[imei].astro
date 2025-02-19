@@ -34,7 +34,9 @@ if (!wisephones || !wisephones.length) {
 const wisephone = wisephones[0];
 
 const subscribedUrl = new URL(`/webhook-is-user-subscribed`, "https://cameronpak-wisephoneii.web.val.run");
-subscribedUrl.searchParams.set("phoneNumber", wisephone.phoneNumber);
+
+// Phone numbers are stored as XXX-XXX-XXXX, but the webhook expects +1XXX-XXX-XXXX
+subscribedUrl.searchParams.set("phoneNumber", `+1${wisephone.phoneNumber.replace(/[^0-9+]/g, "")}`);
 subscribedUrl.searchParams.set("imei", String(wisephone.imei));
 
 const bypassTechlessSubscription = await db
