@@ -323,7 +323,7 @@ const error = (result?.error as ActionInputError<typeof actions.wisephones.updat
         updateUnreachableAlpineState({
           sourceDataElement: document.documentElement,
           key: "toastMessage",
-          value: `Your device is being updated. ${feature.name} will be ${isEnabled ? "disabled" : "enabled"} shortly.`
+          value: `Your device is being updated. ${feature.name} will be ${isToolDrawerEnabled ? "disabled" : "enabled"} shortly.`
         });
       },
       async toggleFeature(feature: Feature, switchElement: HTMLInputElement) {
