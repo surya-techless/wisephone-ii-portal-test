@@ -3,6 +3,12 @@ import { SignedIn, SignedOut, SignInButton, SignUpButton } from "@clerk/astro/co
 import WisephoneLogo from "@/components/WisephoneLogo.astro";
 import Layout from "@/layouts/Layout.astro";
 import Footer from "@/components/Footer.astro";
+
+const { userId } = Astro.locals.auth();
+
+if (userId) {
+  return Astro.redirect("/dashboard");
+}
 ---
 
 <Layout
