@@ -60,7 +60,7 @@ const error = (result?.error as ActionInputError<typeof actions.wisephones.updat
 
 <Layout title="Device Features" description="Manage the features of your Wisephone II device.">
   <div
-    class="prose p-6 container mx-auto"
+    class="container p-6 mx-auto prose"
     x-data="device"
     x-init={`
       imei = "${imei}";
@@ -75,78 +75,79 @@ const error = (result?.error as ActionInputError<typeof actions.wisephones.updat
   >
     <Header activeTab="page" isProjectPublished={false} projectSlug={""} />
 
-    <main class="py-12 flex flex-col gap-6">
-      <section class="not-prose flex flex-col gap-6">
+    <main class="flex flex-col gap-6 py-12">
+      <section class="flex flex-col gap-6 not-prose">
         <div>
-          <a href="/dashboard" class="w-fit btn btn-link p-0 text-slate-500 no-underline">
+          <a href="/dashboard" class="p-0 no-underline w-fit btn btn-link text-slate-500">
             <Icon name="lucide:arrow-left" class="w-4 h-4" />
             Devices
           </a>
-          <h1 class="text-3xl font-bold flex items-center gap-2">
-            <span>Features</span>
-            <button
-              @click="alert('Use this page to manage the features of your Wisephone II. Make sure the device is connected to the internet before updating any features.')"
-            >
-              <Icon name="lucide:circle-help" class="text-slate-500 w-4 h-4" />
+
+          <div class="grid grid-cols-[1fr_auto] items-center gap-2">
+            <h1 class="flex items-center gap-2 !m-0 text-3xl font-bold">
+              <span>Features</span>
+              <button
+                @click="alert('Use this page to manage the features of your Wisephone II. Make sure the device is connected to the internet before updating any features.')"
+              >
+                <Icon name="lucide:circle-help" class="w-4 h-4 text-slate-500" />
+              </button>
+            </h1>
+
+            <button x-cloak class="sm:hidden btn btn-sm btn-primary" x-show="!isPhoneSetUp" @click="completeSetup()">
+              Complete Setup
             </button>
-          </h1>
+          </div>
 
-          <div class="text-slate-500 w-full inline-flex flex-wrap items-baseline gap-2">
-            <div>
-              <div x-show="!isEditing">
-                <div class="flex items-baseline gap-2">
-                  <span
-                    class="hover:underline hover:cursor-pointer underline-offset-4"
-                    @click="isEditing = true"
-                    x-text="nickname">{wisephone.nickname}</span
-                  >
-                  •
-                  <span
-                    class="hover:underline hover:cursor-pointer underline-offset-4"
-                    @click="isEditing = true"
-                    x-text="phoneNumber">{wisephone.phoneNumber}</span
-                  >
-                </div>
-              </div>
-
-              <div x-cloak x-show="isEditing" class="w-full" x-collapse>
-                <form
-                  method="POST"
-                  class="[&>*]:max-sm:w-full flex flex-wrap max-sm:flex-col w-full items-baseline gap-2"
-                  action={actions.wisephones.updateWisephone}
+          <div class="inline-flex flex-wrap items-baseline w-full gap-2 mt-2 text-slate-500">
+            <div x-show="!isEditing">
+              <div class="flex items-baseline gap-2">
+                <span
+                  class="hover:underline hover:cursor-pointer underline-offset-4"
+                  @click="isEditing = true"
+                  x-text="nickname">{wisephone.nickname}</span
                 >
-                  <input
-                    placeholder="Device Nickname"
-                    type="text"
-                    name="nickname"
-                    x-model="nickname"
-                    class="input input-bordered"
-                    required
-                  />
-                  <input
-                    type="text"
-                    name="phoneNumber"
-                    placeholder="123-456-7890"
-                    x-model="phoneNumber"
-                    x-mask="999-999-9999"
-                    class="input input-bordered"
-                    required
-                  />
-                  <input type="hidden" name="imei" :value="imei" />
-                  <div class="flex gap-1">
-                    <button type="submit" class="btn btn-primary btn-circle">
-                      <Icon name="lucide:check" class="w-4 h-4" />
-                    </button>
-                    <button
-                      type="button"
-                      @click="isEditing = false"
-                      class="btn hover:!bg-slate-50 btn-ghost btn-circle"
-                    >
-                      <Icon name="lucide:x" class="w-4 h-4" />
-                    </button>
-                  </div>
-                </form>
+                •
+                <span
+                  class="hover:underline hover:cursor-pointer underline-offset-4"
+                  @click="isEditing = true"
+                  x-text="phoneNumber">{wisephone.phoneNumber}</span
+                >
               </div>
+            </div>
+
+            <div x-cloak x-show="isEditing" class="w-full" x-collapse>
+              <form
+                method="POST"
+                class="[&>*]:max-sm:w-full flex flex-wrap max-sm:flex-col w-full items-baseline gap-2"
+                action={actions.wisephones.updateWisephone}
+              >
+                <input
+                  placeholder="Device Nickname"
+                  type="text"
+                  name="nickname"
+                  x-model="nickname"
+                  class="input input-bordered"
+                  required
+                />
+                <input
+                  type="text"
+                  name="phoneNumber"
+                  placeholder="123-456-7890"
+                  x-model="phoneNumber"
+                  x-mask="999-999-9999"
+                  class="input input-bordered"
+                  required
+                />
+                <input type="hidden" name="imei" :value="imei" />
+                <div class="flex gap-1">
+                  <button type="submit" class="btn btn-primary btn-circle">
+                    <Icon name="lucide:check" class="w-4 h-4" />
+                  </button>
+                  <button type="button" @click="isEditing = false" class="btn hover:!bg-slate-50 btn-ghost btn-circle">
+                    <Icon name="lucide:x" class="w-4 h-4" />
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         </div>
@@ -155,11 +156,11 @@ const error = (result?.error as ActionInputError<typeof actions.wisephones.updat
           x-show="!isSubscribed"
           x-cloak
           x-transition
-          class="alert bg-slate-200 border-slate-300 text-slate-800 -rotate-1 hover:rotate-0 transition-transform duration-150"
+          class="transition-transform duration-150 alert bg-slate-200 border-slate-300 text-slate-800 -rotate-1 hover:rotate-0"
         >
           <Icon name="lucide:info" class="w-4 h-4" />
           <p>
-            <a href="https://wisephone.com/pages/activate" class="link font-medium text-slate-800"
+            <a href="https://wisephone.com/pages/activate" class="font-medium link text-slate-800"
               >Activate a Techless Subscription</a
             > to update this device's features.
           </p>
@@ -169,7 +170,7 @@ const error = (result?.error as ActionInputError<typeof actions.wisephones.updat
           {
             features.map((feature) => (
               <li
-                class="list-item bg-white shadow w-full"
+                class="w-full bg-white shadow list-item"
                 role="button"
                 x-bind:class="{ 'pointer-events-none': isLoading, 'opacity-50': !isSubscribed }"
                 @click="toggleFeature(feature, getSwitchElement())"
@@ -189,7 +190,7 @@ const error = (result?.error as ActionInputError<typeof actions.wisephones.updat
                     <input
                       x-ref="switch"
                       type="checkbox"
-                      class="toggle pointer-events-none"
+                      class="pointer-events-none toggle"
                       x-bind:checked="isFeatureEnabled(feature.knoxManageId)"
                     />
                     <div
@@ -232,127 +233,147 @@ const error = (result?.error as ActionInputError<typeof actions.wisephones.updat
     oldKnoxUserGroupsForSubscription
   } from "@/libs/utils";
 
-  Alpine.data("device", () => ({
-    isAiEnabled: false,
-    isEditing: false,
-    nickname: "",
-    phoneNumber: "",
-    originalNickname: "",
-    originalPhoneNumber: "",
-    features: [] as string[],
-    imei: "",
-    isSubscribed: false,
-    isFeatureEnabled(knoxManageId: string) {
-      return this.features.includes(knoxManageId);
-    },
-    isLoading: true,
-    async getFeatures() {
-      const url = new URL(`/api/samsung-knox.json`, window.location.origin);
-      url.searchParams.set("action", "get-device-groups");
-      url.searchParams.set("imei", this.imei);
-
-      const res = await fetch(url, { method: "GET" });
-      const features = await res.json();
-      this.features = features;
-    },
-    async toggleFeature(feature: Feature, switchElement: HTMLInputElement) {
-      if (!this.isSubscribed) {
-        alert("Oops! You must have an active Techless Subscription to enable features.");
-        return;
-      }
-
-      const isEnabled = this.isFeatureEnabled(feature.knoxManageId);
-      if (!confirm(isEnabled ? feature.disableMessage : feature.enableMessage)) {
-        return;
-      }
-
-      switchElement.checked = !switchElement.checked;
-      const url = new URL(`/api/samsung-knox.json`, window.location.origin);
-
-      if (this.isFeatureEnabled(feature.knoxManageId)) {
-        url.searchParams.set("action", "remove-feature");
-      } else {
-        url.searchParams.set("action", "apply-feature");
-      }
-
-      url.searchParams.set("imei", this.imei);
-      url.searchParams.set("knoxManageId", feature.knoxManageId);
-
-      await fetch(url, { method: "POST" });
-
-      updateUnreachableAlpineState({
-        sourceDataElement: document.documentElement,
-        key: "toastMessage",
-        value: `Your device is being updated. ${feature.name} will be ${isEnabled ? "disabled" : "enabled"} shortly.`
-      });
-    },
-    async removeExclusiveGroups(userGroups: string[]) {
-      if (!userGroups.length) {
-        return;
-      }
-
-      if (!this.isSubscribed) {
-        return;
-      }
-
-      const hasMoreThanOneExclusiveGroup =
-        userGroups.filter((group) => oldKnoxUserGroupsForSubscription.has(group)).length > 1;
-
-      if (!hasMoreThanOneExclusiveGroup) {
-        return;
-      }
-
-      if (userGroups.includes(KNOX_USER_GROUPS.UNPAID)) {
-        const url = new URL(`/api/samsung-knox.json`, window.location.origin);
-
-        url.searchParams.set("action", "remove-feature");
-        url.searchParams.set("imei", this.imei);
-        url.searchParams.set("knoxManageId", KNOX_USER_GROUPS.UNPAID);
-
-        await fetch(url, { method: "POST" });
-      }
-
-      if (userGroups.includes(KNOX_USER_GROUPS.PRO) && userGroups.includes(KNOX_USER_GROUPS.HEALTHY)) {
-        const url = new URL(`/api/samsung-knox.json`, window.location.origin);
-
-        url.searchParams.set("action", "remove-feature");
-        url.searchParams.set("imei", this.imei);
-        url.searchParams.set("knoxManageId", KNOX_USER_GROUPS.HEALTHY);
-
-        await fetch(url, { method: "POST" });
-      }
-
-      if (
-        (userGroups.includes(KNOX_USER_GROUPS.PRO) || userGroups.includes(KNOX_USER_GROUPS.HEALTHY)) &&
-        userGroups.includes(KNOX_USER_GROUPS.MINIMAL)
-      ) {
-        const url = new URL(`/api/samsung-knox.json`, window.location.origin);
-
-        url.searchParams.set("action", "remove-feature");
-        url.searchParams.set("imei", this.imei);
-        url.searchParams.set("knoxManageId", KNOX_USER_GROUPS.MINIMAL);
-
-        await fetch(url, { method: "POST" });
-      }
-
-      window.location.reload();
-    },
-    async init() {
-      this.$watch("imei", async () => {
-        await this.getFeatures();
-        this.isLoading = false;
-      });
-
-      this.$watch("isEditing", (value) => {
-        if (!value) {
-          this.nickname = this.originalNickname;
-          this.phoneNumber = this.originalPhoneNumber;
+  Alpine.data("device", function () {
+    return {
+      isAiEnabled: false,
+      isEditing: false,
+      nickname: "",
+      phoneNumber: "",
+      originalNickname: "",
+      originalPhoneNumber: "",
+      features: [] as string[],
+      imei: "",
+      /** Using this field as a local storage flag to track if the phone is set up. */
+      // @ts-ignore
+      isPhoneSetUp: this.$persist(false),
+      get completeSetupUrl() {
+        return `http://localhost?imei=${this.imei}&phone=${this.phoneNumber}&subscription=done`;
+      },
+      completeSetup() {
+        if (
+          confirm(
+            "Completing the setup will close the Portal and remove 'Setup' from your Wisephone II's home screen. Continue?"
+          )
+        ) {
+          this.isPhoneSetUp = true;
+          this.$nextTick(() => {
+            window.location.href = this.completeSetupUrl;
+          });
         }
-      });
+      },
+      isSubscribed: false,
+      isFeatureEnabled(knoxManageId: string) {
+        return this.features.includes(knoxManageId);
+      },
+      isLoading: true,
+      async getFeatures() {
+        const url = new URL(`/api/samsung-knox.json`, window.location.origin);
+        url.searchParams.set("action", "get-device-groups");
+        url.searchParams.set("imei", this.imei);
 
-      this.$watch("features", async (userGroups: string[]) => {
-        await this.removeExclusiveGroups(userGroups);
-      });
-    }
-  }));
+        const res = await fetch(url, { method: "GET" });
+        const features = await res.json();
+        this.features = features;
+      },
+      async toggleFeature(feature: Feature, switchElement: HTMLInputElement) {
+        if (!this.isSubscribed) {
+          alert("Oops! You must have an active Techless Subscription to enable features.");
+          return;
+        }
+
+        const isEnabled = this.isFeatureEnabled(feature.knoxManageId);
+        if (!confirm(isEnabled ? feature.disableMessage : feature.enableMessage)) {
+          return;
+        }
+
+        switchElement.checked = !switchElement.checked;
+        const url = new URL(`/api/samsung-knox.json`, window.location.origin);
+
+        if (this.isFeatureEnabled(feature.knoxManageId)) {
+          url.searchParams.set("action", "remove-feature");
+        } else {
+          url.searchParams.set("action", "apply-feature");
+        }
+
+        url.searchParams.set("imei", this.imei);
+        url.searchParams.set("knoxManageId", feature.knoxManageId);
+
+        await fetch(url, { method: "POST" });
+
+        updateUnreachableAlpineState({
+          sourceDataElement: document.documentElement,
+          key: "toastMessage",
+          value: `Your device is being updated. ${feature.name} will be ${isEnabled ? "disabled" : "enabled"} shortly.`
+        });
+      },
+      async removeExclusiveGroups(userGroups: string[]) {
+        if (!userGroups.length) {
+          return;
+        }
+
+        if (!this.isSubscribed) {
+          return;
+        }
+
+        const hasMoreThanOneExclusiveGroup =
+          userGroups.filter((group) => oldKnoxUserGroupsForSubscription.has(group)).length > 1;
+
+        if (!hasMoreThanOneExclusiveGroup) {
+          return;
+        }
+
+        if (userGroups.includes(KNOX_USER_GROUPS.UNPAID)) {
+          const url = new URL(`/api/samsung-knox.json`, window.location.origin);
+
+          url.searchParams.set("action", "remove-feature");
+          url.searchParams.set("imei", this.imei);
+          url.searchParams.set("knoxManageId", KNOX_USER_GROUPS.UNPAID);
+
+          await fetch(url, { method: "POST" });
+        }
+
+        if (userGroups.includes(KNOX_USER_GROUPS.PRO) && userGroups.includes(KNOX_USER_GROUPS.HEALTHY)) {
+          const url = new URL(`/api/samsung-knox.json`, window.location.origin);
+
+          url.searchParams.set("action", "remove-feature");
+          url.searchParams.set("imei", this.imei);
+          url.searchParams.set("knoxManageId", KNOX_USER_GROUPS.HEALTHY);
+
+          await fetch(url, { method: "POST" });
+        }
+
+        if (
+          (userGroups.includes(KNOX_USER_GROUPS.PRO) || userGroups.includes(KNOX_USER_GROUPS.HEALTHY)) &&
+          userGroups.includes(KNOX_USER_GROUPS.MINIMAL)
+        ) {
+          const url = new URL(`/api/samsung-knox.json`, window.location.origin);
+
+          url.searchParams.set("action", "remove-feature");
+          url.searchParams.set("imei", this.imei);
+          url.searchParams.set("knoxManageId", KNOX_USER_GROUPS.MINIMAL);
+
+          await fetch(url, { method: "POST" });
+        }
+
+        window.location.reload();
+      },
+      async init() {
+        this.$watch("imei", async () => {
+          await this.getFeatures();
+          this.isLoading = false;
+        });
+
+        this.$watch("isEditing", (value) => {
+          if (!value) {
+            this.nickname = this.originalNickname;
+            this.phoneNumber = this.originalPhoneNumber;
+          }
+        });
+
+        this.$watch("features", async (userGroups: string[]) => {
+          await this.removeExclusiveGroups(userGroups);
+        });
+      }
+    };
+  });
 </script>
