@@ -250,10 +250,16 @@ const error = (result?.error as ActionInputError<typeof actions.wisephones.updat
         return `http://localhost?imei=${this.imei}&phone=${this.phoneNumber}&subscription=done`;
       },
       completeSetup() {
-        this.isPhoneSetUp = true;
-        this.$nextTick(() => {
-          window.location.href = this.completeSetupUrl;
-        });
+        if (
+          confirm(
+            "Completing the setup will close the Portal and remove 'Setup' from your Wisephone II's home screen. Continue?"
+          )
+        ) {
+          this.isPhoneSetUp = true;
+          this.$nextTick(() => {
+            window.location.href = this.completeSetupUrl;
+          });
+        }
       },
       isSubscribed: false,
       isFeatureEnabled(knoxManageId: string) {
