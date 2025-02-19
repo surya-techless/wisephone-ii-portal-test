@@ -293,8 +293,8 @@ const error = (result?.error as ActionInputError<typeof actions.wisephones.updat
           return;
         }
 
-        const isEnabled = this.isFeatureEnabled(feature.knoxManageId);
-        if (!confirm(isEnabled ? feature.disableMessage : feature.enableMessage)) {
+        const isToolDrawerEnabled = this.isFeatureEnabled(feature.knoxManageId);
+        if (!confirm(isToolDrawerEnabled ? feature.disableMessage : feature.enableMessage)) {
           return;
         }
 
@@ -305,16 +305,16 @@ const error = (result?.error as ActionInputError<typeof actions.wisephones.updat
         removeUrl.searchParams.set("imei", this.imei);
         addUrl.searchParams.set("imei", this.imei);
 
-        if (isEnabled) {
+        if (isToolDrawerEnabled) {
           removeUrl.searchParams.set("knoxManageId", KNOX_USER_GROUPS.PRO);
           removeUrl.searchParams.set("action", "remove-feature");
           addUrl.searchParams.set("knoxManageId", KNOX_USER_GROUPS.MINIMAL);
           addUrl.searchParams.set("action", "apply-feature");
         } else {
           removeUrl.searchParams.set("knoxManageId", KNOX_USER_GROUPS.MINIMAL);
-          removeUrl.searchParams.set("action", "apply-feature");
+          removeUrl.searchParams.set("action", "remove-feature");
           addUrl.searchParams.set("knoxManageId", KNOX_USER_GROUPS.PRO);
-          addUrl.searchParams.set("action", "remove-feature");
+          addUrl.searchParams.set("action", "apply-feature");
         }
 
         await fetch(removeUrl, { method: "POST" });
