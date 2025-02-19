@@ -56,7 +56,8 @@ export const FEATURES: Record<string, Feature> = {
     name: "Tool Drawer*",
     description:
       "Access safe, vetted third-party apps. A collection of practical apps that avoid addiction and distraction.",
-    enableMessage: "I acknowledge turning on this feature will allow access to third-party apps on this device.",
+    enableMessage:
+      "Third-party apps may display in-app ads, content, and experiences not managed by Techless. Enable Tool Drawer apps at your discretion. If you are battling addiction, we recommend not enabling the Tool Drawer.",
     disableMessage:
       "I acknowledge turning off this feature will remove access to third-party apps on this device. Any installed third-party apps will be uninstalled."
   },
@@ -67,7 +68,8 @@ export const FEATURES: Record<string, Feature> = {
     name: "Apps curated by faith.tools**",
     isBeta: true,
     description: "Access faith-based apps curated by faith.tools. Bible, YouVersion, Hallow, Dwell and more.",
-    enableMessage: "I acknowledge turning on this feature allows access to faith-based apps on this device.",
+    enableMessage:
+      "Apps curated by faith.tools may display in-app ads and content not affiliated with or curated by Techless. These apps are curated by our partner, faith.tools.",
     disableMessage:
       "I acknowledge turning off this feature will remove access to faith-based apps on this device. Any installed faith-based apps will be uninstalled."
   },
