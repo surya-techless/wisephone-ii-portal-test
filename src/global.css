@@ -7,6 +7,16 @@
   --text-secondary: #88878c;
   --toggle-default: #9a999d;
   --toggle-checked: #4978f7;
+  /* Wisephone Colors - Referenced from Marketing's Google Drive */
+  --charcoal: #3d3935;
+  --rust: #c07f53;
+  --paper: #f7f6f2;
+  --evergreen: #48615b;
+  --graphite: #827c78;
+  --overcast: #dbd5cd;
+  --sea: #5ea59a;
+  --dust: #dbc8b6;
+  --sky: #b3c4cc;
 }
 
 * {
