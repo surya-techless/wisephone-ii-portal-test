@@ -93,7 +93,12 @@ const error = (result?.error as ActionInputError<typeof actions.wisephones.updat
               </button>
             </h1>
 
-            <button x-cloak class="sm:hidden btn btn-sm btn-primary" x-show="!isPhoneSetUp" @click="completeSetup()">
+            <button
+              x-cloak
+              class="sm:hidden btn btn-sm btn-primary"
+              x-show="!isPhoneSetUp && isSubscribed"
+              @click="completeSetup()"
+            >
               Complete Setup
             </button>
           </div>
