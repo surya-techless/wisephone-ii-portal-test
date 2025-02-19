@@ -24,7 +24,7 @@ const result = Astro.getActionResult(actions.wisephones.createWisephone);
 
 <Layout title="Dashboard" description="Manage your Wisephone II devices.">
   <div
-    class="prose p-6 container h-full mx-auto"
+    class="container h-full p-6 mx-auto prose"
     x-data="{
       showForm: false,
     }"
@@ -35,15 +35,15 @@ const result = Astro.getActionResult(actions.wisephones.createWisephone);
   >
     <Header activeTab="page" isProjectPublished={false} projectSlug={""} />
 
-    <main class="py-12 flex flex-col gap-6">
+    <main class="flex flex-col gap-6 py-12">
       {
         derivedHasNoWisephone ? (
           <Fragment>
             <section
-              class="w-full flex flex-col items-center justify-center p-6 rounded-2xl bg-transparent border-2 border-slate-200"
+              class="flex flex-col items-center justify-center w-full p-6 bg-transparent border-2 rounded-2xl border-slate-200"
               x-show="!showForm"
             >
-              <h1 class="text-3xl font-bold">Setup</h1>
+              <h1 class="text-3xl font-bold">Connect to your Wisephone.</h1>
               <p class="m-0 text-center">Connect your Wisephone II to manage your device's experience.</p>
               <button class="mt-8 btn btn-primary w-fit" @click="showForm = true">
                 Get Started
@@ -52,9 +52,9 @@ const result = Astro.getActionResult(actions.wisephones.createWisephone);
           </Fragment>
         ) : (
           <Fragment>
-            <h1 class="m-0 p-0 text-3xl font-bold">Your Devices</h1>
-            <section class="not-prose w-full flex flex-col items-center justify-center rounded-2xl bg-white shadow">
-              <ul class="m-0 p-0 w-full flex flex-col items-center justify-center rounded-2xl">
+            <h1 class="p-0 m-0 text-3xl font-bold">Your Devices</h1>
+            <section class="flex flex-col items-center justify-center w-full bg-white shadow not-prose rounded-2xl">
+              <ul class="flex flex-col items-center justify-center w-full p-0 m-0 rounded-2xl">
                 {wisephones.map((wisephone) => (
                   <li class="w-full [&:not(:last-child)]:border-b border-slate-200">
                     <a
@@ -73,19 +73,19 @@ const result = Astro.getActionResult(actions.wisephones.createWisephone);
             </section>
             <button x-show="!showForm" @click="showForm = true" class="btn btn-ghost hover:bg-slate-200">
               <Icon name="lucide:plus" class="w-6 h-6" />
-              Add Another Wisephone II
+              Add Another Wisephone
             </button>
           </Fragment>
         )
       }
 
       <section
-        class="w-full flex flex-col items-start justify-center p-6 rounded-2xl bg-white shadow"
+        class="flex flex-col items-start justify-center w-full p-6 bg-white shadow rounded-2xl"
         x-show="showForm"
         x-transition
         x-cloak
       >
-        <div class="flex flex-row w-full gap-4 justify-between">
+        <div class="flex flex-row justify-between w-full gap-4">
           <h2 class="text-2xl font-bold">Setup</h2>
 
           <button @click="showForm = false" class="btn btn-sm btn-circle">
@@ -104,10 +104,10 @@ const result = Astro.getActionResult(actions.wisephones.createWisephone);
             >
           </button>
         </div>
-        <form method="POST" action={actions.wisephones.createWisephone} class="w-full flex flex-col gap-4">
-          <div class="form-control w-full">
+        <form method="POST" action={actions.wisephones.createWisephone} class="flex flex-col w-full gap-4">
+          <div class="w-full form-control">
             <label class="label">
-              <span class="label-text">Wisephone II's IMEI (slot 1)</span>
+              <span class="label-text">Wisephone IMEI (slot 1)</span>
               <span class="label-text-alt">Required</span>
             </label>
             <input
@@ -115,7 +115,7 @@ const result = Astro.getActionResult(actions.wisephones.createWisephone);
               name="imei"
               x-mask="999999999999999"
               placeholder="350XXXXXXXXXXXX"
-              class="input input-bordered w-full"
+              class="w-full input input-bordered"
               required
             />
             <label class="label">
@@ -127,9 +127,9 @@ const result = Astro.getActionResult(actions.wisephones.createWisephone);
             </label>
           </div>
 
-          <div class="form-control w-full">
+          <div class="w-full form-control">
             <label class="label">
-              <span class="label-text">Wisephone II's Phone Number</span>
+              <span class="label-text">Wisephone Phone Number</span>
               <span class="label-text-alt">Required</span>
             </label>
             <input
@@ -137,22 +137,22 @@ const result = Astro.getActionResult(actions.wisephones.createWisephone);
               name="phoneNumber"
               x-mask="999-999-9999"
               placeholder="XXX-XXX-XXXX"
-              class="input input-bordered w-full"
+              class="w-full input input-bordered"
               required
             />
           </div>
 
-          <div class="form-control w-full">
+          <div class="w-full form-control">
             <label class="label">
-              <span class="label-text">Who is this Wisephone II for?</span>
+              <span class="label-text">Give this Wisephone a name or owner</span>
               <span class="label-text-alt">Required</span>
             </label>
-            <input type="text" name="nickname" placeholder="John Doe" class="input input-bordered w-full" required />
+            <input type="text" name="nickname" placeholder="John Doe" class="w-full input input-bordered" required />
           </div>
 
           <input type="hidden" name="userId" value={user?.id} />
 
-          <button type="submit" class="btn btn-primary mt-4"> Done </button>
+          <button type="submit" class="mt-4 btn btn-primary"> Done </button>
         </form>
       </section>
     </main>

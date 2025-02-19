@@ -34,7 +34,9 @@ if (!wisephones || !wisephones.length) {
 const wisephone = wisephones[0];
 
 const subscribedUrl = new URL(`/webhook-is-user-subscribed`, "https://cameronpak-wisephoneii.web.val.run");
-subscribedUrl.searchParams.set("phoneNumber", wisephone.phoneNumber);
+
+// Phone numbers are stored as XXX-XXX-XXXX, but the webhook expects +1XXX-XXX-XXXX
+subscribedUrl.searchParams.set("phoneNumber", `+1${wisephone.phoneNumber.replace(/[^0-9+]/g, "")}`);
 subscribedUrl.searchParams.set("imei", String(wisephone.imei));
 
 const bypassTechlessSubscription = await db
@@ -222,15 +224,14 @@ const error = (result?.error as ActionInputError<typeof actions.wisephones.updat
 
         <div class="flex flex-col gap-4 p-6 -translate-y-2 rounded-2xl ps-8 bg-slate-100 rounded-b-2xl">
           <p class="text-xs text-gray-500">
-            * Please note that third-party apps may display in-app ads, which are not endorsed by Techless and could
-            contain unexpected content. Use of the Tool Drawer apps is at your discretion. If you are dealing with
-            sexual addiction, we kindly advise against using the Tool Drawer.
+            * Tool Drawer Disclosure: Please note that third-party apps may display in-app ads, which are not endorsed
+            by Techless and could contain unexpected content. Use of the Tool Drawer apps is at your discretion. If you
+            are battling addiction, we recommend not enabling the Tool Drawer.
           </p>
 
           <p class="text-xs text-gray-500">
-            ** Faith-based apps may display in-app ads, and these ads are not affiliated with or supported by Techless.
-            Accessing the apps for Christians, curated by our partner faith.tools, and its contents is up to your
-            discretion.
+            ** faith.tools Disclosure: Apps curated by faith.tools may display in-app ads and content not affiliated
+            with or curated by Techless. These apps are curated by our partner, faith.tools.
           </p>
         </div>
       </section>

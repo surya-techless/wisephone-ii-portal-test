@@ -53,9 +53,11 @@ export const FEATURES: Record<string, Feature> = {
     lucideIcon: "wrench",
     isEnabled: true,
     isBeta: true,
-    name: "Enable Tool Drawer*",
-    description: "Get access to safe, vetted third-party apps that are tools to help you get a job done.",
-    enableMessage: "I acknowledge turning on this feature will allow access to third-party apps on this device.",
+    name: "Tool Drawer*",
+    description:
+      "Access safe, vetted third-party apps. A collection of practical apps that avoid addiction and distraction.",
+    enableMessage:
+      "Third-party apps may display in-app ads, content, and experiences not managed by Techless. Enable Tool Drawer apps at your discretion. If you are battling addiction, we recommend not enabling the Tool Drawer.",
     disableMessage:
       "I acknowledge turning off this feature will remove access to third-party apps on this device. Any installed third-party apps will be uninstalled."
   },
@@ -63,11 +65,11 @@ export const FEATURES: Record<string, Feature> = {
     isEnabled: true,
     knoxManageId: KNOX_USER_GROUPS.ADD_ON_FAITH_TOOLS,
     lucideIcon: "fish-symbol",
-    name: "Enable faith.tools**",
+    name: "Apps curated by faith.tools**",
     isBeta: true,
-    description:
-      "Get access to faith-based apps in the Tool Drawer, curated by faith.tools. YouVersion, Hallow, Dwell, and more.",
-    enableMessage: "I acknowledge turning on this feature allows access to faith-based apps on this device.",
+    description: "Access faith-based apps curated by faith.tools. Bible, YouVersion, Hallow, Dwell and more.",
+    enableMessage:
+      "Apps curated by faith.tools may display in-app ads and content not affiliated with or curated by Techless. These apps are curated by our partner, faith.tools.",
     disableMessage:
       "I acknowledge turning off this feature will remove access to faith-based apps on this device. Any installed faith-based apps will be uninstalled."
   },
@@ -75,7 +77,7 @@ export const FEATURES: Record<string, Feature> = {
     isEnabled: true,
     knoxManageId: KNOX_USER_GROUPS.ADD_ON_GOOGLE_APPS,
     lucideIcon: "layout-grid",
-    name: "Enable Google Apps",
+    name: "Google Apps",
     description: "Get access to Google Messages, Google Maps, and Google Photos.",
     enableMessage:
       "I acknowledge turning on this feature allows access to Google Messages, Maps, and Photos on this device. At this time Google Messages has Gemini AI available to chat with, so please use caution when making this decision.",

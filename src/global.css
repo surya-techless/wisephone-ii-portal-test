@@ -6,7 +6,18 @@
   --text-primary: #010101;
   --text-secondary: #88878c;
   --toggle-default: #9a999d;
-  --toggle-checked: #4978f7;
+  /* --toggle-checked: #4978f7; */
+  /* Wisephone Colors - Referenced from Marketing's Google Drive */
+  --charcoal: #3d3935;
+  --rust: #c07f53;
+  --paper: #f7f6f2;
+  --evergreen: #48615b;
+  --graphite: #827c78;
+  --overcast: #dbd5cd;
+  --sea: #5ea59a;
+  --dust: #dbc8b6;
+  --sky: #b3c4cc;
+  --toggle-checked: var(--rust);
 }
 
 * {
@@ -125,4 +136,19 @@ li.list-item:last-child {
 
 .btn-ghost:hover {
   @apply bg-slate-100;
+}
+
+/* Hack for Clerk sign up component */
+.cl-formFieldLabel__phoneNumber-field::after {
+  content: "Your #, not necessarily the Wisephone's #";
+  @apply text-xs font-normal text-gray-500;
+}
+
+.cl-formFieldLabel__phoneNumber-field {
+  @apply grid grid-rows-2 justify-items-start;
+}
+
+/* Fixes Clerk modal from shinking weird... */
+.cl-modalContent * {
+  @apply flex-shrink-[unset];
 }
