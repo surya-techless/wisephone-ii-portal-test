@@ -116,6 +116,10 @@ const result = Astro.getActionResult(actions.wisephones.createWisephone);
               x-mask="999999999999999"
               placeholder="350XXXXXXXXXXXX"
               class="w-full input input-bordered"
+              pattern="[0-9]{15}"
+              minlength="15"
+              maxlength="15"
+              title="Please enter exactly 15 digits"
               required
             />
             <label class="label">
