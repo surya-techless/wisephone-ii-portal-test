@@ -84,11 +84,41 @@ const result = Astro.getActionResult(actions.wisephones.createWisephone);
         x-show="showForm"
         x-transition
         x-cloak
+        x-data="{
+          imei1: '',
+          imei2: '',
+          phoneNumber: '',
+          nickname: '',
+          imeiMatch: false,
+          hasBlurredImei: false,
+          validateImei() {
+            this.hasBlurredImei = true;
+            this.imeiMatch = this.imei1.length === 15 && this.imei1 === this.imei2;
+          },
+          isFormValid() {
+            return (
+              this.imei1.length === 15 &&
+              this.imei2.length === 15 &&
+              this.imeiMatch &&
+              this.phoneNumber.replace(/-/g, '').length === 10 &&
+              this.nickname.trim().length > 0
+            );
+          },
+          resetForm() {
+            this.imei1 = '';
+            this.imei2 = '';
+            this.phoneNumber = '';
+            this.nickname = '';
+            this.imeiMatch = false;
+            this.hasBlurredImei = false;
+          }
+        }"
+        @reset.window="resetForm()"
       >
         <div class="flex flex-row justify-between w-full gap-4">
           <h2 class="text-2xl font-bold">Setup</h2>
 
-          <button @click="showForm = false" class="btn btn-sm btn-circle">
+          <button @click="showForm = false; resetForm()" class="btn btn-sm btn-circle">
             <span class="sr-only">Close Settings</span>
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -104,7 +134,12 @@ const result = Astro.getActionResult(actions.wisephones.createWisephone);
             >
           </button>
         </div>
-        <form method="POST" action={actions.wisephones.createWisephone} class="flex flex-col w-full gap-4">
+        <form
+          method="POST"
+          action={actions.wisephones.createWisephone}
+          class="flex flex-col w-full gap-4"
+          @submit.prevent="$el.checkValidity() && isFormValid() ? $el.submit() : null"
+        >
           <div class="w-full form-control">
             <label class="label">
               <span class="label-text">Wisephone IMEI (slot 1)</span>
@@ -113,9 +148,11 @@ const result = Astro.getActionResult(actions.wisephones.createWisephone);
             <input
               type="text"
               name="imei"
+              x-model.trim="imei1"
               x-mask="999999999999999"
               placeholder="350XXXXXXXXXXXX"
               class="w-full input input-bordered"
+              :class="{ 'input-error': imei1.length > 0 && imei1.length !== 15 }"
               pattern="[0-9]{15}"
               minlength="15"
               maxlength="15"
@@ -133,15 +170,55 @@ const result = Astro.getActionResult(actions.wisephones.createWisephone);
 
           <div class="w-full form-control">
             <label class="label">
-              <span class="label-text">Wisephone Phone Number</span>
+              <span class="label-text">Enter the IMEI one more time</span>
               <span class="label-text-alt">Required</span>
             </label>
             <input
               type="text"
+              name="imei2"
+              x-model.trim="imei2"
+              x-mask="999999999999999"
+              placeholder="350XXXXXXXXXXXX"
+              class="w-full input input-bordered"
+              :class="{
+                'input-error': (imei2.length > 0 && imei2.length !== 15) ||
+                              (hasBlurredImei && !imeiMatch && imei2.length === 15)
+              }"
+              @blur="validateImei()"
+              pattern="[0-9]{15}"
+              minlength="15"
+              maxlength="15"
+              title="Please enter exactly 15 digits"
+              required
+            />
+            <label class="label block">
+              <span
+                x-show="!hasBlurredImei || (hasBlurredImei && imeiMatch)"
+                class="label-text w-fit text-slate-500 [&_strong]:text-slate-500"
+              >
+                This is to ensure you have entered the correct IMEI. If you copied and pasted it, feel free to paste it
+                again.
+              </span>
+              <span x-show="hasBlurredImei && !imeiMatch && imei2.length === 15" class="label-text-alt text-red-800">
+                IMEI numbers do not match. Please check your input and try again.
+              </span>
+            </label>
+          </div>
+
+          <div class="w-full form-control">
+            <label class="label">
+              <span class="label-text">Wisephone Phone Number</span>
+              <span class="label-text-alt">Required</span>
+            </label>
+            <input
+              type="tel"
+              x-model.trim="phoneNumber"
               name="phoneNumber"
               x-mask="999-999-9999"
               placeholder="XXX-XXX-XXXX"
+              pattern="[0-9]{3}-[0-9]{3}-[0-9]{4}"
               class="w-full input input-bordered"
+              :class="{ 'input-error': phoneNumber.length > 0 && phoneNumber.replace(/-/g, '').length !== 10 }"
               required
             />
           </div>
@@ -151,12 +228,20 @@ const result = Astro.getActionResult(actions.wisephones.createWisephone);
               <span class="label-text">Give this Wisephone a name or owner</span>
               <span class="label-text-alt">Required</span>
             </label>
-            <input type="text" name="nickname" placeholder="John Doe" class="w-full input input-bordered" required />
+            <input
+              x-model.trim="nickname"
+              type="text"
+              name="nickname"
+              placeholder="John Doe"
+              class="w-full input input-bordered"
+              :class="{ 'input-error': nickname.length > 0 && nickname.trim().length === 0 }"
+              required
+            />
           </div>
 
           <input type="hidden" name="userId" value={user?.id} />
 
-          <button type="submit" class="mt-4 btn btn-primary"> Done </button>
+          <button type="submit" class="mt-4 btn btn-primary" :disabled="!isFormValid()"> Done </button>
         </form>
       </section>
     </main>
