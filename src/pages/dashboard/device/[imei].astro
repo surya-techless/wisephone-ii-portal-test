@@ -263,8 +263,8 @@ const sortedAppsList = Object.fromEntries(
                   }`}
               >
                 <div class="w-full grid grid-cols-[1fr_auto] items-center justify-between gap-6">
-                  <div class="flex flex-col">
-                    <div class="inline-flex items-center gap-2">
+                  <div class="flex flex-col gap-2">
+                    <div class="inline-flex flex-wrap items-center gap-2">
                       <p>{feature.name}</p>
                       {feature.disclosure && (
                         <button @click.stop="alert('Disclosure: ' + feature.disclosure)" class="text-xs text-gray-500">
@@ -310,14 +310,14 @@ const sortedAppsList = Object.fromEntries(
             </div>
 
             <div class="shadow rounded-2xl not-prose">
-              <div class="grid rounded-t-2xl grid-rows-2 gap-3 top-0 z-10 bg-white bg-[var(--surface-secondary)] transition-transform py-6 pb-2 px-6 text-base border-b border-[var(--surface-tertiary)]">
+              <div class="grid rounded-t-2xl grid-rows-2 gap-3 top-0 z-10 bg-white bg-[var(--surface-secondary)] transition-transform py-6 pb-3 px-6 text-base border-b border-[var(--surface-tertiary)]">
                 <input
                   type="text"
                   class="input input-bordered"
                   x-model.debounce.200ms="appSearchQuery"
                   placeholder="Search for an app"
                 />
-                <div role="tablist" class="tabs tabs-boxed h-fit">
+                <div role="tablist" class="max-sm:hidden tabs tabs-boxed h-fit">
                   <a
                     role="tab"
                     class="tab"
@@ -326,7 +326,7 @@ const sortedAppsList = Object.fromEntries(
                     x-bind:class="{ 'tab-active !bg-[var(--evergreen)] !text-white': currentView === 'tool-drawer' }"
                     @click="currentView = 'tool-drawer'"
                   >
-                    Tool Drawer
+                    Tool Drawer
                   </a>
                   <a
                     role="tab"
@@ -347,7 +347,18 @@ const sortedAppsList = Object.fromEntries(
                     Installed
                   </a>
                 </div>
+
+                {/* Make a select input for the tabs on mobile */}
+                <select
+                  @change="currentView = $event.target.value"
+                  class="sm:hidden border-2 !border-[var(--surface-tertiary)] select select-bordered"
+                >
+                  <option value="tool-drawer">Tool Drawer</option>
+                  <option value="faith-tools">faith.tools</option>
+                  <option value="installed">Installed</option>
+                </select>
               </div>
+
               <ul class="list-item-container max-h-[425px] overflow-y-auto">
                 <template x-for="app in filteredApps">
                   <li class="list-item !flex items-center justify-between gap-1">
