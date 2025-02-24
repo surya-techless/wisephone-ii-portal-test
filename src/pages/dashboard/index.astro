@@ -180,10 +180,10 @@ const result = Astro.getActionResult(actions.wisephones.createWisephone);
               x-mask="999999999999999"
               placeholder="350XXXXXXXXXXXX"
               class="w-full input input-bordered"
-              :class="{
-                'input-error': (imei2.length > 0 && imei2.length !== 15) ||
-                              (hasBlurredImei && !imeiMatch && imei2.length === 15)
-              }"
+              :class={`
+                input-error: (imei2.length > 0 && imei2.length !== 15) ||
+                (hasBlurredImei && !imeiMatch && imei2.length === 15)
+              `}
               @blur="validateImei()"
               pattern="[0-9]{15}"
               minlength="15"

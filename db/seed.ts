@@ -1,4 +1,4 @@
-import { db, Wisephone, BypassTechlessSubscription } from "astro:db";
+import { db, Wisephone, BypassTechlessSubscription, App } from "astro:db";
 
 // https://astro.build/db/seed
 export default async function seed() {
@@ -15,6 +15,15 @@ export default async function seed() {
     {
       imei: 350256485931533,
       reason: "Works at Techless"
+    }
+  ]);
+
+  await db.insert(App).values([
+    {
+      packageName: "com.techless.wiseos",
+      name: "WiseOS",
+      createdAt: new Date(),
+      type: "Tool Drawer"
     }
   ]);
 }

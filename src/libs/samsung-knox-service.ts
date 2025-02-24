@@ -1,5 +1,100 @@
 import { KNOX_CLIENT_SECRET, KNOX_CLIENT_ID, KNOX_REGION } from "astro:env/server";
 
+export type App = {
+  appAction: string;
+  appId: string;
+  appName: string;
+  appRegType: string;
+  appType: string;
+  binarySize: string;
+  cellularSliceUuid: string;
+  crc: string;
+  dataSize: string;
+  deviceAppType: string;
+  deviceId: string;
+  dir: string;
+  enabled: string;
+  enrolledType: string;
+  excelArea: string;
+  excelAttr: string;
+  excelHead: string;
+  excelInstallType: string;
+  excelRooting: string;
+  filter: string;
+  firewallId: string;
+  firewallName: string;
+  genericVpnId: string;
+  genericVpnName: string;
+  googleDeviceId: string;
+  hasAppFeedback: string;
+  insertChromeApp: string;
+  installArea: string;
+  installAreas: string[];
+  installLocation: string;
+  installUser: string;
+  installed: string; // ISO date format string
+  installedStatus: string;
+  isAeDevice: string;
+  isAutomaticDelete: string;
+  isBackupPrevent: string;
+  isCommonTenant: string;
+  isConfiguration: string;
+  isFeedBack: string;
+  isGoogleManaged: string;
+  isInstalledStatus: string;
+  isManaged: string;
+  isProvisioned: string;
+  isRooting: string;
+  knoxClientId: string;
+  knoxId: string;
+  knoxIds: string[];
+  knoxManageType: string;
+  knoxName: string;
+  knoxType: string;
+  limit: number;
+  managedAppConfig: string;
+  managedAppConfigMap: Record<string, unknown>;
+  managedAppConfigSize: number;
+  managedAppFeedback: string;
+  managedAppFeedbackMap: Record<string, unknown>;
+  managedAppFeedbackSize: number;
+  mandatoryApp: string;
+  mandatoryApps: string[];
+  mobileId: string;
+  mocanaVpnId: string;
+  mocanaVpnName: string;
+  packageFullName: string;
+  packageName: string;
+  packageNameList: string[];
+  pkEmpty: boolean;
+  platform: string;
+  platformName: string;
+  processStatus: string;
+  processStatuses: string[];
+  runningCount: string;
+  searchPackageAppName: string;
+  sharedUserId: string;
+  sort: string;
+  start: number;
+  systemApp: string;
+  systemAppUpdated: string;
+  tenantId: string;
+  unusedRedemCode: string;
+  updated: string; // ISO date format string
+  versionCode: string;
+  versionName: string;
+  vpnId: string;
+  vpnName: string;
+};
+
+type KnoxAppListResponse = {
+  resultCode: string;
+  resultMessage: string;
+  resultValue: {
+    appList: App[];
+  };
+};
+
 export class SamsungKnoxService {
   private static token: string | null = null;
   private static tokenExpiry: number | null = null;
@@ -250,5 +345,251 @@ export class SamsungKnoxService {
       console.error("Error fetching device ID:", error);
       return null;
     }
+  }
+
+  /**
+   * Install an Android application on a device
+   * @param imei - The IMEI number of the device
+   * @param appInfo - Information about the app to install
+   * @param appInfo.url - URL where the APK file is hosted
+   * @param appInfo.appPackage - Application package name
+   * @param appInfo.component - Explicit Intent Name. Parameters for install app by url.
+   * @param appInfo.componentClass - Select either Activity or Broadcast or Service
+   * @param appInfo.autoRun - Auto run app after installing (Automatic or Manual)
+   * @param appInfo.knoxId - Optional KNOX ID that UEM Service issued (null means default area on android device)
+   * @returns The response from the Knox API
+   * https://docs.samsungknox.com/dev/knox-manage/api/#tag/Device-Command/operation/sendDeviceControlForInstallApp
+   */
+  public static async installAndroidApp(
+    imei: string,
+    appInfo: {
+      url?: string;
+      appPackage: string;
+      component?: string;
+      autoRun?: "Automatic" | "Manual";
+      componentClass?: "Activity" | "Broadcast" | "Service";
+      knoxId?: string;
+    }
+  ): Promise<Record<string, any>> {
+    const deviceId = await this.getDeviceIdFromImei(imei);
+
+    if (!deviceId) {
+      throw new Error("Device not found");
+    }
+
+    const apiUrl = `https://${KNOX_REGION}.manage.samsungknox.com/emm/oapi/mdm/commonOTCServiceWrapper/sendDeviceControlForInstallApp`;
+
+    const params = new URLSearchParams({
+      deviceId,
+      appPackage: appInfo.appPackage,
+      action: "unknown",
+      autoRun: appInfo.autoRun || "Manual",
+      componentClass: appInfo.componentClass || "Activity",
+      ...(appInfo.component && { component: appInfo.component }),
+      ...(appInfo.url && { url: appInfo.url }),
+      ...(appInfo.knoxId && { knoxId: appInfo.knoxId })
+    });
+
+    const response = await fetch(apiUrl, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${await this.getKnoxToken()}`,
+        "cache-control": "no-cache",
+        "content-type": "application/x-www-form-urlencoded"
+      },
+      body: params
+    });
+
+    if (!response.ok) {
+      const data = await response.json();
+      console.error(data);
+      throw new Error("Failed to initiate app installation on device");
+    }
+
+    const data = await response.json();
+
+    if (!data.resultValue) {
+      throw new Error("Failed to initiate app installation on device");
+    }
+
+    return data as {
+      resultCode: string;
+      resultMessage: string;
+      resultValue: {
+        areaResult: {
+          area: string;
+          commandId: string;
+          optionData: string;
+          result: string;
+          type: string;
+        }[];
+        deviceId: string;
+        platform: string;
+      };
+    };
+  }
+
+  /**
+   * Uninstall an Android application from a device
+   * @param imei - The IMEI number of the device
+   * @param appPackage - Application package name
+   * @param knoxId - Optional KNOX ID that UEM Service issued
+   * @returns The response from the Knox API
+   * @see https://docs.samsungknox.com/dev/knox-manage/api/#tag/Device-Command/operation/sendDeviceControlForUninstallApp
+   */
+  public static async uninstallAndroidApp(
+    imei: string,
+    appPackage: string,
+    knoxId?: string
+  ): Promise<{
+    resultCode: string;
+    resultMessage: string;
+    resultValue: {
+      areaResult: {
+        area: string;
+        commandId: string;
+        optionData: string;
+        result: string;
+        type: string;
+      }[];
+      deviceId: string;
+      platform: string;
+    };
+  }> {
+    const deviceId = await this.getDeviceIdFromImei(imei);
+
+    if (!deviceId) {
+      throw new Error("Device not found");
+    }
+
+    const apiUrl = `https://${KNOX_REGION}.manage.samsungknox.com/emm/oapi/mdm/commonOTCServiceWrapper/sendDeviceControlForUninstallApp`;
+
+    const params = new URLSearchParams({
+      deviceId,
+      appPackage
+    });
+
+    // Only add knoxId if it's provided
+    if (knoxId) {
+      params.append("knoxId", knoxId);
+    }
+
+    const response = await fetch(apiUrl, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${await this.getKnoxToken()}`,
+        "cache-control": "no-cache",
+        "content-type": "application/x-www-form-urlencoded"
+      },
+      body: params
+    });
+
+    if (!response.ok) {
+      const data = await response.json();
+      console.error(data);
+      throw new Error("Failed to initiate app uninstallation on device");
+    }
+
+    const data = await response.json();
+
+    if (!data.resultValue) {
+      throw new Error("Failed to initiate app uninstallation on device");
+    }
+
+    return data;
+  }
+
+  /**
+   * Get the list of installed applications on a device
+   * @param imei - The IMEI number of the device
+   * @returns The list of installed applications
+   * @see https://docs.samsungknox.com/dev/knox-manage/api/#tag/Device/operation/selectDeviceAppList
+   */
+  public static async getInstalledApps(imei: string): Promise<KnoxAppListResponse> {
+    const deviceId = await this.getDeviceIdFromImei(imei);
+
+    if (!deviceId) {
+      throw new Error("Device not found");
+    }
+
+    const apiUrl = `https://${KNOX_REGION}.manage.samsungknox.com/emm/oapi/device/selectDeviceAppList`;
+
+    const params = new URLSearchParams({
+      deviceId
+    });
+
+    const response = await fetch(apiUrl, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${await this.getKnoxToken()}`,
+        "cache-control": "no-cache",
+        "content-type": "application/x-www-form-urlencoded"
+      },
+      body: params
+    });
+
+    if (!response.ok) {
+      const data = await response.json();
+      console.error(data);
+      throw new Error("Failed to fetch installed applications");
+    }
+
+    const data = await response.json();
+
+    if (!data.resultValue) {
+      throw new Error("Failed to fetch installed applications");
+    }
+
+    return data as KnoxAppListResponse;
+  }
+
+  /**
+   * Trigger a synchronization of the installed applications list on a device
+   * @param imei - The IMEI number of the device
+   * @returns The response from the Knox API
+   * @see https://docs.samsungknox.com/dev/knox-manage/api/#tag/Device-Command/operation/sendDeviceControlForSyncInstalledAppList
+   */
+  public static async syncInstalledAppList(imei: string): Promise<{
+    resultCode: string;
+    resultMessage: string;
+    resultValue: {
+      commandId: string;
+    };
+  }> {
+    const deviceId = await this.getDeviceIdFromImei(imei);
+
+    if (!deviceId) {
+      throw new Error("Device not found");
+    }
+
+    const apiUrl = `https://${KNOX_REGION}.manage.samsungknox.com/emm/oapi/mdm/commonOTCServiceWrapper/sendDeviceControlForSyncInstalledAppList`;
+
+    const params = new URLSearchParams({
+      deviceId
+    });
+
+    const response = await fetch(apiUrl, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${await this.getKnoxToken()}`,
+        "cache-control": "no-cache",
+        "content-type": "application/x-www-form-urlencoded"
+      },
+      body: params
+    });
+
+    if (!response.ok) {
+      const data = await response.json();
+      console.error(data);
+      throw new Error("Failed to sync installed applications list");
+    }
+
+    const data = await response.json();
+
+    if (!data.resultValue) {
+      throw new Error("Failed to sync installed applications list");
+    }
+
+    return data;
   }
 }

@@ -65,15 +65,18 @@ export const POST: APIRoute = async ({ request }) => {
   const url = new URL(request.url);
   const action = url.searchParams.get("action");
   const imei = url.searchParams.get("imei");
-  const knoxManageId = url.searchParams.get("knoxManageId");
 
-  if (!imei || !knoxManageId) {
-    return new Response(JSON.stringify({ error: "IMEI and groupId are required" }), { status: 400 });
+  if (!imei) {
+    return new Response(JSON.stringify({ error: "IMEI is required" }), { status: 400 });
   }
 
   try {
     switch (action) {
       case "apply-feature": {
+        const knoxManageId = url.searchParams.get("knoxManageId");
+        if (!knoxManageId) {
+          return new Response(JSON.stringify({ error: "Knox Manage ID is required" }), { status: 400 });
+        }
         const response = await SamsungKnoxService.applyFeature(knoxManageId, imei, true);
         await SamsungKnoxService.sendNotification(
           imei,
@@ -86,6 +89,10 @@ export const POST: APIRoute = async ({ request }) => {
         return new Response(JSON.stringify(response), { status: 200 });
       }
       case "remove-feature": {
+        const knoxManageId = url.searchParams.get("knoxManageId");
+        if (!knoxManageId) {
+          return new Response(JSON.stringify({ error: "Knox Manage ID is required" }), { status: 400 });
+        }
         const response = await SamsungKnoxService.removeFeature(knoxManageId, imei, true);
         await SamsungKnoxService.sendNotification(
           imei,
@@ -95,6 +102,29 @@ export const POST: APIRoute = async ({ request }) => {
             sendType: "Notification"
           }
         );
+        return new Response(JSON.stringify(response), { status: 200 });
+      }
+      case "install-app": {
+        const appPackage = url.searchParams.get("appPackage");
+
+        if (!appPackage) {
+          return new Response(JSON.stringify({ error: "App package is required" }), { status: 400 });
+        }
+
+        const response = await SamsungKnoxService.installAndroidApp(imei, {
+          appPackage
+        });
+
+        return new Response(JSON.stringify(response), { status: 200 });
+      }
+      case "uninstall-app": {
+        const appPackage = url.searchParams.get("appPackage");
+
+        if (!appPackage) {
+          return new Response(JSON.stringify({ error: "App package is required" }), { status: 400 });
+        }
+
+        const response = await SamsungKnoxService.uninstallAndroidApp(imei, appPackage);
         return new Response(JSON.stringify(response), { status: 200 });
       }
       default: {

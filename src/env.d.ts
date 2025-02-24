@@ -43,6 +43,8 @@ interface ImportMetaEnv {
   readonly KNOX_CLIENT_SECRET: string;
   /** https://docs.samsungknox.com/dev/knox-manage/api */
   readonly KNOX_REGION: string;
+  /** https://ottogrid.ai/docs */
+  readonly OTTOGRID_API_KEY: string;
 }
 
 interface ImportMeta {

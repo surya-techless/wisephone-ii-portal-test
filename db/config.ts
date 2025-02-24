@@ -16,9 +16,20 @@ const BypassTechlessSubscription = defineTable({
   }
 });
 
+const App = defineTable({
+  columns: {
+    packageName: column.text({ primaryKey: true }),
+    name: column.text(),
+    createdAt: column.date({ default: new Date() }),
+    updatedAt: column.date({ optional: true }),
+    type: column.text()
+  }
+});
+
 export default defineDb({
   tables: {
-    Wisephone,
-    BypassTechlessSubscription
+    App,
+    BypassTechlessSubscription,
+    Wisephone
   }
 });

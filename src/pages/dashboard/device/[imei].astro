@@ -5,11 +5,13 @@ import Icon from "astro-iconify";
 import Layout from "@/layouts/Layout.astro";
 import Header from "@/components/Header.astro";
 import Footer from "@/components/Footer.astro";
-import { FEATURES, KNOX_USER_GROUPS } from "@/libs/utils";
+import { FEATURES, KNOX_USER_GROUPS, FAITH_TOOLS_APPS, getPackageNameFromPlayStoreUrl } from "@/libs/utils";
+import { fetchOttogridData } from "@/libs/ottogrid";
+import type { AppsList } from "@/types/apps";
 
 const { imei } = Astro.params;
 
-if (isNaN(Number(imei))) {
+if (!imei || isNaN(Number(imei))) {
   return Astro.redirect("/dashboard");
 }
 
@@ -55,9 +57,73 @@ if (!isSubscribed) {
 }
 
 const result = Astro.getActionResult(actions.wisephones.updateWisephone);
-const error = (result?.error as ActionInputError<typeof actions.wisephones.updateWisephone>)?.issues
-  .map((issue) => issue.message)
+const installAppResult = Astro.getActionResult(actions.wisephones.installApp);
+const uninstallAppResult = Astro.getActionResult(actions.wisephones.uninstallApp);
+
+const error = [
+  result?.error as ActionInputError<typeof actions.wisephones.updateWisephone>,
+  installAppResult?.error as ActionInputError<typeof actions.wisephones.installApp>,
+  uninstallAppResult?.error as ActionInputError<typeof actions.wisephones.uninstallApp>
+]
+  .filter(Boolean)
+  .flatMap((error) => error.issues.map((issue) => issue.message))
   .join("\n");
+
+const success = [
+  result?.data?.success as string,
+  installAppResult?.data?.success as string,
+  uninstallAppResult?.data?.success as string
+]
+  .filter(Boolean)
+  .join("\n");
+
+// Get the latest installed apps list
+const formData = new FormData();
+formData.append("imei", String(wisephone.imei));
+await Astro.callAction(actions.wisephones.syncInstalledApps, formData);
+
+const getInstalledAppsResult = await Astro.callAction(actions.wisephones.getInstalledApps, formData);
+const installedApps = getInstalledAppsResult?.data?.apps || [];
+
+// Create apps list with type safety
+const appsList: AppsList = {};
+
+// Process Ottogrid apps with error handling
+try {
+  const appsFromOttogrid = await fetchOttogridData();
+  appsFromOttogrid.rows
+    .filter((row) => row.cells["Tool Drawer"] === "Yes")
+    .forEach((row) => {
+      const packageName = getPackageNameFromPlayStoreUrl(row.cells["Play Store URL"]);
+      if (!packageName) return;
+
+      const app = installedApps.find((app) => app.packageName === packageName);
+      appsList[packageName] = {
+        source: "Tool Drawer",
+        installed: Boolean(app),
+        name: app?.appName || row.cells["Tool Name"]
+      };
+    });
+} catch (error) {
+  console.error("Error processing Ottogrid apps:", error);
+}
+
+// Process Faith Tools apps
+FAITH_TOOLS_APPS.forEach((app) => {
+  const packageName = getPackageNameFromPlayStoreUrl(app["Play Store URL"]);
+  if (!packageName) return;
+
+  appsList[packageName] = {
+    source: "faith.tools",
+    installed: installedApps.some((app) => app.packageName === packageName),
+    name: app.Name
+  };
+});
+
+// Sort apps by name
+const sortedAppsList = Object.fromEntries(
+  Object.entries(appsList).sort(([, a], [, b]) => a.name.localeCompare(b.name))
+);
 ---
 
 <Layout title="Device Features" description="Manage the features of your Wisephone II device.">
@@ -65,6 +131,7 @@ const error = (result?.error as ActionInputError<typeof actions.wisephones.updat
     class="container p-6 mx-auto prose"
     x-data="device"
     x-init={`
+      appsList = ${JSON.stringify(sortedAppsList)};
       imei = "${imei}";
       isSubscribed = ${isSubscribed};
       nickname = "${wisephone.nickname}";
@@ -72,12 +139,12 @@ const error = (result?.error as ActionInputError<typeof actions.wisephones.updat
       originalNickname = "${wisephone.nickname}";
       originalPhoneNumber = "${wisephone.phoneNumber}";
       toastErrorMessage = "${error || ""}" || toastErrorMessage;
-      toastMessage = "${result?.data?.success || ""}" || toastMessage;
+      toastMessage = "${success}" || toastMessage;
     `}
   >
     <Header activeTab="page" isProjectPublished={false} projectSlug={""} />
 
-    <main class="flex flex-col gap-6 py-12">
+    <main class="flex flex-col gap-12 py-12">
       <section class="flex flex-col gap-6 not-prose">
         <div>
           <a href="/dashboard" class="p-0 no-underline w-fit btn btn-link text-slate-500">
@@ -167,7 +234,7 @@ const error = (result?.error as ActionInputError<typeof actions.wisephones.updat
         >
           <Icon name="lucide:info" class="w-4 h-4" />
           <p>
-            <a href="https://wisephone.com/pages/activate" class="font-medium link text-slate-800"
+            <a href="https://wisephone.com/pages/activate" target="_blank" class="font-medium link text-slate-800"
               >Activate a Techless Subscription</a
             > to update this device's features.
           </p>
@@ -199,17 +266,25 @@ const error = (result?.error as ActionInputError<typeof actions.wisephones.updat
                   <div class="flex flex-col">
                     <div class="inline-flex items-center gap-2">
                       <p>{feature.name}</p>
+                      {feature.disclosure && (
+                        <button @click.stop="alert('Disclosure: ' + feature.disclosure)" class="text-xs text-gray-500">
+                          <Icon name="lucide:triangle-alert" class="w-4 h-4 text-[var(--rust)]" />
+                        </button>
+                      )}
                       {feature.isBeta && <span class="text-xs text-gray-500">(Beta)</span>}
                     </div>
                     <p class="text-sm text-gray-500">{feature.description}</p>
                   </div>
                   <div class="relative h-[24px]">
                     <input
+                      x-show="!isLoading"
                       x-ref="switch"
                       type="checkbox"
                       class="pointer-events-none toggle"
-                      x-bind:checked="isFeatureEnabled(feature.knoxManageId)"
+                      x-bind:checked="isFeatureEnabled(feature.knoxManageId, feature.isInverse || false)"
                     />
+                    {/* Makes loading all start at disabled */}
+                    <input disabled x-cloak class="pointer-events-none toggle" x-show="isLoading" type="checkbox" />
                     <div
                       x-show="isLoading"
                       x-transition
@@ -221,29 +296,136 @@ const error = (result?.error as ActionInputError<typeof actions.wisephones.updat
             ))
           }
         </ul>
-
-        <div class="flex flex-col gap-4 p-6 -translate-y-2 rounded-2xl ps-8 bg-slate-100 rounded-b-2xl">
-          <p class="text-xs text-gray-500">
-            * Tool Drawer Disclosure: Please note that third-party apps may display in-app ads, which are not endorsed
-            by Techless and could contain unexpected content. Use of the Tool Drawer apps is at your discretion. If you
-            are battling addiction, we recommend not enabling the Tool Drawer.
-          </p>
-
-          <p class="text-xs text-gray-500">
-            ** faith.tools Disclosure: Apps curated by faith.tools may display in-app ads and content not affiliated
-            with or curated by Techless. These apps are curated by our partner, faith.tools.
-          </p>
-        </div>
       </section>
+
+      {/* @TODO: Can this install apps with Play Store hidden? */}
+      {/* @TODO: Make search do imperfect matching */}
+      {
+        isSubscribed ? (
+          <section x-show="isToolDrawerEnabled || isFaithToolsEnabled" x-cloak x-collapse>
+            <div class="flex items-center justify-between mb-4">
+              <h2 class="text-2xl font-bold">
+                Manage Apps <span class="text-sm font-normal text-slate-500">(beta)</span>
+              </h2>
+            </div>
+
+            <div class="shadow rounded-2xl not-prose">
+              <div class="grid rounded-t-2xl grid-rows-2 gap-3 top-0 z-10 bg-white bg-[var(--surface-secondary)] transition-transform py-6 pb-2 px-6 text-base border-b border-[var(--surface-tertiary)]">
+                <input
+                  type="text"
+                  class="input input-bordered"
+                  x-model.debounce.200ms="appSearchQuery"
+                  placeholder="Search for an app"
+                />
+                <div role="tablist" class="tabs tabs-boxed h-fit">
+                  <a
+                    role="tab"
+                    class="tab"
+                    x-show="isToolDrawerEnabled"
+                    x-cloak
+                    x-bind:class="{ 'tab-active !bg-[var(--evergreen)] !text-white': currentView === 'tool-drawer' }"
+                    @click="currentView = 'tool-drawer'"
+                  >
+                    Tool Drawer
+                  </a>
+                  <a
+                    role="tab"
+                    class="tab"
+                    x-show="isFaithToolsEnabled"
+                    x-cloak
+                    x-bind:class="{ 'tab-active !bg-[var(--evergreen)] !text-white': currentView === 'faith-tools' }"
+                    @click="currentView = 'faith-tools'"
+                  >
+                    faith.tools
+                  </a>
+                  <a
+                    role="tab"
+                    class="tab"
+                    x-bind:class="{ 'tab-active !bg-[var(--evergreen)] !text-white': currentView === 'installed' }"
+                    @click="currentView = 'installed'"
+                  >
+                    Installed
+                  </a>
+                </div>
+              </div>
+              <ul class="list-item-container max-h-[425px] overflow-y-auto">
+                <template x-for="app in filteredApps">
+                  <li class="list-item !flex items-center justify-between gap-1">
+                    <div class="flex flex-col gap-1">
+                      <a
+                        class="no-underline underline-offset-4 hover:underline"
+                        x-bind:href="'https://play.google.com/store/apps/details?id=' + app.packageName"
+                        target="_blank"
+                      >
+                        <p x-text="app.name" />
+                      </a>
+                    </div>
+
+                    <div class="grid" style="grid-template-areas: 'stack'">
+                      <button
+                        x-data="{ isInstalling: false }"
+                        x-show="!app.installed"
+                        @click="isInstalling = true; await installApp(app.packageName); isInstalling = false"
+                        class="relative btn btn-ghost btn-circle disabled:cursor-not-allowed"
+                        style="grid-area: stack"
+                      >
+                        <Icon name="lucide:plus" class="w-5 h-5" />
+                        <span
+                          x-transition
+                          x-show="isInstalling"
+                          class="absolute top-auto bottom-auto left-auto right-auto loading loading-spinner loading-sm"
+                        />
+                      </button>
+
+                      <button
+                        x-data="{ isLoading: false }"
+                        x-show="app.installed"
+                        x-cloak
+                        @click="isLoading = true; await uninstallApp(app.packageName); isLoading = false"
+                        class="relative btn btn-ghost btn-circle disabled:cursor-not-allowed"
+                        style="grid-area: stack"
+                      >
+                        <Icon name="lucide:trash-2" class="w-5 h-5 text-red-800" />
+                        <span
+                          x-transition
+                          x-show="isLoading"
+                          class="absolute top-auto bottom-auto left-auto right-auto loading loading-spinner loading-sm"
+                        />
+                      </button>
+                    </div>
+                  </li>
+                </template>
+
+                <li
+                  class="bg-white bg-[var(--surface-secondary)] transition-transform py-4 px-6 text-base border-b border-[var(--surface-tertiary)] text-slate-500"
+                  x-transition
+                  x-show="!filteredApps.length && appSearchQuery"
+                  x-cloak
+                >
+                  <p>
+                    No apps found for "<span x-text="appSearchQuery" />"
+                  </p>
+                  <p class="mt-3" x-show="!isFaithToolsEnabled && appSearchQuery.toLowerCase().includes('bible')">
+                    Looking for a Bible? Turn on faith.tools integration.
+                  </p>
+                  <a class="mt-4 btn btn-primary" href="https://getwisephone.com/request-app" target="_blank">
+                    Request an app
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </section>
+        ) : null
+      }
       <form
         method="POST"
         action={actions.wisephones.deleteWisephone}
         onsubmit="return confirm('Are you sure you want to delete this device? This action cannot be undone.')"
       >
         <input type="hidden" name="imei" :value="imei" />
-        <button type="submit" class="btn btn-ghost btn-sm text-error hover:bg-error/10">
+        <button type="submit" class="text-red-800 btn btn-ghost btn-sm hover:bg-red-700">
           <Icon name="lucide:trash-2" class="w-4 h-4" />
-          Delete Device
+          Remove Wisephone from My Devices
         </button>
       </form>
     </main>
@@ -262,23 +444,121 @@ const error = (result?.error as ActionInputError<typeof actions.wisephones.updat
     KNOX_USER_GROUPS,
     oldKnoxUserGroupsForSubscription
   } from "@/libs/utils";
+  import { AppManagementService } from "@/services/AppManagementService";
+  import { FeatureManagementService } from "@/services/FeatureManagementService";
+  import type { AppEntry, AppsList, CurrentView } from "@/types/apps";
+
+  // Create service instances
+  const appManagement = new AppManagementService();
+  const featureManagement = new FeatureManagementService();
 
   Alpine.data("device", function () {
     return {
+      appsList: {} as AppsList,
+      currentView: "installed" as CurrentView,
+      appSearchQuery: "",
+      features: [] as string[],
+      isSubscribed: false,
       isAiEnabled: false,
       isEditing: false,
       nickname: "",
       phoneNumber: "",
       originalNickname: "",
       originalPhoneNumber: "",
-      features: [] as string[],
       imei: "",
-      /** Using this field as a local storage flag to track if the phone is set up. */
+      isLoading: true,
       // @ts-ignore
       isPhoneSetUp: this.$persist(false),
+
+      // Computed properties
+      get isToolDrawerEnabled() {
+        return this.isSubscribed && Array.isArray(this.features) && this.features.includes(KNOX_USER_GROUPS.PRO);
+      },
+      get isFaithToolsEnabled() {
+        return this.isSubscribed && this.features.includes(KNOX_USER_GROUPS.ADD_ON_FAITH_TOOLS);
+      },
       get completeSetupUrl() {
         return `http://localhost?imei=${this.imei}&phone=${this.phoneNumber}&subscription=done`;
       },
+
+      // Memoized filtered apps computation
+      get filteredApps(): AppEntry[] {
+        return this.computeFilteredApps();
+      },
+
+      // Methods
+      computeFilteredApps(): AppEntry[] {
+        if (!Object.keys(this.appsList).length) return [];
+
+        const baseApps = !this.isFaithToolsEnabled
+          ? Object.entries(this.appsList).filter(([, app]) => app.source !== "faith.tools")
+          : Object.entries(this.appsList);
+
+        const viewFiltered = this.filterAppsByView(baseApps);
+        const mappedApps = this.mapAppsToEntries(viewFiltered);
+
+        return this.appSearchQuery ? this.filterAppsBySearch(mappedApps) : mappedApps;
+      },
+
+      filterAppsByView(apps: [string, Omit<AppEntry, "packageName">][]): [string, Omit<AppEntry, "packageName">][] {
+        const view = this.currentView;
+        switch (view) {
+          case "installed":
+            return apps.filter(([, app]) => app.installed);
+          case "faith-tools":
+            return apps.filter(([, app]) => app.source === "faith.tools");
+          case "tool-drawer":
+            return apps.filter(([, app]) => app.source === "Tool Drawer");
+          default:
+            return apps;
+        }
+      },
+
+      mapAppsToEntries(apps: [string, Omit<AppEntry, "packageName">][]): AppEntry[] {
+        return apps.map(([packageName, { installed, name, source }]) => ({
+          packageName,
+          installed,
+          name,
+          source
+        }));
+      },
+
+      filterAppsBySearch(apps: AppEntry[]): AppEntry[] {
+        const searchQuery = this.appSearchQuery.toLowerCase();
+        return apps.filter((app) => app.name.toLowerCase().includes(searchQuery));
+      },
+
+      isFeatureEnabled(knoxManageId: string, isInverse = false) {
+        const isEnabled = this.features.includes(knoxManageId);
+        return isInverse ? !isEnabled : isEnabled;
+      },
+
+      showSuccessToast(message: string) {
+        updateUnreachableAlpineState({
+          sourceDataElement: document.documentElement,
+          key: "toastMessage",
+          value: message
+        });
+      },
+
+      showErrorToast(message: string) {
+        updateUnreachableAlpineState({
+          sourceDataElement: document.documentElement,
+          key: "toastErrorMessage",
+          value: message
+        });
+      },
+
+      async getFeatures() {
+        const url = new URL(`/api/samsung-knox.json`, window.location.origin);
+        url.searchParams.set("action", "get-device-groups");
+        url.searchParams.set("imei", this.imei);
+
+        const res = await fetch(url, { method: "GET" });
+        const features = await res.json();
+        this.features = features;
+      },
+
       completeSetup() {
         if (
           confirm(
@@ -291,178 +571,222 @@ const error = (result?.error as ActionInputError<typeof actions.wisephones.updat
           });
         }
       },
-      isSubscribed: false,
-      isFeatureEnabled(knoxManageId: string) {
-        return this.features.includes(knoxManageId);
-      },
-      isLoading: true,
-      async getFeatures() {
-        const url = new URL(`/api/samsung-knox.json`, window.location.origin);
-        url.searchParams.set("action", "get-device-groups");
-        url.searchParams.set("imei", this.imei);
 
-        const res = await fetch(url, { method: "GET" });
-        const features = await res.json();
-        this.features = features;
-      },
-      /**
-       * This function is used to toggle the Pro and Minimal features. We must have one of these enabled.
-       * @param feature - The feature to toggle.
-       * @param switchElement - The switch element to toggle.
-       */
-      async toggleProAndMinimalFeature(feature: Feature, switchElement: HTMLInputElement) {
-        if (!this.isSubscribed) {
-          alert("Oops! You must have an active Techless Subscription to enable features.");
-          return;
-        }
-
-        const isToolDrawerEnabled = this.isFeatureEnabled(feature.knoxManageId);
-        if (!confirm(isToolDrawerEnabled ? feature.disableMessage : feature.enableMessage)) {
-          return;
-        }
-
-        switchElement.checked = !switchElement.checked;
-        const removeUrl = new URL(`/api/samsung-knox.json`, window.location.origin);
-        const addUrl = new URL(`/api/samsung-knox.json`, window.location.origin);
-
-        removeUrl.searchParams.set("imei", this.imei);
-        addUrl.searchParams.set("imei", this.imei);
-
-        if (isToolDrawerEnabled) {
-          removeUrl.searchParams.set("knoxManageId", KNOX_USER_GROUPS.PRO);
-          removeUrl.searchParams.set("action", "remove-feature");
-          addUrl.searchParams.set("knoxManageId", KNOX_USER_GROUPS.MINIMAL);
-          addUrl.searchParams.set("action", "apply-feature");
-        } else {
-          removeUrl.searchParams.set("knoxManageId", KNOX_USER_GROUPS.MINIMAL);
-          removeUrl.searchParams.set("action", "remove-feature");
-          addUrl.searchParams.set("knoxManageId", KNOX_USER_GROUPS.PRO);
-          addUrl.searchParams.set("action", "apply-feature");
-        }
-
-        await fetch(removeUrl, { method: "POST" });
-        await fetch(addUrl, { method: "POST" });
-
-        updateUnreachableAlpineState({
-          sourceDataElement: document.documentElement,
-          key: "toastMessage",
-          value: `Your device is being updated. ${feature.name} will be ${isToolDrawerEnabled ? "disabled" : "enabled"} shortly.`
-        });
-      },
       async toggleFeature(feature: Feature, switchElement: HTMLInputElement) {
-        if (!this.isSubscribed) {
-          alert("Oops! You must have an active Techless Subscription to enable features.");
-          return;
-        }
+        let currentEnabled = false;
 
-        const isEnabled = this.isFeatureEnabled(feature.knoxManageId);
-        if (!confirm(isEnabled ? feature.disableMessage : feature.enableMessage)) {
-          return;
-        }
-
-        switchElement.checked = !switchElement.checked;
-        const url = new URL(`/api/samsung-knox.json`, window.location.origin);
-
-        if (this.isFeatureEnabled(feature.knoxManageId)) {
-          url.searchParams.set("action", "remove-feature");
-        } else {
-          url.searchParams.set("action", "apply-feature");
-        }
-
-        url.searchParams.set("imei", this.imei);
-        url.searchParams.set("knoxManageId", feature.knoxManageId);
-
-        await fetch(url, { method: "POST" });
-
-        updateUnreachableAlpineState({
-          sourceDataElement: document.documentElement,
-          key: "toastMessage",
-          value: `Your device is being updated. ${feature.name} will be ${isEnabled ? "disabled" : "enabled"} shortly.`
-        });
-      },
-      async removeExclusiveGroups(userGroups: string[]) {
-        if (!userGroups.length) {
-          return;
-        }
-
-        if (!this.isSubscribed) {
-          return;
-        }
-
-        const hasMoreThanOneExclusiveGroup =
-          userGroups.filter((group) => oldKnoxUserGroupsForSubscription.has(group)).length > 1;
-
-        if (!hasMoreThanOneExclusiveGroup) {
-          // Do they have any exclusive groups? If not, we need to add Minimal.
-          const hasAtLeastOneExclusiveGroup = userGroups.some((group) => oldKnoxUserGroupsForSubscription.has(group));
-          if (!hasAtLeastOneExclusiveGroup) {
-            if (this.isSubscribed) {
-              const url = new URL(`/api/samsung-knox.json`, window.location.origin);
-
-              url.searchParams.set("action", "add-feature");
-              url.searchParams.set("imei", this.imei);
-              url.searchParams.set("knoxManageId", KNOX_USER_GROUPS.MINIMAL);
-
-              await fetch(url, { method: "POST" });
-            } else {
-              const url = new URL(`/api/samsung-knox.json`, window.location.origin);
-
-              url.searchParams.set("action", "add-feature");
-              url.searchParams.set("imei", this.imei);
-              url.searchParams.set("knoxManageId", KNOX_USER_GROUPS.UNPAID);
-
-              await fetch(url, { method: "POST" });
-            }
+        try {
+          if (!this.isSubscribed) {
+            throw new Error("Active subscription required");
           }
 
+          if (!feature?.knoxManageId) {
+            throw new Error("Invalid feature configuration");
+          }
+
+          currentEnabled = this.isFeatureEnabled(feature.knoxManageId, feature.isInverse);
+          const confirmMessage = currentEnabled ? feature.disableMessage : feature.enableMessage;
+
+          if (!confirm(confirmMessage)) return;
+
+          switchElement.checked = !currentEnabled;
+
+          await featureManagement.toggleFeature({
+            imei: this.imei,
+            feature,
+            enabled: !currentEnabled
+          });
+
+          // Update features list
+          if (!currentEnabled) {
+            this.features.push(feature.knoxManageId);
+          } else {
+            this.features = this.features.filter((id) => id !== feature.knoxManageId);
+          }
+
+          this.showSuccessToast(
+            `Your device is being updated. ${feature.name} will be ${!currentEnabled ? "enabled" : "disabled"} shortly.`
+          );
+        } catch (error) {
+          console.error("Feature toggle failed:", error);
+          this.showErrorToast(error instanceof Error ? error.message : "Feature update failed");
+          switchElement.checked = currentEnabled;
+        }
+      },
+
+      async toggleProAndMinimalFeature(feature: Feature, switchElement: HTMLInputElement) {
+        try {
+          if (!this.isSubscribed) {
+            throw new Error("Oops! You must have an active Techless Subscription to enable features.");
+          }
+
+          const isToolDrawerEnabled = this.isFeatureEnabled(feature.knoxManageId);
+          if (!confirm(isToolDrawerEnabled ? feature.disableMessage : feature.enableMessage)) {
+            return;
+          }
+
+          switchElement.checked = !switchElement.checked;
+
+          await featureManagement.toggleProAndMinimalFeature({
+            imei: this.imei,
+            feature,
+            isToolDrawerEnabled
+          });
+
+          // Update the feature list
+          if (isToolDrawerEnabled) {
+            this.features = this.features.filter((group) => group !== KNOX_USER_GROUPS.PRO);
+          } else {
+            this.features.push(KNOX_USER_GROUPS.PRO);
+          }
+
+          this.showSuccessToast(
+            `Your device is being updated. ${feature.name} will be ${isToolDrawerEnabled ? "disabled" : "enabled"} shortly.`
+          );
+        } catch (error) {
+          console.error("Feature toggle failed:", error);
+          this.showErrorToast(error instanceof Error ? error.message : "Feature update failed");
+          switchElement.checked = !switchElement.checked; // Revert the switch state
+        }
+      },
+
+      /**
+       * Ensures a device has the correct Knox user group configuration by managing exclusive group memberships.
+       * This prevents conflicts between incompatible feature combinations.
+       * @param userGroups - Array of Knox user group IDs currently assigned to the device
+       */
+      async removeExclusiveGroups(userGroups: string[]) {
+        if (!this.isSubscribed) {
           return;
         }
 
-        if (userGroups.includes(KNOX_USER_GROUPS.UNPAID)) {
-          const url = new URL(`/api/samsung-knox.json`, window.location.origin);
-
-          url.searchParams.set("action", "remove-feature");
-          url.searchParams.set("imei", this.imei);
-          url.searchParams.set("knoxManageId", KNOX_USER_GROUPS.UNPAID);
-
-          await fetch(url, { method: "POST" });
+        const exclusiveGroups = this.getExclusiveGroups(userGroups);
+        if (!this.hasMultipleExclusiveGroups(exclusiveGroups)) {
+          await this.ensureBaseGroup(userGroups);
+          return;
         }
 
-        if (userGroups.includes(KNOX_USER_GROUPS.PRO) && userGroups.includes(KNOX_USER_GROUPS.HEALTHY)) {
-          const url = new URL(`/api/samsung-knox.json`, window.location.origin);
+        await this.removeIncompatibleFeatures(userGroups);
+      },
 
-          url.searchParams.set("action", "remove-feature");
-          url.searchParams.set("imei", this.imei);
-          url.searchParams.set("knoxManageId", KNOX_USER_GROUPS.HEALTHY);
+      /**
+       * Gets the list of exclusive groups from the user's current groups
+       */
+      getExclusiveGroups(userGroups: string[]): string[] {
+        return userGroups.filter((group) => oldKnoxUserGroupsForSubscription.has(group));
+      },
 
-          await fetch(url, { method: "POST" });
+      /**
+       * Checks if the device has more than one exclusive group assigned
+       */
+      hasMultipleExclusiveGroups(exclusiveGroups: string[]): boolean {
+        return exclusiveGroups.length > 1;
+      },
+
+      /**
+       * Ensures the device has at least one base group (Minimal or Unpaid)
+       * based on subscription status
+       */
+      async ensureBaseGroup(userGroups: string[]) {
+        const hasBaseGroup = userGroups.some((group) => oldKnoxUserGroupsForSubscription.has(group));
+        if (!hasBaseGroup) {
+          const baseGroup = this.isSubscribed ? KNOX_USER_GROUPS.MINIMAL : KNOX_USER_GROUPS.UNPAID;
+          await this.addFeatureToDevice(baseGroup);
         }
+      },
 
-        if (
-          (userGroups.includes(KNOX_USER_GROUPS.PRO) || userGroups.includes(KNOX_USER_GROUPS.HEALTHY)) &&
-          userGroups.includes(KNOX_USER_GROUPS.MINIMAL)
-        ) {
-          const url = new URL(`/api/samsung-knox.json`, window.location.origin);
-
-          url.searchParams.set("action", "remove-feature");
-          url.searchParams.set("imei", this.imei);
-          url.searchParams.set("knoxManageId", KNOX_USER_GROUPS.MINIMAL);
-
-          await fetch(url, { method: "POST" });
+      /**
+       * Removes incompatible feature combinations from the device
+       */
+      async removeIncompatibleFeatures(userGroups: string[]) {
+        const featuresToRemove = this.getIncompatibleFeatures(userGroups);
+        for (const knoxManageId of featuresToRemove) {
+          await this.removeFeatureFromDevice(knoxManageId);
         }
-
         window.location.reload();
       },
+
+      /**
+       * Determines which features need to be removed to resolve conflicts
+       */
+      getIncompatibleFeatures(userGroups: string[]): string[] {
+        return [
+          // Remove Unpaid if present with any other group
+          userGroups.includes(KNOX_USER_GROUPS.UNPAID) && KNOX_USER_GROUPS.UNPAID,
+          // Remove Healthy if Pro is present
+          userGroups.includes(KNOX_USER_GROUPS.PRO) &&
+            userGroups.includes(KNOX_USER_GROUPS.HEALTHY) &&
+            KNOX_USER_GROUPS.HEALTHY,
+          // Remove Minimal if Pro or Healthy is present
+          (userGroups.includes(KNOX_USER_GROUPS.PRO) || userGroups.includes(KNOX_USER_GROUPS.HEALTHY)) &&
+            userGroups.includes(KNOX_USER_GROUPS.MINIMAL) &&
+            KNOX_USER_GROUPS.MINIMAL
+        ].filter(Boolean) as string[];
+      },
+
+      /**
+       * Adds a feature to the device using the Knox API
+       */
+      async addFeatureToDevice(knoxManageId: string) {
+        const url = new URL(`/api/samsung-knox.json`, window.location.origin);
+        url.searchParams.set("action", "add-feature");
+        url.searchParams.set("imei", this.imei);
+        url.searchParams.set("knoxManageId", knoxManageId);
+        await fetch(url, { method: "POST" });
+      },
+
+      /**
+       * Removes a feature from the device using the Knox API
+       */
+      async removeFeatureFromDevice(knoxManageId: string) {
+        const url = new URL(`/api/samsung-knox.json`, window.location.origin);
+        url.searchParams.set("action", "remove-feature");
+        url.searchParams.set("imei", this.imei);
+        url.searchParams.set("knoxManageId", knoxManageId);
+        await fetch(url, { method: "POST" });
+      },
+
+      async installApp(packageName: string) {
+        try {
+          if (!packageName || !this.appsList[packageName]) {
+            throw new Error("Invalid app selected");
+          }
+
+          await appManagement.installApp(this.imei, packageName);
+          this.appsList[packageName].installed = true;
+          this.showSuccessToast(`${this.appsList[packageName].name} will be installed shortly`);
+        } catch (error) {
+          console.error("App installation failed:", error);
+          this.showErrorToast("Failed to install app");
+        }
+      },
+
+      async uninstallApp(packageName: string) {
+        try {
+          await appManagement.uninstallApp(this.imei, packageName);
+          this.appsList[packageName].installed = false;
+          this.showSuccessToast(`${this.appsList[packageName].name} will be uninstalled shortly`);
+        } catch (error) {
+          console.error("App uninstallation failed:", error);
+          this.showErrorToast("Failed to uninstall app");
+        }
+      },
+
       async init() {
         this.$watch("imei", async () => {
-          await this.getFeatures();
-          this.isLoading = false;
+          try {
+            await this.getFeatures();
+          } catch (error) {
+            console.error("Failed to load features:", error);
+          } finally {
+            this.isLoading = false;
+          }
         });
 
         this.$watch("isEditing", (value) => {
           if (!value) {
-            this.nickname = this.originalNickname;
-            this.phoneNumber = this.originalPhoneNumber;
+            this.nickname = this.originalNickname || "";
+            this.phoneNumber = this.originalPhoneNumber || "";
           }
         });
 

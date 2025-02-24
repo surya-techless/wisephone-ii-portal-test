@@ -1,6 +1,7 @@
-import { defineAction } from "astro:actions";
+import { defineAction, ActionError } from "astro:actions";
 import { z } from "astro:schema";
 import { db, Wisephone, eq } from "astro:db";
+import { SamsungKnoxService } from "@/libs/samsung-knox-service";
 
 export const wisephones = {
   // Create a new Wisephone
@@ -20,8 +21,18 @@ export const wisephones = {
           success: "Wisephone created successfully!",
           wisephone: newWisephone
         };
-      } catch (error) {
-        throw new Error(`Failed to create Wisephone: ${error instanceof Error ? error.message : "Unknown error"}`);
+      } catch (error: any) {
+        if (error?.code === "SQLITE_CONSTRAINT_PRIMARYKEY") {
+          throw new ActionError({
+            code: "CONFLICT",
+            message: `Wisephone (${input.imei}) is already registered on another account. To add it to this account, please remove it from the other account first.`
+          });
+        }
+
+        throw new ActionError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: `Failed to create Wisephone: ${error instanceof Error ? error.message : "Unknown error"}`
+        });
       }
     }
   }),
@@ -36,7 +47,10 @@ export const wisephones = {
         const wisephone = await db.select().from(Wisephone).where(eq(Wisephone.imei, imei)).get();
 
         if (!wisephone) {
-          throw new Error("Wisephone not found");
+          throw new ActionError({
+            code: "NOT_FOUND",
+            message: "Wisephone not found"
+          });
         }
 
         return {
@@ -44,7 +58,10 @@ export const wisephones = {
           wisephone
         };
       } catch (error) {
-        throw new Error(`Failed to get Wisephone: ${error instanceof Error ? error.message : "Unknown error"}`);
+        throw new ActionError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: `Failed to get Wisephone: ${error instanceof Error ? error.message : "Unknown error"}`
+        });
       }
     }
   }),
@@ -93,7 +110,10 @@ export const wisephones = {
           .get();
 
         if (!updatedWisephone) {
-          throw new Error("Wisephone not found");
+          throw new ActionError({
+            code: "NOT_FOUND",
+            message: "Wisephone not found"
+          });
         }
 
         return {
@@ -101,7 +121,10 @@ export const wisephones = {
           wisephone: updatedWisephone
         };
       } catch (error) {
-        throw new Error(`Failed to update Wisephone: ${error instanceof Error ? error.message : "Unknown error"}`);
+        throw new ActionError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: `Failed to update Wisephone: ${error instanceof Error ? error.message : "Unknown error"}`
+        });
       }
     }
   }),
@@ -117,7 +140,10 @@ export const wisephones = {
         const deletedWisephone = await db.delete(Wisephone).where(eq(Wisephone.imei, imei)).returning().get();
 
         if (!deletedWisephone) {
-          throw new Error("Wisephone not found");
+          throw new ActionError({
+            code: "NOT_FOUND",
+            message: "Wisephone not found"
+          });
         }
 
         return {
@@ -125,7 +151,173 @@ export const wisephones = {
           message: "Wisephone deleted successfully"
         };
       } catch (error) {
-        throw new Error(`Failed to delete Wisephone: ${error instanceof Error ? error.message : "Unknown error"}`);
+        throw new ActionError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: `Failed to delete Wisephone: ${error instanceof Error ? error.message : "Unknown error"}`
+        });
+      }
+    }
+  }),
+
+  // Install an Android app on a Wisephone
+  installApp: defineAction({
+    accept: "form",
+    input: z.object({
+      imei: z.number(),
+      url: z.string().url("Invalid APK URL").optional(),
+      appPackage: z.string().min(1, "Package name is required"),
+      componentClass: z
+        .enum(["Activity", "Broadcast", "Service"], {
+          errorMap: () => ({ message: "Component class must be Activity, Broadcast, or Service" })
+        })
+        .default("Activity")
+        .optional(),
+      autoRun: z
+        .enum(["Automatic", "Manual"], {
+          errorMap: () => ({ message: "Auto run must be Automatic or Manual" })
+        })
+        .default("Manual")
+        .optional(),
+      knoxId: z.string().optional()
+    }),
+    handler: async (input) => {
+      try {
+        // First verify the Wisephone exists
+        const wisephone = await db.select().from(Wisephone).where(eq(Wisephone.imei, input.imei)).get();
+
+        if (!wisephone) {
+          throw new ActionError({
+            code: "NOT_FOUND",
+            message: "Wisephone not found"
+          });
+        }
+
+        // Use the SamsungKnoxService to install the app
+        const result = await SamsungKnoxService.installAndroidApp(input.imei.toString(), {
+          appPackage: input.appPackage,
+          ...(input.autoRun && { autoRun: input.autoRun }),
+          ...(input.componentClass && { componentClass: input.componentClass }),
+          ...(input.knoxId && { knoxId: input.knoxId }),
+          ...(input.url && { url: input.url })
+        });
+
+        return {
+          success: "App will be installed on the device shortly",
+          result
+        };
+      } catch (error) {
+        throw new ActionError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: `Failed to install app: ${error instanceof Error ? error.message : "Unknown error"}`
+        });
+      }
+    }
+  }),
+
+  // Uninstall an Android app from a Wisephone
+  uninstallApp: defineAction({
+    accept: "form",
+    input: z.object({
+      imei: z.number(),
+      appPackage: z.string().min(1, "Package name is required"),
+      knoxId: z.string().optional()
+    }),
+    handler: async (input) => {
+      try {
+        // First verify the Wisephone exists
+        const wisephone = await db.select().from(Wisephone).where(eq(Wisephone.imei, input.imei)).get();
+
+        if (!wisephone) {
+          throw new ActionError({
+            code: "NOT_FOUND",
+            message: "Wisephone not found"
+          });
+        }
+
+        // Use the SamsungKnoxService to uninstall the app
+        const result = await SamsungKnoxService.uninstallAndroidApp(
+          input.imei.toString(),
+          input.appPackage,
+          input.knoxId || ""
+        );
+
+        return {
+          success: "App will be uninstalled from the device shortly",
+          result
+        };
+      } catch (error) {
+        throw new ActionError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: `Failed to uninstall app: ${error instanceof Error ? error.message : "Unknown error"}`
+        });
+      }
+    }
+  }),
+
+  // Get list of installed apps on a Wisephone
+  getInstalledApps: defineAction({
+    accept: "form",
+    input: z.object({
+      imei: z.number()
+    }),
+    handler: async ({ imei }) => {
+      try {
+        // First verify the Wisephone exists
+        const wisephone = await db.select().from(Wisephone).where(eq(Wisephone.imei, imei)).get();
+
+        if (!wisephone) {
+          throw new ActionError({
+            code: "NOT_FOUND",
+            message: "Wisephone not found"
+          });
+        }
+
+        // Use the SamsungKnoxService to get installed apps
+        const result = await SamsungKnoxService.getInstalledApps(imei.toString());
+
+        return {
+          success: "Retrieved installed applications",
+          apps: result.resultValue.appList
+        };
+      } catch (error) {
+        throw new ActionError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: `Failed to get installed apps: ${error instanceof Error ? error.message : "Unknown error"}`
+        });
+      }
+    }
+  }),
+
+  // Sync installed apps list on a Wisephone
+  syncInstalledApps: defineAction({
+    accept: "form",
+    input: z.object({
+      imei: z.number()
+    }),
+    handler: async ({ imei }) => {
+      try {
+        // First verify the Wisephone exists
+        const wisephone = await db.select().from(Wisephone).where(eq(Wisephone.imei, imei)).get();
+
+        if (!wisephone) {
+          throw new ActionError({
+            code: "NOT_FOUND",
+            message: "Wisephone not found"
+          });
+        }
+
+        // Use the SamsungKnoxService to sync installed apps list
+        const result = await SamsungKnoxService.syncInstalledAppList(imei.toString());
+
+        return {
+          success: "Sync of installed applications list initiated",
+          result
+        };
+      } catch (error) {
+        throw new ActionError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: `Failed to sync installed apps list: ${error instanceof Error ? error.message : "Unknown error"}`
+        });
       }
     }
   })

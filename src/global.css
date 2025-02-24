@@ -17,7 +17,7 @@
   --sea: #5ea59a;
   --dust: #dbc8b6;
   --sky: #b3c4cc;
-  --toggle-checked: var(--rust);
+  --toggle-checked: var(--evergreen);
 }
 
 * {

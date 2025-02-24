@@ -36,7 +36,7 @@ const {
     history.replaceState({}, '', window.location.pathname);
   `}
   lang="en"
-  class="bg-slate-50 min-h-screen"
+  class="min-h-screen bg-slate-50"
 >
   <!-- "For God so loved the world that he gave his one and only Son, that whoever believes in him shall not perish but have eternal life." John 3:16 NIV -->
   <head>
@@ -99,12 +99,14 @@ const {
         backupOfToastMessage: '',
         init() {
           if (toastMessage) {
-            this.backupOfToastMessage = toastMessage
+            this.backupOfToastMessage = toastMessage;
+            setTimeout(() => toastMessage = '', 5000);
           }
 
           $watch('toastMessage', () => {
             if (toastMessage) {
-              this.backupOfToastMessage = toastMessage
+              this.backupOfToastMessage = toastMessage;
+              setTimeout(() => toastMessage = '', 5000);
             }
           })
         }
@@ -117,12 +119,14 @@ const {
       x-transition:leave="transition ease-in duration-300"
       x-transition:leave-start="opacity-100 transform translate-y-0"
       x-transition:leave-end="opacity-0 transform -translate-y-2"
-      x-init="setTimeout(() => toastMessage = '', 5000)"
-      class="z-30 toast toast-top toast-center max-w-sm w-full"
+      class="z-30 w-full max-w-sm toast toast-top toast-center"
     >
-      <div role="alert" class="max-w-sm w-full shadow-lg alert alert-info bg-white border-slate-100 text-primary">
+      <div
+        role="alert"
+        class="max-w-sm w-full shadow-lg alert alert-info bg-white border-slate-100 text-[var(--charcoal)]"
+      >
         <Icon pack="lucide" name="check-circle" height={20} width={20} class="shrink-0" />
-        <span class="p-0 m-0 w-full text-wrap inline-block" x-text="toastMessage || '-'"></span>
+        <span class="inline-block w-full p-0 m-0 text-wrap" x-text="toastMessage || '-'"></span>
       </div>
     </div>
 
@@ -131,12 +135,14 @@ const {
         backupOfToastErrorMessage: '',
         init() {
           if (toastErrorMessage) {
-            this.backupOfToastErrorMessage = toastErrorMessage
+            this.backupOfToastErrorMessage = toastErrorMessage;
+            setTimeout(() => toastErrorMessage = '', 5000);
           }
 
           $watch('toastErrorMessage', () => {
             if (toastErrorMessage) {
-              this.backupOfToastErrorMessage = toastErrorMessage
+              this.backupOfToastErrorMessage = toastErrorMessage;
+              setTimeout(() => toastErrorMessage = '', 5000);
             }
           })
         }
@@ -149,14 +155,14 @@ const {
       x-transition:leave="transition ease-in duration-300"
       x-transition:leave-start="opacity-100 transform translate-y-0"
       x-transition:leave-end="opacity-0 transform -translate-y-2"
-      class="z-30 toast toast-top toast-center max-w-sm w-full"
+      class="z-30 w-full max-w-sm toast toast-top toast-center"
     >
       <div
         role="alert"
         class="max-w-sm w-full grid grid-cols-[auto_1fr] gap-2 shadow-lg alert alert-error bg-red-100 border-red-200 text-red-900"
       >
         <Icon pack="lucide" name="octagon-alert" height={20} width={20} class="shrink-0" />
-        <p class="p-0 m-0 w-full text-wrap inline-block" x-text="backupOfToastErrorMessage || '-'" class="w-full"></p>
+        <p class="inline-block w-full p-0 m-0 text-wrap" x-text="backupOfToastErrorMessage || '-'" class="w-full"></p>
       </div>
     </div>
 
