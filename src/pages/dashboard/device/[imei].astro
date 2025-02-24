@@ -363,8 +363,9 @@ const sortedAppsList = Object.fromEntries(
                 <template x-for="app in filteredApps">
                   <li class="list-item !flex items-center justify-between gap-1">
                     <div class="flex flex-col gap-1">
+                      {/* I don't want people to click on the link and get distracted on mobile. */}
                       <a
-                        class="no-underline underline-offset-4 hover:underline"
+                        class="no-underline max-sm:pointer-events-none underline-offset-4 hover:underline"
                         x-bind:href="'https://play.google.com/store/apps/details?id=' + app.packageName"
                         target="_blank"
                       >
