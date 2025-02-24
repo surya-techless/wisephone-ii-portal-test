@@ -310,10 +310,10 @@ const sortedAppsList = Object.fromEntries(
             </div>
 
             <div class="shadow rounded-2xl not-prose">
-              <div class="grid rounded-t-2xl grid-rows-2 gap-3 top-0 z-10 bg-white bg-[var(--surface-secondary)] transition-transform py-6 pb-3 px-6 text-base border-b border-[var(--surface-tertiary)]">
+              <div class="w-full grid rounded-t-2xl grid-rows-2 gap-3 top-0 z-10 bg-white bg-[var(--surface-secondary)] transition-transform py-6 pb-3 px-6 text-base border-b border-[var(--surface-tertiary)]">
                 <input
                   type="text"
-                  class="input input-bordered"
+                  class="w-full input input-bordered"
                   x-model.debounce.200ms="appSearchQuery"
                   placeholder="Search for an app"
                 />
@@ -351,7 +351,7 @@ const sortedAppsList = Object.fromEntries(
                 {/* Make a select input for the tabs on mobile */}
                 <select
                   @change="currentView = $event.target.value"
-                  class="sm:hidden border-2 !border-[var(--surface-tertiary)] select select-bordered"
+                  class="sm:hidden w-full border-2 !border-[var(--surface-tertiary)] select select-bordered"
                 >
                   <option value="tool-drawer">Tool Drawer</option>
                   <option value="faith-tools">faith.tools</option>
