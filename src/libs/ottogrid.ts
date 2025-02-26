@@ -109,8 +109,8 @@ async function fetchFreshData(): Promise<ToolData> {
         method: "GET",
         signal: controller.signal,
         headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${OTTOGRID_API_KEY}`
+          "X-API-Key": OTTOGRID_API_KEY,
+          "Content-Type": "application/json"
         }
       });
 
