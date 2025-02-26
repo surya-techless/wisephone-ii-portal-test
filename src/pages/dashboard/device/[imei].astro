@@ -220,7 +220,7 @@ try {
 
           <div class="inline-flex flex-wrap items-baseline w-full gap-2 sm:mt-2 max-sm:mt-4 text-slate-500">
             <div x-show="!isEditing">
-              <div class="flex max-sm:flex-col max-sm:items-start sm:items-center gap-2">
+              <div class="flex gap-2 max-sm:flex-col max-sm:items-start sm:items-center">
                 <span
                   class="hover:underline hover:cursor-pointer underline-offset-4 line-clamp-1 max-w-[200px] overflow-hidden text-ellipsis"
                   @click="isEditing = true"
@@ -295,30 +295,30 @@ try {
             </p>
 
             <details
-              class="mt-3 transition-all duration-150 ease-in-out w-full"
+              class="w-full mt-3 transition-all duration-150 ease-in-out"
               x-data="{ isOpen: false }"
               @toggle="isOpen = $event.target.open"
               x-bind:class="{ 'p-6 pt-4 bg-slate-300 rounded-xl': isOpen }"
             >
               <summary
-                class="w-full font-medium text-slate-500 cursor-pointer hover:text-slate-800 hover:underline transition"
+                class="w-full font-medium transition cursor-pointer text-slate-500 hover:text-slate-800 hover:underline"
               >
                 Already have a subscription?
               </summary>
-              <ol class="list-decimal list-inside mt-3">
+              <ol class="mt-3 list-decimal list-inside">
                 <li>
                   Make sure the phone number is correct: <code
-                    class="px-2 py-1 bg-slate-200 rounded-md select-all font-sans font-medium"
+                    class="px-2 py-1 font-sans font-medium rounded-md select-all bg-slate-200"
                     x-text="phoneNumber"></code>
-                  <ul class="ml-8 mt-1">
+                  <ul class="mt-1 ml-8">
                     <li class="list-disc">If the phone number is incorrect, update it.</li>
                   </ul>
                 </li>
                 <li class="mt-3">
                   Make sure the device's IMEI is correct: <code
-                    class="px-2 py-1 bg-slate-200 rounded-md select-all font-sans font-medium"
+                    class="px-2 py-1 font-sans font-medium rounded-md select-all bg-slate-200"
                     x-text="imei"></code>
-                  <ul class="ml-8 mt-1">
+                  <ul class="mt-1 ml-8">
                     <li class="list-disc">If the IMEI is incorrect, remove this device and start over.</li>
                   </ul>
                 </li>
@@ -447,7 +447,7 @@ try {
                 </select>
               </div>
 
-              <ul class="list-item-container max-h-[425px] overflow-y-auto">
+              <ul class="list-item-container !rounded-none max-h-[425px] overflow-y-auto">
                 <template x-for="app in filteredApps">
                   <li class="list-item !grid !bg-white grid-cols-[1fr_auto] items-center justify-between gap-2">
                     <div class="flex flex-col gap-1">
