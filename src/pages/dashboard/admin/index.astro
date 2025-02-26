@@ -245,26 +245,39 @@ if (!(await isAdmin(user.id))) {
                 const data = await response.json();
                 this.wisephones = data.wisephones;
 
-                // Fetch bypass status for each wisephone
-                for (const phone of this.wisephones) {
-                  try {
-                    const bypassResponse = await fetch(`/api/wisephones/${phone.imei}/bypass`);
-                    if (bypassResponse.ok) {
-                      const bypassData = await bypassResponse.json();
-                      phone.bypassSubscription = bypassData.bypass ? true : false;
-                      phone.bypassReason = bypassData.bypass?.reason || '';
-                    }
-                  } catch (err) {
-                    console.error(`Error fetching bypass status for IMEI ${phone.imei}:`, err);
-                    phone.bypassSubscription = false;
-                    phone.bypassReason = '';
-                  }
-                }
+                // Fetch all bypass statuses in a single API call
+                await this.fetchAllBypassStatuses();
               } catch (err) {
                 this.error = err.message || 'Failed to load wisephones';
                 console.error('Error fetching wisephones:', err);
               } finally {
                 this.isLoading = false;
+              }
+            },
+
+            async fetchAllBypassStatuses() {
+              try {
+                const response = await fetch('/api/wisephones/bypass-list');
+                if (!response.ok) {
+                  throw new Error('Failed to fetch bypass statuses');
+                }
+
+                const data = await response.json();
+                const bypassMap = data.bypassMap || {};
+
+                // Update each wisephone with its bypass status
+                for (const phone of this.wisephones) {
+                  const bypass = bypassMap[phone.imei];
+                  phone.bypassSubscription = bypass ? true : false;
+                  phone.bypassReason = bypass?.reason || '';
+                }
+              } catch (err) {
+                console.error('Error fetching bypass statuses:', err);
+                // Set default values for bypass status if the API call fails
+                for (const phone of this.wisephones) {
+                  phone.bypassSubscription = false;
+                  phone.bypassReason = '';
+                }
               }
             },
 
@@ -274,24 +287,9 @@ if (!(await isAdmin(user.id))) {
               this.formNickname = wisephone.nickname || '';
               this.formPhoneNumber = wisephone.phoneNumber;
 
-              // Check if this wisephone has a bypass
-              try {
-                const response = await fetch(`/api/wisephones/${wisephone.imei}/bypass`);
-                if (response.ok) {
-                  const data = await response.json();
-                  if (data.bypass) {
-                    this.formBypassSubscription = true;
-                    this.formBypassReason = data.bypass.reason || '';
-                  } else {
-                    this.formBypassSubscription = false;
-                    this.formBypassReason = '';
-                  }
-                }
-              } catch (err) {
-                console.error('Error fetching bypass status:', err);
-                this.formBypassSubscription = false;
-                this.formBypassReason = '';
-              }
+              // Use the bypass status already fetched with the wisephone
+              this.formBypassSubscription = wisephone.bypassSubscription || false;
+              this.formBypassReason = wisephone.bypassReason || '';
 
               this.showEditModal = true;
             },
