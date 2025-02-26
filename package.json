@@ -44,7 +44,6 @@
     "isomorphic-dompurify": "^2.15.0",
     "lottie-web": "^5.12.2",
     "marked": "^14.1.2",
-    "node-cache": "^5.1.2",
     "trix": "^2.1.6",
     "uqr": "^0.1.2"
   },
