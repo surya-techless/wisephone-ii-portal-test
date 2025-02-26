@@ -140,38 +140,53 @@ try {
   // Process Ottogrid apps with error handling
   try {
     const appsFromOttogrid = await fetchOttogridData();
-    if (appsFromOttogrid && appsFromOttogrid.rows) {
+    // The fetchOttogridData now returns EMPTY_DATA instead of throwing errors
+    if (appsFromOttogrid && appsFromOttogrid.rows && appsFromOttogrid.rows.length > 0) {
       appsFromOttogrid.rows
-        .filter((row) => row.cells && row.cells["Tool Drawer"] === "Yes")
+        .filter((row) => row && row.cells && row.cells["Tool Drawer"] === "Yes")
         .forEach((row) => {
-          const packageName = getPackageNameFromPlayStoreUrl(row.cells["Play Store URL"]);
-          if (!packageName) return;
+          try {
+            const packageName = getPackageNameFromPlayStoreUrl(row.cells["Play Store URL"]);
+            if (!packageName) return;
 
-          const app = installedApps.find((app) => app.packageName === packageName);
-          appsList[packageName] = {
-            source: "Tool Drawer",
-            installed: Boolean(app),
-            name: app?.appName || row.cells["Tool Name"]
-          };
+            const app = installedApps.find((app) => app.packageName === packageName);
+            appsList[packageName] = {
+              source: "Tool Drawer",
+              installed: Boolean(app),
+              name: app?.appName || row.cells["Tool Name"] || "Unknown App"
+            };
+          } catch (rowError) {
+            console.error("Error processing Ottogrid app row:", rowError);
+            // Continue with next app instead of crashing
+          }
         });
     } else {
-      console.error("Ottogrid data structure is not as expected");
+      console.error("No valid Ottogrid data available");
     }
   } catch (error) {
     console.error("Error processing Ottogrid apps:", error);
   }
 
-  // Process Faith Tools apps
-  FAITH_TOOLS_APPS.forEach((app) => {
-    const packageName = getPackageNameFromPlayStoreUrl(app["Play Store URL"]);
-    if (!packageName) return;
+  // Process Faith Tools apps with similar protection
+  try {
+    FAITH_TOOLS_APPS.forEach((app) => {
+      try {
+        const packageName = getPackageNameFromPlayStoreUrl(app["Play Store URL"]);
+        if (!packageName) return;
 
-    appsList[packageName] = {
-      source: "faith.tools",
-      installed: installedApps.some((app) => app.packageName === packageName),
-      name: app.Name
-    };
-  });
+        appsList[packageName] = {
+          source: "faith.tools",
+          installed: installedApps.some((app) => app.packageName === packageName),
+          name: app.Name || "Unknown App"
+        };
+      } catch (appError) {
+        console.error("Error processing Faith Tools app:", appError);
+        // Continue with next app instead of crashing
+      }
+    });
+  } catch (faithToolsError) {
+    console.error("Error processing Faith Tools apps:", faithToolsError);
+  }
 
   // Sort apps by name
   sortedAppsList = Object.fromEntries(Object.entries(appsList).sort(([, a], [, b]) => a.name.localeCompare(b.name)));
@@ -188,15 +203,24 @@ try {
     class="container p-6 mx-auto prose"
     x-data="device"
     x-init={`
-      appsList = ${JSON.stringify(sortedAppsList)};
-      imei = "${imei}";
-      isSubscribed = ${isSubscribed};
-      nickname = \`${wisephone?.nickname || ""}\`;
-      phoneNumber = \`${wisephone?.phoneNumber || ""}\`;
-      originalNickname = \`${wisephone?.nickname || ""}\`;
-      originalPhoneNumber = \`${wisephone?.phoneNumber || ""}\`;
-      toastErrorMessage = "${error || ""}" || toastErrorMessage;
-      toastMessage = "${success}" || toastMessage;
+      try {
+        // Convert objects to safe strings and handle potential serialization errors
+        const safeAppsListJson = ${JSON.stringify(sortedAppsList || {})};
+        appsList = typeof safeAppsListJson === 'object' ? safeAppsListJson : {};
+
+        imei = "${imei || ""}";
+        isSubscribed = ${Boolean(isSubscribed)};
+        nickname = \`${(wisephone?.nickname || "").replace(/`/g, "'")}\`;
+        phoneNumber = \`${(wisephone?.phoneNumber || "").replace(/`/g, "'")}\`;
+        originalNickname = \`${(wisephone?.nickname || "").replace(/`/g, "'")}\`;
+        originalPhoneNumber = \`${(wisephone?.phoneNumber || "").replace(/`/g, "'")}\`;
+
+        // Provide fallbacks for error messages
+        toastErrorMessage = "${(error || "").replace(/"/g, '\\"')}";
+        toastMessage = "${(success || "").replace(/"/g, '\\"')}";
+      } catch (e) {
+        console.error('Error during Alpine initialization:', e);
+      }
     `}
   >
     <Header activeTab="page" isProjectPublished={false} projectSlug={""} />
@@ -424,7 +448,7 @@ try {
                     x-bind:class="{ 'tab-active !bg-[var(--evergreen)] !text-white': currentView === 'tool-drawer' }"
                     @click="currentView = 'tool-drawer'"
                   >
-                    Tool Drawer
+                    Tool Drawer
                   </a>
                   <a
                     role="tab"
