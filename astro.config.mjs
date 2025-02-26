@@ -18,6 +18,7 @@ export default defineConfig({
     clerk(),
     sentry({
       dsn: "https://5eb13a77d6b20ea29b280f60280399db@o4508453437308928.ingest.us.sentry.io/4508887396974592",
+      // This means we don't capture any video replays - Save Money
       replaysSessionSampleRate: 0,
       replaysOnErrorSampleRate: 0,
       sourceMapsUploadOptions: {
