@@ -1,5 +1,5 @@
 import type { APIRoute } from "astro";
-import { db, BypassTechlessSubscription, eq } from "astro:db";
+import { db, BypassTechlessSubscription, eq, sql } from "astro:db";
 import { isAdmin } from "@/lib/auth/permissions";
 
 export const GET: APIRoute = async ({ locals, params }) => {
@@ -41,7 +41,7 @@ export const GET: APIRoute = async ({ locals, params }) => {
     const bypass = await db
       .select()
       .from(BypassTechlessSubscription)
-      .where(eq(BypassTechlessSubscription.imei, imei))
+      .where(sql`${BypassTechlessSubscription.imei} = ${imei}`)
       .get();
 
     return new Response(JSON.stringify({ bypass }), {

@@ -560,7 +560,7 @@ if (!(await isAdmin(user.id))) {
 
           // Update each wisephone with its bypass status
           for (const phone of this.wisephones) {
-            const bypass = bypassMap[phone.imei];
+            const bypass = bypassMap[String(phone.imei)];
             phone.bypassSubscription = bypass ? true : false;
             phone.bypassReason = bypass?.reason || "";
           }

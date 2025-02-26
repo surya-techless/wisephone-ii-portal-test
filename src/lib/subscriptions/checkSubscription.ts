@@ -48,12 +48,10 @@ export async function checkSubscription(phoneNumber: string, imei: string): Prom
       };
     } else {
       // Call the bypass endpoint
-      const bypassUrl = new URL(`/api/wisephones/${imei}/bypass`, "https://cameronpak-wisephoneii.web.val.run");
+      const bypassUrl = new URL(`/api/wisephones/${imei}/bypass`, window.location.origin);
       const bypassResult = await fetch(bypassUrl, { method: "GET" });
       const bypassData = await bypassResult.json();
       const bypass = bypassData.bypass;
-
-      console.log("bypass", bypass);
 
       if (bypass) {
         return {
