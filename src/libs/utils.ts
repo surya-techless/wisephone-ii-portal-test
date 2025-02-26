@@ -100,8 +100,9 @@ export const FEATURES: Record<string, Feature> = {
     isEnabled: true,
     knoxManageId: KNOX_USER_GROUPS.ADD_ON_DISABLE_HOTSPOT,
     lucideIcon: "signal",
-    name: "Enable Hotspot",
-    description: "Enable the hotspot feature on this device.",
+    name: "Allow Hotspot",
+    description:
+      "This determines if the hotspot feature on this device is allowed. Requires a compatible service plan to use hotspot.",
     enableMessage: "I acknowledge turning on this feature enables the hotspot feature on this device.",
     disableMessage: "I acknowledge turning off this feature disables the hotspot feature on this device.",
     isInverse: true
