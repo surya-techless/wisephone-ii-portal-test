@@ -41,7 +41,6 @@ if (!(await isAdmin(user.id))) {
           x-data="{
             phoneNumber: '',
             imei: '',
-            isLoading: false,
             subscriptionResult: null,
             subscriptionError: null,
             hasBeenSubmitted: false,
@@ -217,7 +216,6 @@ if (!(await isAdmin(user.id))) {
           class="p-6 bg-white shadow-sm rounded-2xl"
           x-data="{
             wisephones: [],
-            isLoading: false,
             error: null,
             editWisephone: null,
             searchQuery: '',
