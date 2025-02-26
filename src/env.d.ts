@@ -45,6 +45,8 @@ interface ImportMetaEnv {
   readonly KNOX_REGION: string;
   /** https://ottogrid.ai/docs */
   readonly OTTOGRID_API_KEY: string;
+  /** https://docs.sentry.io/platforms/javascript/guides/astro/#configure */
+  readonly SENTRY_AUTH_TOKEN: string;
 }
 
 interface ImportMeta {

@@ -4,6 +4,7 @@ import alpinejs from "@astrojs/alpinejs";
 import netlify from "@astrojs/netlify";
 import db from "@astrojs/db";
 import clerk from "@clerk/astro";
+import sentry from "@sentry/astro";
 
 // https://astro.build/config
 export default defineConfig({
@@ -14,7 +15,16 @@ export default defineConfig({
     alpinejs({
       entrypoint: "/src/entrypoint"
     }),
-    clerk()
+    clerk(),
+    sentry({
+      dsn: "https://5eb13a77d6b20ea29b280f60280399db@o4508453437308928.ingest.us.sentry.io/4508887396974592",
+      replaysSessionSampleRate: 0,
+      replaysOnErrorSampleRate: 0,
+      sourceMapsUploadOptions: {
+        project: "wisephone-ii-portal",
+        authToken: process.env.SENTRY_AUTH_TOKEN
+      }
+    })
   ],
   vite: {
     optimizeDeps: {
