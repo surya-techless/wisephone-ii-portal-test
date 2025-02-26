@@ -10,139 +10,166 @@ import { fetchOttogridData } from "@/libs/ottogrid";
 import type { AppsList } from "@/types/apps";
 import NodeCache from "node-cache";
 
-const { imei } = Astro.params;
+// Initialize variables with default values
+let imei: string | undefined = Astro.params.imei;
+let wisephone: any = null;
+let features = Object.values(FEATURES);
+let isSubscribed = false;
+let error = "";
+let success = "";
+let installedApps: any[] = [];
+let appsList: AppsList = {};
+let sortedAppsList = {};
 
-if (!imei || isNaN(Number(imei))) {
-  return Astro.redirect("/dashboard");
-}
+try {
+  if (!imei || isNaN(Number(imei))) {
+    return Astro.redirect("/dashboard?error=" + encodeURIComponent("Invalid IMEI provided"));
+  }
 
-const resultDelete = Astro.getActionResult(actions.wisephones.deleteWisephone);
-const resultDeleteMessage = resultDelete?.data?.success || "";
-if (resultDeleteMessage) {
-  return Astro.redirect("/dashboard?message=" + encodeURIComponent(resultDeleteMessage));
-}
+  const resultDelete = Astro.getActionResult(actions.wisephones.deleteWisephone);
+  const resultDeleteMessage = resultDelete?.data?.success || "";
+  if (resultDeleteMessage) {
+    return Astro.redirect("/dashboard?message=" + encodeURIComponent(resultDeleteMessage));
+  }
 
-const wisephones = await db
-  .select()
-  .from(Wisephone)
-  .where(eq(Wisephone.imei, Number(imei)))
-  .limit(1);
+  const wisephones = await db
+    .select()
+    .from(Wisephone)
+    .where(eq(Wisephone.imei, Number(imei)))
+    .limit(1);
 
-const features = Object.values(FEATURES);
+  if (!wisephones || !wisephones.length) {
+    return Astro.redirect("/dashboard?error=" + encodeURIComponent("Device not found"));
+  }
 
-if (!wisephones || !wisephones.length) {
-  return Astro.redirect("/dashboard");
-}
+  wisephone = wisephones[0];
 
-const wisephone = wisephones[0];
+  // Safety check - if wisephone is null or undefined, redirect to dashboard with error
+  if (!wisephone) {
+    return Astro.redirect("/dashboard?error=" + encodeURIComponent("Device information could not be loaded"));
+  }
 
-const subscribedUrl = new URL(`/webhook-is-user-subscribed`, "https://cameronpak-wisephoneii.web.val.run");
+  const subscribedUrl = new URL(`/webhook-is-user-subscribed`, "https://cameronpak-wisephoneii.web.val.run");
 
-// Phone numbers are stored as XXX-XXX-XXXX, but the webhook expects XXXXXXXXXX
-subscribedUrl.searchParams.set("phoneNumber", `${wisephone.phoneNumber.replace(/[^0-9+]/g, "")}`);
-subscribedUrl.searchParams.set("imei", String(wisephone.imei));
+  // Phone numbers are stored as XXX-XXX-XXXX, but the webhook expects XXXXXXXXXX
+  subscribedUrl.searchParams.set("phoneNumber", `${wisephone?.phoneNumber.replace(/[^0-9+]/g, "") || ""}`);
+  subscribedUrl.searchParams.set("imei", String(wisephone?.imei || ""));
 
-// Create a new cache instance with standard TTL of 1 day (86400 seconds)
-const subscriptionCache = new NodeCache({ stdTTL: 86400 });
+  // Create a new cache instance with standard TTL of 1 day (86400 seconds)
+  const subscriptionCache = new NodeCache({ stdTTL: 86400 });
 
-const bypassTechlessSubscription = await db
-  .select()
-  .from(BypassTechlessSubscription)
-  .where(eq(BypassTechlessSubscription.imei, Number(imei)))
-  .limit(1);
+  const bypassTechlessSubscription = await db
+    .select()
+    .from(BypassTechlessSubscription)
+    .where(eq(BypassTechlessSubscription.imei, Number(imei)))
+    .limit(1);
 
-let isSubscribed = bypassTechlessSubscription.length > 0 || false;
+  isSubscribed = bypassTechlessSubscription.length > 0 || false;
 
-if (!isSubscribed) {
-  // Create a cache key using the IMEI
-  const cacheKey = `subscription-${imei}`;
+  if (!isSubscribed) {
+    // Create a cache key using the IMEI
+    const cacheKey = `subscription-${imei}`;
 
-  // Check if the result is cached
-  const cachedStatus = subscriptionCache.get(cacheKey);
+    // Check if the result is cached
+    const cachedStatus = subscriptionCache.get(cacheKey);
 
-  if (cachedStatus === true) {
-    // Only use cached value if it's true
-    isSubscribed = true;
-  } else {
-    // Fetch fresh data if not in cache or cached as false
-    const result = await fetch(subscribedUrl, { method: "GET" });
-    const isSubscribedText = await result.text();
-    if (isSubscribedText.includes("bypass") || isSubscribedText.includes("is subscribed")) {
+    if (cachedStatus === true) {
+      // Only use cached value if it's true
       isSubscribed = true;
+    } else {
+      try {
+        // Fetch fresh data if not in cache or cached as false
+        const result = await fetch(subscribedUrl, { method: "GET" });
+        const isSubscribedText = await result.text();
+        if (isSubscribedText.includes("bypass") || isSubscribedText.includes("is subscribed")) {
+          isSubscribed = true;
 
-      // Only cache positive subscription statuses
-      subscriptionCache.set(cacheKey, true);
+          // Only cache positive subscription statuses
+          subscriptionCache.set(cacheKey, true);
+        }
+      } catch (subscriptionError) {
+        console.error("Error checking subscription status:", subscriptionError);
+        // Continue with isSubscribed = false instead of crashing
+      }
     }
   }
-}
 
-const result = Astro.getActionResult(actions.wisephones.updateWisephone);
-const installAppResult = Astro.getActionResult(actions.wisephones.installApp);
-const uninstallAppResult = Astro.getActionResult(actions.wisephones.uninstallApp);
+  const result = Astro.getActionResult(actions.wisephones.updateWisephone);
+  const installAppResult = Astro.getActionResult(actions.wisephones.installApp);
+  const uninstallAppResult = Astro.getActionResult(actions.wisephones.uninstallApp);
 
-const error = [
-  result?.error as ActionInputError<typeof actions.wisephones.updateWisephone>,
-  installAppResult?.error as ActionInputError<typeof actions.wisephones.installApp>,
-  uninstallAppResult?.error as ActionInputError<typeof actions.wisephones.uninstallApp>
-]
-  .filter(Boolean)
-  .flatMap((error) => error.issues.map((issue) => issue.message))
-  .join("\n");
+  error = [
+    result?.error as ActionInputError<typeof actions.wisephones.updateWisephone>,
+    installAppResult?.error as ActionInputError<typeof actions.wisephones.installApp>,
+    uninstallAppResult?.error as ActionInputError<typeof actions.wisephones.uninstallApp>
+  ]
+    .filter(Boolean)
+    .flatMap((err) => err.issues.map((issue) => issue.message))
+    .join("\n");
 
-const success = [
-  result?.data?.success as string,
-  installAppResult?.data?.success as string,
-  uninstallAppResult?.data?.success as string
-]
-  .filter(Boolean)
-  .join("\n");
+  success = [
+    result?.data?.success as string,
+    installAppResult?.data?.success as string,
+    uninstallAppResult?.data?.success as string
+  ]
+    .filter(Boolean)
+    .join("\n");
 
-// Get the latest installed apps list
-const formData = new FormData();
-formData.append("imei", String(wisephone.imei));
+  // Get the latest installed apps list
+  const formData = new FormData();
+  formData.append("imei", String(wisephone?.imei || ""));
 
-const getInstalledAppsResult = await Astro.callAction(actions.wisephones.getInstalledApps, formData);
-const installedApps = getInstalledAppsResult?.data?.apps || [];
+  try {
+    const getInstalledAppsResult = await Astro.callAction(actions.wisephones.getInstalledApps, formData);
+    installedApps = getInstalledAppsResult?.data?.apps || [];
+  } catch (appsError) {
+    console.error("Error getting installed apps:", appsError);
+    // Continue with empty installedApps array instead of crashing
+  }
 
-// Create apps list with type safety
-const appsList: AppsList = {};
+  // Create apps list with type safety
+  appsList = {};
 
-// Process Ottogrid apps with error handling
-try {
-  const appsFromOttogrid = await fetchOttogridData();
-  appsFromOttogrid.rows
-    .filter((row) => row.cells["Tool Drawer"] === "Yes")
-    .forEach((row) => {
-      const packageName = getPackageNameFromPlayStoreUrl(row.cells["Play Store URL"]);
-      if (!packageName) return;
+  // Process Ottogrid apps with error handling
+  try {
+    const appsFromOttogrid = await fetchOttogridData();
+    appsFromOttogrid.rows
+      .filter((row) => row.cells["Tool Drawer"] === "Yes")
+      .forEach((row) => {
+        const packageName = getPackageNameFromPlayStoreUrl(row.cells["Play Store URL"]);
+        if (!packageName) return;
 
-      const app = installedApps.find((app) => app.packageName === packageName);
-      appsList[packageName] = {
-        source: "Tool Drawer",
-        installed: Boolean(app),
-        name: app?.appName || row.cells["Tool Name"]
-      };
-    });
+        const app = installedApps.find((app) => app.packageName === packageName);
+        appsList[packageName] = {
+          source: "Tool Drawer",
+          installed: Boolean(app),
+          name: app?.appName || row.cells["Tool Name"]
+        };
+      });
+  } catch (error) {
+    console.error("Error processing Ottogrid apps:", error);
+  }
+
+  // Process Faith Tools apps
+  FAITH_TOOLS_APPS.forEach((app) => {
+    const packageName = getPackageNameFromPlayStoreUrl(app["Play Store URL"]);
+    if (!packageName) return;
+
+    appsList[packageName] = {
+      source: "faith.tools",
+      installed: installedApps.some((app) => app.packageName === packageName),
+      name: app.Name
+    };
+  });
+
+  // Sort apps by name
+  sortedAppsList = Object.fromEntries(Object.entries(appsList).sort(([, a], [, b]) => a.name.localeCompare(b.name)));
 } catch (error) {
-  console.error("Error processing Ottogrid apps:", error);
+  console.error("Unexpected error in device page:", error);
+  return Astro.redirect(
+    "/dashboard?error=" + encodeURIComponent("An unexpected error occurred while loading the device. Please try again.")
+  );
 }
-
-// Process Faith Tools apps
-FAITH_TOOLS_APPS.forEach((app) => {
-  const packageName = getPackageNameFromPlayStoreUrl(app["Play Store URL"]);
-  if (!packageName) return;
-
-  appsList[packageName] = {
-    source: "faith.tools",
-    installed: installedApps.some((app) => app.packageName === packageName),
-    name: app.Name
-  };
-});
-
-// Sort apps by name
-const sortedAppsList = Object.fromEntries(
-  Object.entries(appsList).sort(([, a], [, b]) => a.name.localeCompare(b.name))
-);
 ---
 
 <Layout title="Device Features" description="Manage the features of your Wisephone II device.">
@@ -153,10 +180,10 @@ const sortedAppsList = Object.fromEntries(
       appsList = ${JSON.stringify(sortedAppsList)};
       imei = "${imei}";
       isSubscribed = ${isSubscribed};
-      nickname = \`${wisephone.nickname}\`;
-      phoneNumber = \`${wisephone.phoneNumber}\`;
-      originalNickname = \`${wisephone.nickname}\`;
-      originalPhoneNumber = \`${wisephone.phoneNumber}\`;
+      nickname = \`${wisephone?.nickname || ""}\`;
+      phoneNumber = \`${wisephone?.phoneNumber || ""}\`;
+      originalNickname = \`${wisephone?.nickname || ""}\`;
+      originalPhoneNumber = \`${wisephone?.phoneNumber || ""}\`;
       toastErrorMessage = "${error || ""}" || toastErrorMessage;
       toastMessage = "${success}" || toastMessage;
     `}
@@ -197,14 +224,14 @@ const sortedAppsList = Object.fromEntries(
                 <span
                   class="hover:underline hover:cursor-pointer underline-offset-4 line-clamp-1 max-w-[200px] overflow-hidden text-ellipsis"
                   @click="isEditing = true"
-                  x-text="nickname">{wisephone.nickname}</span
+                  x-text="nickname">{wisephone?.nickname || ""}</span
                 >
                 <span class="max-sm:hidden">•</span>
                 <div class="flex items-center gap-2">
                   <span
                     class="hover:underline hover:cursor-pointer underline-offset-4"
                     @click="isEditing = true"
-                    x-text="phoneNumber">{wisephone.phoneNumber}</span
+                    x-text="phoneNumber">{wisephone?.phoneNumber || ""}</span
                   >
                   <button class="btn btn-sm btn-ghost btn-circle" @click="isEditing = true">
                     <Icon name="lucide:pencil" class="w-4 h-4" />
