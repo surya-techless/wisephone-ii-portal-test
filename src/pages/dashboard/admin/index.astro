@@ -28,7 +28,7 @@ if (!(await isAdmin(user.id))) {
       x-show="isLoading"
       x-cloak
       x-transition
-      class="absolute top-0 left-0 right-0 w-full progress"
+      class="absolute top-0 left-0 right-0 z-50 w-full progress"
       style="--progress-color: var(--evergreen);"></progress>
 
     <Header activeTab="page" isProjectPublished={false} projectSlug={""} />
@@ -48,6 +48,7 @@ if (!(await isAdmin(user.id))) {
             async checkSubscription() {
               try {
                 this.isLoading = true;
+                $dispatch('loading-start');
                 this.subscriptionResult = null;
                 this.subscriptionError = null;
 
@@ -81,6 +82,7 @@ if (!(await isAdmin(user.id))) {
                 this.subscriptionError = error.message || 'Failed to check subscription. Please try again.';
               } finally {
                 this.isLoading = false;
+                $dispatch('loading-end');
               }
             },
 
@@ -192,7 +194,7 @@ if (!(await isAdmin(user.id))) {
                   :disabled="phoneNumber.replace(/-/g, '').length !== 10 || imei.length !== 15 || isLoading"
                 >
                   <span x-show="!isLoading">Check Subscription</span>
-                  <span x-show="isLoading" class="loading loading-spinner loading-sm"></span>
+                  <span x-show="isLoading">Checking...</span>
                 </button>
 
                 <button
@@ -235,6 +237,7 @@ if (!(await isAdmin(user.id))) {
             async fetchWisephones() {
               try {
                 this.isLoading = true;
+                $dispatch('loading-start');
                 this.error = null;
 
                 const response = await fetch('/api/wisephones');
@@ -252,6 +255,7 @@ if (!(await isAdmin(user.id))) {
                 console.error('Error fetching wisephones:', err);
               } finally {
                 this.isLoading = false;
+                $dispatch('loading-end');
               }
             },
 
@@ -297,6 +301,7 @@ if (!(await isAdmin(user.id))) {
             async saveWisephone() {
               try {
                 this.isLoading = true;
+                $dispatch('loading-start');
 
                 const formData = new FormData();
                 formData.append('imei', parseInt(this.formImei));
@@ -327,6 +332,7 @@ if (!(await isAdmin(user.id))) {
                 console.error('Error updating wisephone:', err);
               } finally {
                 this.isLoading = false;
+                $dispatch('loading-end');
               }
             },
 
@@ -338,6 +344,7 @@ if (!(await isAdmin(user.id))) {
             async deleteWisephone() {
               try {
                 this.isLoading = true;
+                $dispatch('loading-start');
 
                 const formData = new FormData();
                 formData.append('imei', this.wisephoneToDelete.imei);
@@ -362,6 +369,7 @@ if (!(await isAdmin(user.id))) {
                 console.error('Error deleting wisephone:', err);
               } finally {
                 this.isLoading = false;
+                $dispatch('loading-end');
               }
             },
 
@@ -452,10 +460,37 @@ if (!(await isAdmin(user.id))) {
             }
           }"
           x-init="fetchWisephones()"
+          @loading-start="$parent.isLoading = true"
+          @loading-end="$parent.isLoading = false"
         >
-          <!-- Loading indicator -->
-          <div x-show="isLoading" class="flex justify-center py-8">
-            <span class="loading loading-spinner loading-lg"></span>
+          <!-- Remove the spinner loading indicator and replace with content skeleton -->
+          <div x-show="isLoading" class="animate-pulse" x-cloak>
+            <div class="h-6 mb-4 rounded bg-slate-200 w-36"></div>
+            <div class="h-10 mb-6 rounded bg-slate-200"></div>
+            <div class="h-12 mb-4 rounded bg-slate-200"></div>
+            <div class="grid grid-cols-5 gap-4 mb-6">
+              <div class="h-8 col-span-1 rounded bg-slate-200"></div>
+              <div class="h-8 col-span-1 rounded bg-slate-200"></div>
+              <div class="h-8 col-span-1 rounded bg-slate-200"></div>
+              <div class="h-8 col-span-1 rounded bg-slate-200"></div>
+              <div class="h-8 col-span-1 rounded bg-slate-200"></div>
+            </div>
+            <div class="space-y-3">
+              <div class="grid grid-cols-5 gap-4">
+                <div class="h-6 col-span-1 rounded bg-slate-200"></div>
+                <div class="h-6 col-span-1 rounded bg-slate-200"></div>
+                <div class="h-6 col-span-1 rounded bg-slate-200"></div>
+                <div class="h-6 col-span-1 rounded bg-slate-200"></div>
+                <div class="h-6 col-span-1 rounded bg-slate-200"></div>
+              </div>
+              <div class="grid grid-cols-5 gap-4">
+                <div class="h-6 col-span-1 rounded bg-slate-200"></div>
+                <div class="h-6 col-span-1 rounded bg-slate-200"></div>
+                <div class="h-6 col-span-1 rounded bg-slate-200"></div>
+                <div class="h-6 col-span-1 rounded bg-slate-200"></div>
+                <div class="h-6 col-span-1 rounded bg-slate-200"></div>
+              </div>
+            </div>
           </div>
 
           <!-- Error alert -->
@@ -463,147 +498,149 @@ if (!(await isAdmin(user.id))) {
             <p x-text="error"></p>
           </div>
 
-          <h2>Wisephone Management</h2>
+          <div x-show="!isLoading">
+            <h2>Wisephone Management</h2>
 
-          <!-- Search bar -->
-          <div class="mt-4 mb-6">
-            <div class="relative">
-              <input
-                type="text"
-                x-model="searchQuery"
-                placeholder="Search by IMEI, nickname, phone number, or user ID"
-                class="w-full pl-10 input input-bordered"
-                @input="currentPage = 1"
-              />
-              <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  class="w-5 h-5 text-gray-400"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg
-                >
+            <!-- Search bar -->
+            <div class="mt-4 mb-6">
+              <div class="relative">
+                <input
+                  type="text"
+                  x-model="searchQuery"
+                  placeholder="Search by IMEI, nickname, phone number, or user ID"
+                  class="w-full pl-10 input input-bordered"
+                  @input="currentPage = 1"
+                />
+                <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    class="w-5 h-5 text-gray-400"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg
+                  >
+                </div>
               </div>
             </div>
-          </div>
 
-          <!-- Wisephones table -->
-          <div class="overflow-x-auto">
-            <table class="table table-zebra">
-              <thead>
-                <tr>
-                  <th>IMEI</th>
-                  <th class="w-40">Nickname</th>
-                  <th>Phone Number</th>
-                  <th>Bypass</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                <template x-for="phone in paginatedWisephones" :key="phone.imei">
-                  <tr class="[&:nth-child(even)]:!bg-slate-50 border-b-2 border-slate-100">
-                    <td x-text="phone.imei"></td>
-                    <td class="max-w-[160px] break-words" x-text="phone.nickname || '-'"></td>
-                    <td class="whitespace-nowrap" x-text="phone.phoneNumber"></td>
-                    <td>
-                      <div class="flex items-center gap-2">
-                        <template x-if="phone.bypassSubscription">
-                          <div class="tooltip" :data-tip="phone.bypassReason || 'No reason provided'">
-                            <div class="flex items-center gap-2 cursor-help">
-                              <Icon name="lucide:check" class="w-4 h-4 text-[var(--evergreen)]" />
+            <!-- Wisephones table -->
+            <div class="overflow-x-auto">
+              <table class="table table-zebra">
+                <thead>
+                  <tr>
+                    <th>IMEI</th>
+                    <th class="w-40">Nickname</th>
+                    <th>Phone Number</th>
+                    <th>Bypass</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <template x-for="phone in paginatedWisephones" :key="phone.imei">
+                    <tr class="[&:nth-child(even)]:!bg-slate-50 border-b-2 border-slate-100">
+                      <td x-text="phone.imei"></td>
+                      <td class="max-w-[160px] break-words" x-text="phone.nickname || '-'"></td>
+                      <td class="whitespace-nowrap" x-text="phone.phoneNumber"></td>
+                      <td>
+                        <div class="flex items-center gap-2">
+                          <template x-if="phone.bypassSubscription">
+                            <div class="tooltip" :data-tip="phone.bypassReason || 'No reason provided'">
+                              <div class="flex items-center gap-2 cursor-help">
+                                <Icon name="lucide:check" class="w-4 h-4 text-[var(--evergreen)]" />
+                              </div>
                             </div>
-                          </div>
-                        </template>
-                        <span x-show="!phone.bypassSubscription" class="text-xs text-slate-400">-</span>
-                      </div>
-                    </td>
-                    <td class="flex gap-2">
-                      <button @click="openEditModal(phone)" class="btn btn-sm btn-circle">
-                        <Icon name="lucide:pencil" class="w-4 h-4" />
-                      </button>
-                      <button @click="confirmDelete(phone)" class="btn btn-sm btn-circle">
-                        <Icon name="lucide:trash" class="w-4 h-4" />
-                      </button>
+                          </template>
+                          <span x-show="!phone.bypassSubscription" class="text-xs text-slate-400">-</span>
+                        </div>
+                      </td>
+                      <td class="flex gap-2">
+                        <button @click="openEditModal(phone)" class="btn btn-sm btn-circle">
+                          <Icon name="lucide:pencil" class="w-4 h-4" />
+                        </button>
+                        <button @click="confirmDelete(phone)" class="btn btn-sm btn-circle">
+                          <Icon name="lucide:trash" class="w-4 h-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  </template>
+                  <tr class="!bg-slate-50" x-show="filteredWisephones.length === 0 && !isLoading">
+                    <td colspan="5" class="py-4 text-center">
+                      <template x-if="searchQuery">
+                        <p>No wisephones found matching your search query.</p>
+                      </template>
+                      <template x-if="!searchQuery">
+                        <p>No wisephones have been registered yet.</p>
+                      </template>
                     </td>
                   </tr>
-                </template>
-                <tr class="!bg-slate-50" x-show="filteredWisephones.length === 0 && !isLoading">
-                  <td colspan="5" class="py-4 text-center">
-                    <template x-if="searchQuery">
-                      <p>No wisephones found matching your search query.</p>
-                    </template>
-                    <template x-if="!searchQuery">
-                      <p>No wisephones have been registered yet.</p>
-                    </template>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <!-- Pagination Controls -->
-          <div class="flex items-center justify-between gap-3 mt-6 max-sm:flex-col" x-show="totalPages > 0" x-cloak>
-            <div class="text-sm text-slate-500">
-              Showing <span x-text="((currentPage - 1) * itemsPerPage) + 1"></span> to
-              <span x-text="Math.min(currentPage * itemsPerPage, filteredWisephones.length)"></span> of
-              <span x-text="filteredWisephones.length"></span> wisephones
+                </tbody>
+              </table>
             </div>
 
-            <div class="join">
-              <!-- Previous button -->
-              <button
-                class="join-item btn btn-sm"
-                :class="currentPage === 1 ? 'btn-disabled' : ''"
-                @click="prevPage()"
-                :disabled="currentPage === 1"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  class="w-4 h-4"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"><path d="m15 18-6-6 6-6"></path></svg
-                >
-              </button>
+            <!-- Pagination Controls -->
+            <div class="flex items-center justify-between gap-3 mt-6 max-sm:flex-col" x-show="totalPages > 0" x-cloak>
+              <div class="text-sm text-slate-500">
+                Showing <span x-text="((currentPage - 1) * itemsPerPage) + 1"></span> to
+                <span x-text="Math.min(currentPage * itemsPerPage, filteredWisephones.length)"></span> of
+                <span x-text="filteredWisephones.length"></span> wisephones
+              </div>
 
-              <!-- Page numbers -->
-              <template x-for="page in visiblePageNumbers" :key="page">
-                <template x-if="page === 'ellipsis'">
-                  <button class="join-item btn btn-sm btn-disabled">...</button>
-                </template>
-                <template x-if="page !== 'ellipsis'">
-                  <button
-                    class="join-item btn btn-sm"
-                    :class="currentPage === page ? 'btn-active' : ''"
-                    @click="goToPage(page)"
-                    x-text="page"></button>
-                </template>
-              </template>
-
-              <!-- Next button -->
-              <button
-                class="join-item btn btn-sm"
-                :class="currentPage === totalPages || totalPages === 0 ? 'btn-disabled' : ''"
-                @click="nextPage()"
-                :disabled="currentPage === totalPages || totalPages === 0"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  class="w-4 h-4"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"><path d="m9 18 6-6-6-6"></path></svg
+              <div class="join">
+                <!-- Previous button -->
+                <button
+                  class="join-item btn btn-sm"
+                  :class="currentPage === 1 ? 'btn-disabled' : ''"
+                  @click="prevPage()"
+                  :disabled="currentPage === 1"
                 >
-              </button>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    class="w-4 h-4"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"><path d="m15 18-6-6 6-6"></path></svg
+                  >
+                </button>
+
+                <!-- Page numbers -->
+                <template x-for="page in visiblePageNumbers" :key="page">
+                  <template x-if="page === 'ellipsis'">
+                    <button class="join-item btn btn-sm btn-disabled">...</button>
+                  </template>
+                  <template x-if="page !== 'ellipsis'">
+                    <button
+                      class="join-item btn btn-sm"
+                      :class="currentPage === page ? 'btn-active' : ''"
+                      @click="goToPage(page)"
+                      x-text="page"></button>
+                  </template>
+                </template>
+
+                <!-- Next button -->
+                <button
+                  class="join-item btn btn-sm"
+                  :class="currentPage === totalPages || totalPages === 0 ? 'btn-disabled' : ''"
+                  @click="nextPage()"
+                  :disabled="currentPage === totalPages || totalPages === 0"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    class="w-4 h-4"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"><path d="m9 18 6-6-6-6"></path></svg
+                  >
+                </button>
+              </div>
             </div>
           </div>
 
@@ -689,7 +726,7 @@ if (!(await isAdmin(user.id))) {
                   <button type="button" class="btn btn-ghost" @click="showEditModal = false">Cancel</button>
                   <button type="submit" class="btn btn-primary" :disabled="isLoading">
                     <span x-show="!isLoading">Save Changes</span>
-                    <span x-show="isLoading" class="loading loading-spinner loading-sm"></span>
+                    <span x-show="isLoading">Saving...</span>
                   </button>
                 </div>
               </form>
@@ -734,7 +771,7 @@ if (!(await isAdmin(user.id))) {
                   :disabled="isLoading"
                 >
                   <span x-show="!isLoading">Delete</span>
-                  <span x-show="isLoading" class="loading loading-spinner loading-sm"></span>
+                  <span x-show="isLoading">Deleting...</span>
                 </button>
               </div>
             </div>
