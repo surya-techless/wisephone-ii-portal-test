@@ -26,7 +26,7 @@ if (!(await isAdmin(user.id))) {
       x-show="isLoading"
       x-cloak
       x-transition
-      class="absolute top-0 left-0 right-0 z-50 w-full progress"
+      class="fixed top-0 left-0 right-0 z-50 w-full progress"
       style="--progress-color: var(--evergreen);"></progress>
 
     <Header activeTab="page" isProjectPublished={false} projectSlug={""} />
@@ -162,7 +162,7 @@ if (!(await isAdmin(user.id))) {
             <p x-text="error"></p>
           </div>
 
-          <div x-show="!isLoading">
+          <div>
             <h2>Wisephone Management</h2>
 
             <!-- Search bar -->
