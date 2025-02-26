@@ -1,6 +1,8 @@
 ---
 import { UserButton } from "@clerk/astro/components";
+import IsAdmin from "@/components/server-islands/IsAdmin.astro";
 import WisephoneLogo from "@/components/WisephoneLogo.astro";
+import Icon from "astro-iconify";
 ---
 
 <header class="flex flex-col w-full gap-6 not-prose">
@@ -10,6 +12,11 @@ import WisephoneLogo from "@/components/WisephoneLogo.astro";
     </a>
 
     <div class="flex items-center self-center gap-2 justify-self-end">
+      <IsAdmin>
+        <a href="/dashboard/admin" class="btn btn-sm btn-ghost btn-circle">
+          <Icon name="lucide:shield-ellipsis" class="w-5 h-5" />
+        </a>
+      </IsAdmin>
       <div class="relative w-8 h-8 rounded-full bg-slate-200">
         <div
           x-cloak

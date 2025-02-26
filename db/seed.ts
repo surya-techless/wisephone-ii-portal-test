@@ -1,5 +1,6 @@
-import { db, Wisephone, BypassTechlessSubscription, App } from "astro:db";
+import { db, Wisephone, BypassTechlessSubscription, UserPermission, App } from "astro:db";
 
+const CAM_CLERK_ID = "user_2sLc5BX4F7qRUklqQ2UTUJXSipf";
 // https://astro.build/db/seed
 export default async function seed() {
   await db.insert(Wisephone).values([
@@ -7,7 +8,7 @@ export default async function seed() {
       imei: 350256485931533,
       nickname: "Cam Pak",
       phoneNumber: "405-206-0654",
-      userId: "user_2sLc5BX4F7qRUklqQ2UTUJXSipf" // Cam's Clerk ID
+      userId: CAM_CLERK_ID
     }
   ]);
 
@@ -24,6 +25,13 @@ export default async function seed() {
       name: "WiseOS",
       createdAt: new Date(),
       type: "Tool Drawer"
+    }
+  ]);
+
+  await db.insert(UserPermission).values([
+    {
+      userId: CAM_CLERK_ID,
+      role: "admin"
     }
   ]);
 }

@@ -67,7 +67,8 @@ trix-toolbar .trix-button-group,
 trix-editor,
 input[type="text"],
 input[type="number"],
-input[type="tel"] {
+input[type="tel"],
+textarea.textarea-bordered {
   @apply border-2 border-[var(--surface-tertiary)] rounded-lg;
 }
 

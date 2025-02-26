@@ -26,10 +26,20 @@ const App = defineTable({
   }
 });
 
+const UserPermission = defineTable({
+  columns: {
+    userId: column.text({ primaryKey: true }), // Clerk user ID
+    role: column.text({ default: "member" }), // 'member' or 'admin'
+    createdAt: column.date({ default: new Date() }),
+    updatedAt: column.date({ optional: true })
+  }
+});
+
 export default defineDb({
   tables: {
     App,
     BypassTechlessSubscription,
-    Wisephone
+    Wisephone,
+    UserPermission
   }
 });

@@ -38,7 +38,7 @@ const result = Astro.getActionResult(actions.wisephones.createWisephone);
       x-show="isLoading"
       x-cloak
       x-transition
-      class="absolute top-0 left-0 right-0 progress w-full"
+      class="absolute top-0 left-0 right-0 w-full progress"
       style="--progress-color: var(--evergreen);"></progress>
 
     <Header activeTab="page" isProjectPublished={false} projectSlug={""} />
@@ -200,7 +200,7 @@ const result = Astro.getActionResult(actions.wisephones.createWisephone);
               title="Please enter exactly 15 digits"
               required
             />
-            <label class="label block">
+            <label class="block label">
               <span
                 x-show="!hasBlurredImei || (hasBlurredImei && imeiMatch)"
                 class="label-text w-fit text-slate-500 [&_strong]:text-slate-500"
@@ -208,7 +208,7 @@ const result = Astro.getActionResult(actions.wisephones.createWisephone);
                 This is to ensure you have entered the correct IMEI. If you copied and pasted it, feel free to paste it
                 again.
               </span>
-              <span x-show="hasBlurredImei && !imeiMatch && imei2.length === 15" class="label-text-alt text-red-800">
+              <span x-show="hasBlurredImei && !imeiMatch && imei2.length === 15" class="text-red-800 label-text-alt">
                 IMEI numbers do not match. Please check your input and try again.
               </span>
             </label>

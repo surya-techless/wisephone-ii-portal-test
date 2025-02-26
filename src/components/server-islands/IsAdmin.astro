@@ -1,0 +1,28 @@
+---
+import { isAdmin } from "@/lib/auth/permissions";
+
+// Get the current user from Astro.locals
+const user = await Astro.locals.currentUser();
+const userId = Astro.locals.auth().userId;
+
+// Default: don't show admin content
+let userIsAdmin = false;
+
+// Check if user is authenticated and is an admin
+if (userId && user) {
+  userIsAdmin = await isAdmin(user.id);
+}
+
+// Optional fallback content
+const { fallback = null } = Astro.props;
+---
+
+{
+  userIsAdmin && (
+    <div class="flex flex-col gap-2">
+      <slot />
+    </div>
+  )
+}
+
+{!userIsAdmin && fallback && <div>{fallback}</div>}

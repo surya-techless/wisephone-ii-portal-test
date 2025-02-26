@@ -1,0 +1,752 @@
+---
+import Icon from "astro-iconify";
+import Header from "@/components/Header.astro";
+import Layout from "@/layouts/Layout.astro";
+import Footer from "@/components/Footer.astro";
+import { isAdmin } from "@/lib/auth/permissions";
+
+if (!Astro.locals.auth().userId) {
+  return Astro.redirect("/");
+}
+
+const user = await Astro.locals.currentUser();
+
+if (!user) {
+  return Astro.redirect("/");
+}
+
+if (!(await isAdmin(user.id))) {
+  return Astro.redirect("/");
+}
+---
+
+<Layout title="Dashboard" description="Manage your Wisephone II devices.">
+  <div class="container h-full p-6 mx-auto prose" x-data="{
+      isLoading: false,
+    }">
+    <progress
+      x-show="isLoading"
+      x-cloak
+      x-transition
+      class="absolute top-0 left-0 right-0 w-full progress"
+      style="--progress-color: var(--evergreen);"></progress>
+
+    <Header activeTab="page" isProjectPublished={false} projectSlug={""} />
+
+    <main class="flex flex-col gap-6 py-12">
+      <h1>Admin</h1>
+      <section class="w-full">
+        <form
+          class="p-6 bg-white shadow-sm roundex-2xl"
+          x-data="{
+            phoneNumber: '',
+            imei: '',
+            isLoading: false,
+            subscriptionResult: null,
+            subscriptionError: null,
+            hasBeenSubmitted: false,
+            async checkSubscription() {
+              try {
+                this.isLoading = true;
+                this.subscriptionResult = null;
+                this.subscriptionError = null;
+
+                // Format phone number to remove dashes
+                const formattedPhone = this.phoneNumber.replace(/[^0-9+]/g, '');
+
+                // Create the subscription check URL
+                const subscribedUrl = new URL('/webhook-is-user-subscribed', 'https://cameronpak-wisephoneii.web.val.run');
+                subscribedUrl.searchParams.set('phoneNumber', formattedPhone);
+                subscribedUrl.searchParams.set('imei', this.imei);
+
+                // Fetch the subscription status
+                const result = await fetch(subscribedUrl, { method: 'GET' });
+
+                if (!result.ok) {
+                  throw new Error(`Failed to check subscription: ${result.status} ${result.statusText}`);
+                }
+
+                const responseText = await result.text();
+
+                // Check for subscription indicators in the response
+                if (responseText.includes('bypass') || responseText.includes('is subscribed')) {
+                  this.subscriptionResult = { status: 'subscribed', message: 'User is subscribed' };
+                } else {
+                  this.subscriptionResult = { status: 'not-subscribed', message: 'User is not subscribed' };
+                }
+
+                this.hasBeenSubmitted = true;
+              } catch (error) {
+                console.error('Subscription check failed:', error);
+                this.subscriptionError = error.message || 'Failed to check subscription. Please try again.';
+              } finally {
+                this.isLoading = false;
+              }
+            },
+
+            resetForm() {
+              this.phoneNumber = '';
+              this.imei = '';
+              this.subscriptionResult = null;
+              this.subscriptionError = null;
+              this.isLoading = false;
+              this.hasBeenSubmitted = false;
+            }
+          }"
+          @submit.prevent="checkSubscription()"
+        >
+          <div class="flex flex-col gap-4 p-0">
+            <h2>Techless Subscription Checker</h2>
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div class="w-full form-control">
+                <label class="label">
+                  <span class="font-medium label-text">IMEI</span>
+                  <span class="label-text-alt">Required</span>
+                </label>
+                <input
+                  type="text"
+                  x-model.trim="imei"
+                  x-mask="999999999999999"
+                  placeholder="350XXXXXXXXXXXX"
+                  pattern="[0-9]{15}"
+                  minlength="15"
+                  maxlength="15"
+                  class="w-full input input-bordered"
+                  :class="{ 'input-error': imei.length > 0 && imei.length !== 15 }"
+                  required
+                />
+                <label class="label" x-show="imei.length > 0 && imei.length !== 15">
+                  <span class="label-text-alt text-error">Please enter a valid 15-digit IMEI number</span>
+                </label>
+              </div>
+
+              <div class="w-full form-control">
+                <label class="label">
+                  <span class="font-medium label-text">Phone Number</span>
+                  <span class="label-text-alt">Required</span>
+                </label>
+                <input
+                  type="tel"
+                  x-model.trim="phoneNumber"
+                  x-mask="999-999-9999"
+                  placeholder="XXX-XXX-XXXX"
+                  pattern="[0-9]{3}-[0-9]{3}-[0-9]{4}"
+                  class="w-full input input-bordered"
+                  :class="{ 'input-error': phoneNumber.length > 0 && phoneNumber.replace(/-/g, '').length !== 10 }"
+                  required
+                />
+                <label class="label" x-show="phoneNumber.length > 0 && phoneNumber.replace(/-/g, '').length !== 10">
+                  <span class="label-text-alt text-error">Please enter a valid 10-digit phone number</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Subscription Result Display -->
+            <div class="mt-4" x-show="subscriptionResult !== null" x-cloak x-collapse>
+              <div
+                class="p-4 rounded-lg"
+                :class={`{
+                  'bg-green-100 text-green-800': subscriptionResult?.status === 'subscribed',
+                  'bg-red-100 text-red-800': subscriptionResult?.status === 'not-subscribed'
+                }`}
+              >
+                <div class="flex items-center gap-2">
+                  <span
+                    class="text-lg"
+                    :class={`{
+                      'text-green-600': subscriptionResult?.status === 'subscribed',
+                      'text-red-600': subscriptionResult?.status === 'not-subscribed'
+                    }`}
+                  >
+                    <template x-if="subscriptionResult?.status === 'subscribed'">✓</template>
+                    <template x-if="subscriptionResult?.status === 'not-subscribed'">✗</template>
+                  </span>
+                  <div class="flex-1">
+                    <p
+                      class="p-0 m-0 font-medium whitespace-normal"
+                      x-show="subscriptionResult?.status === 'subscribed'"
+                    >
+                      Active Subscription Found
+                    </p>
+                    <p
+                      class="p-0 m-0 font-medium break-words whitespace-normal"
+                      x-show="subscriptionResult?.status === 'not-subscribed'"
+                    >
+                      No Active Subscription Found for that IMEI and phone number combination
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Error Message -->
+            <div class="p-4 mt-4 text-red-800 bg-red-100 rounded-lg" x-show="subscriptionError" x-cloak x-transition>
+              <p x-text="subscriptionError"></p>
+            </div>
+
+            <div class="mt-4 form-control">
+              <div class="flex flex-row gap-2">
+                <button
+                  type="submit"
+                  class="flex-1 btn btn-primary"
+                  :disabled="phoneNumber.replace(/-/g, '').length !== 10 || imei.length !== 15 || isLoading"
+                >
+                  <span x-show="!isLoading">Check Subscription</span>
+                  <span x-show="isLoading" class="loading loading-spinner loading-sm"></span>
+                </button>
+
+                <button
+                  type="button"
+                  class="btn btn-ghost"
+                  @click="resetForm()"
+                  x-show="hasBeenSubmitted && (phoneNumber || imei || subscriptionResult || subscriptionError)"
+                  x-transition
+                >
+                  Reset
+                </button>
+              </div>
+            </div>
+          </div>
+        </form>
+      </section>
+
+      <section class="mt-12">
+        <div
+          class="p-6 bg-white shadow-sm rounded-2xl"
+          x-data="{
+            wisephones: [],
+            isLoading: false,
+            error: null,
+            editWisephone: null,
+            searchQuery: '',
+            showEditModal: false,
+            showDeleteConfirm: false,
+            wisephoneToDelete: null,
+            currentPage: 1,
+            itemsPerPage: 10,
+
+            // Form fields
+            formImei: '',
+            formNickname: '',
+            formPhoneNumber: '',
+            formBypassSubscription: false,
+            formBypassReason: '',
+
+            async fetchWisephones() {
+              try {
+                this.isLoading = true;
+                this.error = null;
+
+                const response = await fetch('/api/wisephones');
+                if (!response.ok) {
+                  throw new Error('Failed to fetch wisephones');
+                }
+
+                const data = await response.json();
+                this.wisephones = data.wisephones;
+
+                // Fetch bypass status for each wisephone
+                for (const phone of this.wisephones) {
+                  try {
+                    const bypassResponse = await fetch(`/api/wisephones/${phone.imei}/bypass`);
+                    if (bypassResponse.ok) {
+                      const bypassData = await bypassResponse.json();
+                      phone.bypassSubscription = bypassData.bypass ? true : false;
+                      phone.bypassReason = bypassData.bypass?.reason || '';
+                    }
+                  } catch (err) {
+                    console.error(`Error fetching bypass status for IMEI ${phone.imei}:`, err);
+                    phone.bypassSubscription = false;
+                    phone.bypassReason = '';
+                  }
+                }
+              } catch (err) {
+                this.error = err.message || 'Failed to load wisephones';
+                console.error('Error fetching wisephones:', err);
+              } finally {
+                this.isLoading = false;
+              }
+            },
+
+            async openEditModal(wisephone) {
+              this.editWisephone = wisephone;
+              this.formImei = wisephone.imei.toString();
+              this.formNickname = wisephone.nickname || '';
+              this.formPhoneNumber = wisephone.phoneNumber;
+
+              // Check if this wisephone has a bypass
+              try {
+                const response = await fetch(`/api/wisephones/${wisephone.imei}/bypass`);
+                if (response.ok) {
+                  const data = await response.json();
+                  if (data.bypass) {
+                    this.formBypassSubscription = true;
+                    this.formBypassReason = data.bypass.reason || '';
+                  } else {
+                    this.formBypassSubscription = false;
+                    this.formBypassReason = '';
+                  }
+                }
+              } catch (err) {
+                console.error('Error fetching bypass status:', err);
+                this.formBypassSubscription = false;
+                this.formBypassReason = '';
+              }
+
+              this.showEditModal = true;
+            },
+
+            async saveWisephone() {
+              try {
+                this.isLoading = true;
+
+                const formData = new FormData();
+                formData.append('imei', parseInt(this.formImei));
+                formData.append('nickname', this.formNickname);
+                formData.append('phoneNumber', this.formPhoneNumber);
+                formData.append('userId', this.editWisephone.userId);
+                formData.append('bypassSubscription', this.formBypassSubscription ? 'true' : 'false');
+                if (this.formBypassSubscription) {
+                  formData.append('bypassReason', this.formBypassReason);
+                }
+
+                const response = await fetch('/api/wisephones/update', {
+                  method: 'POST',
+                  body: formData
+                });
+
+                if (!response.ok) {
+                  const errorText = await response.text();
+                  throw new Error(errorText || 'Failed to update wisephone');
+                }
+
+                // Refresh the wisephones list
+                await this.fetchWisephones();
+                this.showEditModal = false;
+
+              } catch (err) {
+                this.error = err.message || 'Failed to update wisephone';
+                console.error('Error updating wisephone:', err);
+              } finally {
+                this.isLoading = false;
+              }
+            },
+
+            confirmDelete(wisephone) {
+              this.wisephoneToDelete = wisephone;
+              this.showDeleteConfirm = true;
+            },
+
+            async deleteWisephone() {
+              try {
+                this.isLoading = true;
+
+                const formData = new FormData();
+                formData.append('imei', this.wisephoneToDelete.imei);
+
+                const response = await fetch('/api/wisephones/delete', {
+                  method: 'POST',
+                  body: formData
+                });
+
+                if (!response.ok) {
+                  const errorText = await response.text();
+                  throw new Error(errorText || 'Failed to delete wisephone');
+                }
+
+                // Refresh the wisephones list
+                await this.fetchWisephones();
+                this.showDeleteConfirm = false;
+                this.wisephoneToDelete = null;
+
+              } catch (err) {
+                this.error = err.message || 'Failed to delete wisephone';
+                console.error('Error deleting wisephone:', err);
+              } finally {
+                this.isLoading = false;
+              }
+            },
+
+            get filteredWisephones() {
+              if (!this.searchQuery) return this.wisephones;
+
+              const query = this.searchQuery.toLowerCase();
+              return this.wisephones.filter(phone =>
+                phone.imei.toString().includes(query) ||
+                (phone.nickname && phone.nickname.toLowerCase().includes(query)) ||
+                phone.phoneNumber.includes(query) ||
+                phone.userId.toLowerCase().includes(query) ||
+                // Also search in bypass status and reason
+                (query === 'bypass' && phone.bypassSubscription) ||
+                (query === 'bypassed' && phone.bypassSubscription) ||
+                (phone.bypassReason && phone.bypassReason.toLowerCase().includes(query))
+              );
+            },
+
+            get paginatedWisephones() {
+              const startIndex = (this.currentPage - 1) * this.itemsPerPage;
+              const endIndex = startIndex + this.itemsPerPage;
+              return this.filteredWisephones.slice(startIndex, endIndex);
+            },
+
+            get totalPages() {
+              return Math.ceil(this.filteredWisephones.length / this.itemsPerPage);
+            },
+
+            nextPage() {
+              if (this.currentPage < this.totalPages) {
+                this.currentPage++;
+              }
+            },
+
+            prevPage() {
+              if (this.currentPage > 1) {
+                this.currentPage--;
+              }
+            },
+
+            goToPage(page) {
+              if (page >= 1 && page <= this.totalPages) {
+                this.currentPage = page;
+              }
+            },
+
+            get visiblePageNumbers() {
+              const pages = [];
+              const maxVisiblePages = 5;
+
+              if (this.totalPages <= maxVisiblePages) {
+                // If we have fewer pages than our max, show all of them
+                for (let i = 1; i <= this.totalPages; i++) {
+                  pages.push(i);
+                }
+              } else {
+                // Always include first page, last page, and pages around current page
+                let startPage = Math.max(1, this.currentPage - Math.floor(maxVisiblePages / 2));
+                let endPage = Math.min(this.totalPages, startPage + maxVisiblePages - 1);
+
+                // Adjust if we're near the end
+                if (endPage - startPage + 1 < maxVisiblePages) {
+                  startPage = Math.max(1, endPage - maxVisiblePages + 1);
+                }
+
+                // Add first page
+                if (startPage > 1) {
+                  pages.push(1);
+                  if (startPage > 2) pages.push('ellipsis');
+                }
+
+                // Add middle pages
+                for (let i = startPage; i <= endPage; i++) {
+                  if (i !== 1 && i !== this.totalPages) {
+                    pages.push(i);
+                  }
+                }
+
+                // Add last page
+                if (endPage < this.totalPages) {
+                  if (endPage < this.totalPages - 1) pages.push('ellipsis');
+                  pages.push(this.totalPages);
+                }
+              }
+
+              return pages;
+            }
+          }"
+          x-init="fetchWisephones()"
+        >
+          <!-- Loading indicator -->
+          <div x-show="isLoading" class="flex justify-center py-8">
+            <span class="loading loading-spinner loading-lg"></span>
+          </div>
+
+          <!-- Error alert -->
+          <div x-show="error" class="p-4 mb-6 text-red-800 bg-red-100 rounded-lg" x-cloak>
+            <p x-text="error"></p>
+          </div>
+
+          <h2>Wisephone Management</h2>
+
+          <!-- Search bar -->
+          <div class="mt-4 mb-6">
+            <div class="relative">
+              <input
+                type="text"
+                x-model="searchQuery"
+                placeholder="Search by IMEI, nickname, phone number, or user ID"
+                class="w-full pl-10 input input-bordered"
+                @input="currentPage = 1"
+              />
+              <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  class="w-5 h-5 text-gray-400"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg
+                >
+              </div>
+            </div>
+          </div>
+
+          <!-- Wisephones table -->
+          <div class="overflow-x-auto">
+            <table class="table table-zebra">
+              <thead>
+                <tr>
+                  <th>IMEI</th>
+                  <th class="w-40">Nickname</th>
+                  <th>Phone Number</th>
+                  <th>Bypass</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="phone in paginatedWisephones" :key="phone.imei">
+                  <tr class="[&:nth-child(even)]:!bg-slate-50 border-b-2 border-slate-100">
+                    <td x-text="phone.imei"></td>
+                    <td class="max-w-[160px] break-words" x-text="phone.nickname || '-'"></td>
+                    <td class="whitespace-nowrap" x-text="phone.phoneNumber"></td>
+                    <td>
+                      <div class="flex items-center gap-2">
+                        <template x-if="phone.bypassSubscription">
+                          <div class="tooltip" :data-tip="phone.bypassReason || 'No reason provided'">
+                            <div class="flex items-center gap-2 cursor-help">
+                              <Icon name="lucide:check" class="w-4 h-4 text-[var(--evergreen)]" />
+                            </div>
+                          </div>
+                        </template>
+                        <span x-show="!phone.bypassSubscription" class="text-xs text-slate-400">-</span>
+                      </div>
+                    </td>
+                    <td class="flex gap-2">
+                      <button @click="openEditModal(phone)" class="btn btn-sm btn-circle">
+                        <Icon name="lucide:pencil" class="w-4 h-4" />
+                      </button>
+                      <button @click="confirmDelete(phone)" class="btn btn-sm btn-circle">
+                        <Icon name="lucide:trash" class="w-4 h-4" />
+                      </button>
+                    </td>
+                  </tr>
+                </template>
+                <tr class="!bg-slate-50" x-show="filteredWisephones.length === 0 && !isLoading">
+                  <td colspan="5" class="py-4 text-center">
+                    <template x-if="searchQuery">
+                      <p>No wisephones found matching your search query.</p>
+                    </template>
+                    <template x-if="!searchQuery">
+                      <p>No wisephones have been registered yet.</p>
+                    </template>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Pagination Controls -->
+          <div class="flex items-center justify-between gap-3 mt-6 max-sm:flex-col" x-show="totalPages > 0" x-cloak>
+            <div class="text-sm text-slate-500">
+              Showing <span x-text="((currentPage - 1) * itemsPerPage) + 1"></span> to
+              <span x-text="Math.min(currentPage * itemsPerPage, filteredWisephones.length)"></span> of
+              <span x-text="filteredWisephones.length"></span> wisephones
+            </div>
+
+            <div class="join">
+              <!-- Previous button -->
+              <button
+                class="join-item btn btn-sm"
+                :class="currentPage === 1 ? 'btn-disabled' : ''"
+                @click="prevPage()"
+                :disabled="currentPage === 1"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  class="w-4 h-4"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"><path d="m15 18-6-6 6-6"></path></svg
+                >
+              </button>
+
+              <!-- Page numbers -->
+              <template x-for="page in visiblePageNumbers" :key="page">
+                <template x-if="page === 'ellipsis'">
+                  <button class="join-item btn btn-sm btn-disabled">...</button>
+                </template>
+                <template x-if="page !== 'ellipsis'">
+                  <button
+                    class="join-item btn btn-sm"
+                    :class="currentPage === page ? 'btn-active' : ''"
+                    @click="goToPage(page)"
+                    x-text="page"></button>
+                </template>
+              </template>
+
+              <!-- Next button -->
+              <button
+                class="join-item btn btn-sm"
+                :class="currentPage === totalPages || totalPages === 0 ? 'btn-disabled' : ''"
+                @click="nextPage()"
+                :disabled="currentPage === totalPages || totalPages === 0"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  class="w-4 h-4"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"><path d="m9 18 6-6-6-6"></path></svg
+                >
+              </button>
+            </div>
+          </div>
+
+          <!-- Edit Modal -->
+          <div
+            class="fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-black bg-opacity-50"
+            x-show="showEditModal"
+            x-cloak
+            x-transition
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="edit-modal-title"
+            @keydown.escape.window="showEditModal = false"
+          >
+            <div
+              class="w-full max-w-lg p-6 bg-white rounded-lg shadow-xl max-h-[90vh] overflow-y-auto my-4"
+              @click.outside="showEditModal = false"
+              x-trap.noscroll.inert="showEditModal"
+            >
+              <h3 id="edit-modal-title" class="mb-4 text-lg font-bold">Edit Wisephone</h3>
+
+              <form @submit.prevent="saveWisephone">
+                <div class="mb-4 form-control">
+                  <label class="label">
+                    <span class="font-medium label-text">IMEI</span>
+                  </label>
+                  <input type="text" x-model="formImei" class="input input-bordered" disabled />
+                </div>
+
+                <div class="mb-4 form-control">
+                  <label class="label">
+                    <span class="font-medium label-text">Nickname</span>
+                  </label>
+                  <input type="text" x-model="formNickname" class="input input-bordered" />
+                </div>
+
+                <div class="mb-4 form-control">
+                  <label class="label">
+                    <span class="font-medium label-text">Phone Number</span>
+                  </label>
+                  <input
+                    type="tel"
+                    x-model="formPhoneNumber"
+                    x-mask="999-999-9999"
+                    pattern="[0-9]{3}-[0-9]{3}-[0-9]{4}"
+                    class="input input-bordered"
+                    :class="{ 'input-error': formPhoneNumber && formPhoneNumber.replace(/-/g, '').length !== 10 }"
+                    required
+                  />
+                  <label class="label" x-show="formPhoneNumber && formPhoneNumber.replace(/-/g, '').length !== 10">
+                    <span class="label-text-alt text-error">Please enter a valid 10-digit phone number</span>
+                  </label>
+                </div>
+
+                <div class="mb-4 form-control">
+                  <label class="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      x-model="formBypassSubscription"
+                      class="checkbox checkbox-primary border-2 border-slate-200 hover:border-slate-200 [&:checked]:border-[var(--evergreen)]"
+                      style="--chkbg: var(--evergreen); --chkfg: white;"
+                    />
+                    <span class="font-medium">Bypass Techless Subscription</span>
+                  </label>
+                  <p class="mt-1 text-sm text-slate-500">
+                    Mark this device as bypassed for Techless subscription checks
+                  </p>
+                </div>
+
+                <div class="mb-4 form-control" x-show="formBypassSubscription" x-transition>
+                  <label class="label">
+                    <span class="font-medium label-text">Bypass Reason</span>
+                    <span class="label-text-alt">Required</span>
+                  </label>
+                  <textarea
+                    x-model="formBypassReason"
+                    class="w-full textarea textarea-bordered"
+                    placeholder="Enter reason for bypassing subscription"
+                    :required="formBypassSubscription"></textarea>
+                </div>
+
+                <div class="flex justify-end gap-2 mt-6">
+                  <button type="button" class="btn btn-ghost" @click="showEditModal = false">Cancel</button>
+                  <button type="submit" class="btn btn-primary" :disabled="isLoading">
+                    <span x-show="!isLoading">Save Changes</span>
+                    <span x-show="isLoading" class="loading loading-spinner loading-sm"></span>
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          <!-- Delete Confirmation Modal -->
+          <div
+            class="fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-black bg-opacity-50"
+            x-show="showDeleteConfirm"
+            x-cloak
+            x-transition
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-modal-title"
+            @keydown.escape.window="showDeleteConfirm = false"
+          >
+            <div
+              class="w-full max-w-md p-6 bg-white rounded-lg shadow-xl max-h-[90vh] overflow-y-auto my-4"
+              @click.outside="showDeleteConfirm = false"
+              x-trap.noscroll.inert="showDeleteConfirm"
+            >
+              <h3 id="delete-modal-title" class="mb-4 text-lg font-bold">Confirm Deletion</h3>
+
+              <p class="mb-6">
+                Are you sure you want to delete the Wisephone with IMEI:
+                <span class="font-medium" x-text="wisephoneToDelete?.imei"></span>
+                <template x-if="wisephoneToDelete?.nickname">
+                  <span> ("<span x-text="wisephoneToDelete?.nickname"></span>")</span>
+                </template>
+                ?
+              </p>
+
+              <p class="mb-6 text-red-600">This action cannot be undone.</p>
+
+              <div class="flex justify-end gap-2">
+                <button type="button" class="btn btn-ghost" @click="showDeleteConfirm = false">Cancel</button>
+                <button
+                  type="button"
+                  class="btn btn-outline border-2 border-slate-200 hover:!border-red-700 hover:!text-white hover:!bg-red-700"
+                  @click="deleteWisephone()"
+                  :disabled="isLoading"
+                >
+                  <span x-show="!isLoading">Delete</span>
+                  <span x-show="isLoading" class="loading loading-spinner loading-sm"></span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="mb-12">
+    <Footer showLogo={false} />
+  </div>
+</Layout>
