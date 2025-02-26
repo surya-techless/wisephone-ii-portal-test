@@ -35,11 +35,21 @@ const UserPermission = defineTable({
   }
 });
 
+const OttogridCache = defineTable({
+  columns: {
+    id: column.number({ primaryKey: true, autoIncrement: true }),
+    data: column.json(), // Stores the entire response data
+    createdAt: column.date({ default: new Date() }),
+    expiresAt: column.date()
+  }
+});
+
 export default defineDb({
   tables: {
     App,
     BypassTechlessSubscription,
     Wisephone,
-    UserPermission
+    UserPermission,
+    OttogridCache
   }
 });

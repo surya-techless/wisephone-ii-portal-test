@@ -6,7 +6,6 @@ import Layout from "@/layouts/Layout.astro";
 import Header from "@/components/Header.astro";
 import Footer from "@/components/Footer.astro";
 import { FEATURES, KNOX_USER_GROUPS, FAITH_TOOLS_APPS, getPackageNameFromPlayStoreUrl } from "@/libs/utils";
-import { fetchOttogridData } from "@/libs/ottogrid";
 import type { AppsList } from "@/types/apps";
 
 // Initialize variables with default values
@@ -137,36 +136,6 @@ try {
   // Create apps list with type safety
   appsList = {};
 
-  // Process Ottogrid apps with error handling
-  try {
-    const appsFromOttogrid = await fetchOttogridData();
-    // The fetchOttogridData now returns EMPTY_DATA instead of throwing errors
-    if (appsFromOttogrid && appsFromOttogrid.rows && appsFromOttogrid.rows.length > 0) {
-      appsFromOttogrid.rows
-        .filter((row) => row && row.cells && row.cells["Tool Drawer"] === "Yes")
-        .forEach((row) => {
-          try {
-            const packageName = getPackageNameFromPlayStoreUrl(row.cells["Play Store URL"]);
-            if (!packageName) return;
-
-            const app = installedApps.find((app) => app.packageName === packageName);
-            appsList[packageName] = {
-              source: "Tool Drawer",
-              installed: Boolean(app),
-              name: app?.appName || row.cells["Tool Name"] || "Unknown App"
-            };
-          } catch (rowError) {
-            console.error("Error processing Ottogrid app row:", rowError);
-            // Continue with next app instead of crashing
-          }
-        });
-    } else {
-      console.error("No valid Ottogrid data available");
-    }
-  } catch (error) {
-    console.error("Error processing Ottogrid apps:", error);
-  }
-
   // Process Faith Tools apps with similar protection
   try {
     FAITH_TOOLS_APPS.forEach((app) => {
@@ -215,6 +184,13 @@ try {
       toastMessage = "${(success || "").replace(/"/g, '\\"')}";
     `}
   >
+    <progress
+      x-show="isLoading || isToolDrawerLoading"
+      x-cloak
+      x-transition
+      class="fixed top-0 left-0 right-0 z-50 w-full progress"
+      style="--progress-color: var(--evergreen);"></progress>
+
     <Header activeTab="page" isProjectPublished={false} projectSlug={""} />
 
     <main class="flex flex-col gap-12 py-12">
@@ -570,7 +546,8 @@ try {
     type Feature,
     updateUnreachableAlpineState,
     KNOX_USER_GROUPS,
-    oldKnoxUserGroupsForSubscription
+    oldKnoxUserGroupsForSubscription,
+    getPackageNameFromPlayStoreUrl
   } from "@/libs/utils";
   import { AppManagementService } from "@/services/AppManagementService";
   import { FeatureManagementService } from "@/services/FeatureManagementService";
@@ -595,6 +572,8 @@ try {
       originalPhoneNumber: "",
       imei: "",
       isLoading: true,
+      isToolDrawerLoading: false,
+      isToolDrawerLoaded: false,
       // @ts-ignore
       isPhoneSetUp: this.$persist(false),
 
@@ -900,6 +879,57 @@ try {
         }
       },
 
+      // Add a method to load the Tool Drawer data client-side
+      async loadToolDrawer() {
+        if (this.isToolDrawerLoaded || this.isToolDrawerLoading) {
+          return;
+        }
+
+        try {
+          this.isToolDrawerLoading = true;
+          const response = await fetch("/api/ottogrid.json");
+
+          if (!response.ok) {
+            throw new Error("Failed to load Tool Drawer data");
+          }
+
+          const data = await response.json();
+
+          // Process the data and update the appsList
+          if (data && data.rows && data.rows.length) {
+            const updatedAppsList = { ...this.appsList };
+
+            data.rows
+              .filter((row: any) => row && row.cells && row.cells["Tool Drawer"] === "Yes")
+              .forEach((row: any) => {
+                try {
+                  const packageName = getPackageNameFromPlayStoreUrl(row.cells["Play Store URL"]);
+                  if (!packageName) return;
+
+                  // If the app is already in the list, preserve the installed status
+                  const isInstalled = this.appsList[packageName]?.installed || false;
+
+                  updatedAppsList[packageName] = {
+                    source: "Tool Drawer",
+                    installed: isInstalled,
+                    name: row.cells["Tool Name"] || "Unknown App"
+                  };
+                } catch (error) {
+                  console.error("Error processing app row:", error);
+                }
+              });
+
+            this.appsList = updatedAppsList;
+            this.isToolDrawerLoaded = true;
+          }
+        } catch (error) {
+          console.error("Error loading Tool Drawer:", error);
+          this.showErrorToast("Failed to load Tool Drawer apps");
+        } finally {
+          this.isToolDrawerLoading = false;
+        }
+      },
+
       async init() {
         this.$watch("imei", async () => {
           try {
@@ -920,6 +950,11 @@ try {
 
         this.$watch("features", async (userGroups: string[]) => {
           await this.removeExclusiveGroups(userGroups);
+
+          // Load Tool Drawer data client-side when Tool Drawer feature is enabled
+          if (this.isToolDrawerEnabled && !this.isToolDrawerLoaded) {
+            this.loadToolDrawer();
+          }
         });
 
         // Sync installed apps in the background
