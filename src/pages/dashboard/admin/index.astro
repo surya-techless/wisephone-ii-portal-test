@@ -38,62 +38,7 @@ if (!(await isAdmin(user.id))) {
       <section class="w-full">
         <form
           class="p-6 bg-white shadow-sm roundex-2xl"
-          x-data="{
-            phoneNumber: '',
-            imei: '',
-            subscriptionResult: null,
-            subscriptionError: null,
-            hasBeenSubmitted: false,
-            async checkSubscription() {
-              try {
-                this.isLoading = true;
-                $dispatch('loading-start');
-                this.subscriptionResult = null;
-                this.subscriptionError = null;
-
-                // Format phone number to remove dashes
-                const formattedPhone = this.phoneNumber.replace(/[^0-9+]/g, '');
-
-                // Create the subscription check URL
-                const subscribedUrl = new URL('/webhook-is-user-subscribed', 'https://cameronpak-wisephoneii.web.val.run');
-                subscribedUrl.searchParams.set('phoneNumber', formattedPhone);
-                subscribedUrl.searchParams.set('imei', this.imei);
-
-                // Fetch the subscription status
-                const result = await fetch(subscribedUrl, { method: 'GET' });
-
-                if (!result.ok) {
-                  throw new Error(`Failed to check subscription: ${result.status} ${result.statusText}`);
-                }
-
-                const responseText = await result.text();
-
-                // Check for subscription indicators in the response
-                if (responseText.includes('bypass') || responseText.includes('is subscribed')) {
-                  this.subscriptionResult = { status: 'subscribed', message: 'User is subscribed' };
-                } else {
-                  this.subscriptionResult = { status: 'not-subscribed', message: 'User is not subscribed' };
-                }
-
-                this.hasBeenSubmitted = true;
-              } catch (error) {
-                console.error('Subscription check failed:', error);
-                this.subscriptionError = error.message || 'Failed to check subscription. Please try again.';
-              } finally {
-                this.isLoading = false;
-                $dispatch('loading-end');
-              }
-            },
-
-            resetForm() {
-              this.phoneNumber = '';
-              this.imei = '';
-              this.subscriptionResult = null;
-              this.subscriptionError = null;
-              this.isLoading = false;
-              this.hasBeenSubmitted = false;
-            }
-          }"
+          x-data="subscriptionChecker"
           @submit.prevent="checkSubscription()"
         >
           <div class="flex flex-col gap-4 p-0">
@@ -214,253 +159,10 @@ if (!(await isAdmin(user.id))) {
       <section class="mt-12">
         <div
           class="p-6 bg-white shadow-sm rounded-2xl"
-          x-data="{
-            wisephones: [],
-            error: null,
-            editWisephone: null,
-            searchQuery: '',
-            showEditModal: false,
-            showDeleteConfirm: false,
-            wisephoneToDelete: null,
-            currentPage: 1,
-            itemsPerPage: 10,
-            isLoading: false,
-
-            // Form fields
-            formImei: '',
-            formNickname: '',
-            formPhoneNumber: '',
-            formBypassSubscription: false,
-            formBypassReason: '',
-
-            async fetchWisephones() {
-              try {
-                this.isLoading = true;
-                $dispatch('loading-start');
-                this.error = null;
-
-                const response = await fetch('/api/wisephones');
-                if (!response.ok) {
-                  throw new Error('Failed to fetch wisephones');
-                }
-
-                const data = await response.json();
-                this.wisephones = data.wisephones;
-
-                // Fetch all bypass statuses in a single API call
-                await this.fetchAllBypassStatuses();
-              } catch (err) {
-                this.error = err.message || 'Failed to load wisephones';
-                console.error('Error fetching wisephones:', err);
-              } finally {
-                this.isLoading = false;
-                $dispatch('loading-end');
-              }
-            },
-
-            async fetchAllBypassStatuses() {
-              try {
-                const response = await fetch('/api/wisephones/bypass-list');
-                if (!response.ok) {
-                  throw new Error('Failed to fetch bypass statuses');
-                }
-
-                const data = await response.json();
-                const bypassMap = data.bypassMap || {};
-
-                // Update each wisephone with its bypass status
-                for (const phone of this.wisephones) {
-                  const bypass = bypassMap[phone.imei];
-                  phone.bypassSubscription = bypass ? true : false;
-                  phone.bypassReason = bypass?.reason || '';
-                }
-              } catch (err) {
-                console.error('Error fetching bypass statuses:', err);
-                // Set default values for bypass status if the API call fails
-                for (const phone of this.wisephones) {
-                  phone.bypassSubscription = false;
-                  phone.bypassReason = '';
-                }
-              }
-            },
-
-            async openEditModal(wisephone) {
-              this.editWisephone = wisephone;
-              this.formImei = wisephone.imei.toString();
-              this.formNickname = wisephone.nickname || '';
-              this.formPhoneNumber = wisephone.phoneNumber;
-
-              // Use the bypass status already fetched with the wisephone
-              this.formBypassSubscription = wisephone.bypassSubscription || false;
-              this.formBypassReason = wisephone.bypassReason || '';
-
-              this.showEditModal = true;
-            },
-
-            async saveWisephone() {
-              try {
-                this.isLoading = true;
-                $dispatch('loading-start');
-
-                const formData = new FormData();
-                formData.append('imei', parseInt(this.formImei));
-                formData.append('nickname', this.formNickname);
-                formData.append('phoneNumber', this.formPhoneNumber);
-                formData.append('userId', this.editWisephone.userId);
-                formData.append('bypassSubscription', this.formBypassSubscription ? 'true' : 'false');
-                if (this.formBypassSubscription) {
-                  formData.append('bypassReason', this.formBypassReason);
-                }
-
-                const response = await fetch('/api/wisephones/update', {
-                  method: 'POST',
-                  body: formData
-                });
-
-                if (!response.ok) {
-                  const errorText = await response.text();
-                  throw new Error(errorText || 'Failed to update wisephone');
-                }
-
-                // Refresh the wisephones list
-                await this.fetchWisephones();
-                this.showEditModal = false;
-
-              } catch (err) {
-                this.error = err.message || 'Failed to update wisephone';
-                console.error('Error updating wisephone:', err);
-              } finally {
-                this.isLoading = false;
-                $dispatch('loading-end');
-              }
-            },
-
-            confirmDelete(wisephone) {
-              this.wisephoneToDelete = wisephone;
-              this.showDeleteConfirm = true;
-            },
-
-            async deleteWisephone() {
-              try {
-                this.isLoading = true;
-                $dispatch('loading-start');
-
-                const formData = new FormData();
-                formData.append('imei', this.wisephoneToDelete.imei);
-
-                const response = await fetch('/api/wisephones/delete', {
-                  method: 'POST',
-                  body: formData
-                });
-
-                if (!response.ok) {
-                  const errorText = await response.text();
-                  throw new Error(errorText || 'Failed to delete wisephone');
-                }
-
-                // Refresh the wisephones list
-                await this.fetchWisephones();
-                this.showDeleteConfirm = false;
-                this.wisephoneToDelete = null;
-
-              } catch (err) {
-                this.error = err.message || 'Failed to delete wisephone';
-                console.error('Error deleting wisephone:', err);
-              } finally {
-                this.isLoading = false;
-                $dispatch('loading-end');
-              }
-            },
-
-            get filteredWisephones() {
-              if (!this.searchQuery) return this.wisephones;
-
-              const query = this.searchQuery.toLowerCase();
-              return this.wisephones.filter(phone =>
-                phone.imei.toString().includes(query) ||
-                (phone.nickname && phone.nickname.toLowerCase().includes(query)) ||
-                phone.phoneNumber.includes(query) ||
-                phone.userId.toLowerCase().includes(query) ||
-                // Also search in bypass status and reason
-                (query === 'bypass' && phone.bypassSubscription) ||
-                (query === 'bypassed' && phone.bypassSubscription) ||
-                (phone.bypassReason && phone.bypassReason.toLowerCase().includes(query))
-              );
-            },
-
-            get paginatedWisephones() {
-              const startIndex = (this.currentPage - 1) * this.itemsPerPage;
-              const endIndex = startIndex + this.itemsPerPage;
-              return this.filteredWisephones.slice(startIndex, endIndex);
-            },
-
-            get totalPages() {
-              return Math.ceil(this.filteredWisephones.length / this.itemsPerPage);
-            },
-
-            nextPage() {
-              if (this.currentPage < this.totalPages) {
-                this.currentPage++;
-              }
-            },
-
-            prevPage() {
-              if (this.currentPage > 1) {
-                this.currentPage--;
-              }
-            },
-
-            goToPage(page) {
-              if (page >= 1 && page <= this.totalPages) {
-                this.currentPage = page;
-              }
-            },
-
-            get visiblePageNumbers() {
-              const pages = [];
-              const maxVisiblePages = 5;
-
-              if (this.totalPages <= maxVisiblePages) {
-                // If we have fewer pages than our max, show all of them
-                for (let i = 1; i <= this.totalPages; i++) {
-                  pages.push(i);
-                }
-              } else {
-                // Always include first page, last page, and pages around current page
-                let startPage = Math.max(1, this.currentPage - Math.floor(maxVisiblePages / 2));
-                let endPage = Math.min(this.totalPages, startPage + maxVisiblePages - 1);
-
-                // Adjust if we're near the end
-                if (endPage - startPage + 1 < maxVisiblePages) {
-                  startPage = Math.max(1, endPage - maxVisiblePages + 1);
-                }
-
-                // Add first page
-                if (startPage > 1) {
-                  pages.push(1);
-                  if (startPage > 2) pages.push('ellipsis');
-                }
-
-                // Add middle pages
-                for (let i = startPage; i <= endPage; i++) {
-                  if (i !== 1 && i !== this.totalPages) {
-                    pages.push(i);
-                  }
-                }
-
-                // Add last page
-                if (endPage < this.totalPages) {
-                  if (endPage < this.totalPages - 1) pages.push('ellipsis');
-                  pages.push(this.totalPages);
-                }
-              }
-
-              return pages;
-            }
-          }"
+          x-data="wisephoneManager"
           x-init="fetchWisephones()"
-          @loading-start="$parent.isLoading = true"
-          @loading-end="$parent.isLoading = false"
+          @loading-start="isLoading = true"
+          @loading-end="isLoading = false"
         >
           <!-- Remove the spinner loading indicator and replace with content skeleton -->
           <div x-show="isLoading" class="animate-pulse" x-cloak>
@@ -784,3 +486,338 @@ if (!(await isAdmin(user.id))) {
     <Footer showLogo={false} />
   </div>
 </Layout>
+
+<script>
+  import { checkSubscription, type SubscriptionCheckResult } from "@/lib/subscriptions/checkSubscription";
+  import Alpine from "alpinejs";
+
+  // Define TypeScript interfaces for our components
+  interface Wisephone {
+    imei: number;
+    nickname?: string;
+    phoneNumber: string;
+    userId: string;
+    bypassSubscription: boolean;
+    bypassReason: string;
+  }
+
+  /**
+   * Main app state for loading indicator
+   */
+  document.addEventListener("alpine:init", () => {
+    Alpine.data("appState", () => ({
+      isLoading: false
+    }));
+
+    /**
+     * Subscription checker component
+     */
+    Alpine.data("subscriptionChecker", () => ({
+      phoneNumber: "",
+      imei: "",
+      subscriptionResult: null as SubscriptionCheckResult | null,
+      subscriptionError: null as string | null,
+      hasBeenSubmitted: false,
+      isLoading: false,
+
+      async checkSubscription() {
+        try {
+          this.isLoading = true;
+          // @ts-ignore - Alpine methods
+          this.$dispatch("loading-start");
+          this.subscriptionResult = null;
+          this.subscriptionError = null;
+
+          // Call the utility function - explicitly import to avoid errors
+          const result = await checkSubscription(this.phoneNumber, this.imei);
+
+          // Set the result
+          this.subscriptionResult = result;
+          this.hasBeenSubmitted = true;
+        } catch (error) {
+          console.error("Subscription check failed:", error);
+          this.subscriptionError =
+            error instanceof Error ? error.message : "Failed to check subscription. Please try again.";
+        } finally {
+          this.isLoading = false;
+          // @ts-ignore - Alpine methods
+          this.$dispatch("loading-end");
+        }
+      },
+
+      resetForm() {
+        this.phoneNumber = "";
+        this.imei = "";
+        this.subscriptionResult = null;
+        this.subscriptionError = null;
+        this.isLoading = false;
+        this.hasBeenSubmitted = false;
+      }
+    }));
+
+    /**
+     * Wisephone management component
+     */
+    Alpine.data("wisephoneManager", () => ({
+      wisephones: [] as Wisephone[],
+      error: null as string | null,
+      editWisephone: null as Wisephone | null,
+      searchQuery: "",
+      showEditModal: false,
+      showDeleteConfirm: false,
+      wisephoneToDelete: null as Wisephone | null,
+      currentPage: 1,
+      itemsPerPage: 10,
+      isLoading: false,
+
+      // Form fields
+      formImei: "",
+      formNickname: "",
+      formPhoneNumber: "",
+      formBypassSubscription: false,
+      formBypassReason: "",
+
+      init() {
+        this.fetchWisephones();
+      },
+
+      async fetchWisephones() {
+        try {
+          this.isLoading = true;
+          // @ts-ignore - Alpine methods
+          this.$dispatch("loading-start");
+          this.error = null;
+
+          const response = await fetch("/api/wisephones");
+          if (!response.ok) {
+            throw new Error("Failed to fetch wisephones");
+          }
+
+          const data = await response.json();
+          this.wisephones = data.wisephones;
+
+          // Fetch all bypass statuses in a single API call
+          await this.fetchAllBypassStatuses();
+        } catch (err) {
+          this.error = err instanceof Error ? err.message : "Failed to load wisephones";
+          console.error("Error fetching wisephones:", err);
+        } finally {
+          this.isLoading = false;
+          // @ts-ignore - Alpine methods
+          this.$dispatch("loading-end");
+        }
+      },
+
+      async fetchAllBypassStatuses() {
+        try {
+          const response = await fetch("/api/wisephones/bypass-list");
+          if (!response.ok) {
+            throw new Error("Failed to fetch bypass statuses");
+          }
+
+          const data = await response.json();
+          const bypassMap = data.bypassMap || {};
+
+          // Update each wisephone with its bypass status
+          for (const phone of this.wisephones) {
+            const bypass = bypassMap[phone.imei];
+            phone.bypassSubscription = bypass ? true : false;
+            phone.bypassReason = bypass?.reason || "";
+          }
+        } catch (err) {
+          console.error("Error fetching bypass statuses:", err);
+          // Set default values for bypass status if the API call fails
+          for (const phone of this.wisephones) {
+            phone.bypassSubscription = false;
+            phone.bypassReason = "";
+          }
+        }
+      },
+
+      async openEditModal(wisephone: Wisephone) {
+        this.editWisephone = wisephone;
+        this.formImei = wisephone.imei.toString();
+        this.formNickname = wisephone.nickname || "";
+        this.formPhoneNumber = wisephone.phoneNumber;
+
+        // Use the bypass status already fetched with the wisephone
+        this.formBypassSubscription = wisephone.bypassSubscription || false;
+        this.formBypassReason = wisephone.bypassReason || "";
+
+        this.showEditModal = true;
+      },
+
+      async saveWisephone() {
+        try {
+          this.isLoading = true;
+          // @ts-ignore - Alpine methods
+          this.$dispatch("loading-start");
+
+          if (!this.editWisephone) {
+            throw new Error("No wisephone selected for editing");
+          }
+
+          const formData = new FormData();
+          formData.append("imei", this.formImei);
+          formData.append("nickname", this.formNickname);
+          formData.append("phoneNumber", this.formPhoneNumber);
+          formData.append("userId", this.editWisephone.userId);
+          formData.append("bypassSubscription", this.formBypassSubscription ? "true" : "false");
+          if (this.formBypassSubscription) {
+            formData.append("bypassReason", this.formBypassReason);
+          }
+
+          const response = await fetch("/api/wisephones/update", {
+            method: "POST",
+            body: formData
+          });
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(errorText || "Failed to update wisephone");
+          }
+
+          // Refresh the wisephones list
+          await this.fetchWisephones();
+          this.showEditModal = false;
+        } catch (err) {
+          this.error = err instanceof Error ? err.message : "Failed to update wisephone";
+          console.error("Error updating wisephone:", err);
+        } finally {
+          this.isLoading = false;
+          // @ts-ignore - Alpine methods
+          this.$dispatch("loading-end");
+        }
+      },
+
+      confirmDelete(wisephone: Wisephone) {
+        this.wisephoneToDelete = wisephone;
+        this.showDeleteConfirm = true;
+      },
+
+      async deleteWisephone() {
+        try {
+          this.isLoading = true;
+          // @ts-ignore - Alpine methods
+          this.$dispatch("loading-start");
+
+          if (!this.wisephoneToDelete) {
+            throw new Error("No wisephone selected for deletion");
+          }
+
+          const formData = new FormData();
+          formData.append("imei", this.wisephoneToDelete.imei.toString());
+
+          const response = await fetch("/api/wisephones/delete", {
+            method: "POST",
+            body: formData
+          });
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(errorText || "Failed to delete wisephone");
+          }
+
+          // Refresh the wisephones list
+          await this.fetchWisephones();
+          this.showDeleteConfirm = false;
+          this.wisephoneToDelete = null;
+        } catch (err) {
+          this.error = err instanceof Error ? err.message : "Failed to delete wisephone";
+          console.error("Error deleting wisephone:", err);
+        } finally {
+          this.isLoading = false;
+          // @ts-ignore - Alpine methods
+          this.$dispatch("loading-end");
+        }
+      },
+
+      get filteredWisephones() {
+        if (!this.searchQuery) return this.wisephones;
+
+        const query = this.searchQuery.toLowerCase();
+        return this.wisephones.filter(
+          (phone) =>
+            phone.imei.toString().includes(query) ||
+            (phone.nickname && phone.nickname.toLowerCase().includes(query)) ||
+            phone.phoneNumber.includes(query) ||
+            phone.userId.toLowerCase().includes(query) ||
+            // Also search in bypass status and reason
+            (query === "bypass" && phone.bypassSubscription) ||
+            (query === "bypassed" && phone.bypassSubscription) ||
+            (phone.bypassReason && phone.bypassReason.toLowerCase().includes(query))
+        );
+      },
+
+      get paginatedWisephones() {
+        const startIndex = (this.currentPage - 1) * this.itemsPerPage;
+        const endIndex = startIndex + this.itemsPerPage;
+        return this.filteredWisephones.slice(startIndex, endIndex);
+      },
+
+      get totalPages() {
+        return Math.ceil(this.filteredWisephones.length / this.itemsPerPage);
+      },
+
+      nextPage() {
+        if (this.currentPage < this.totalPages) {
+          this.currentPage++;
+        }
+      },
+
+      prevPage() {
+        if (this.currentPage > 1) {
+          this.currentPage--;
+        }
+      },
+
+      goToPage(page: number) {
+        if (page >= 1 && page <= this.totalPages) {
+          this.currentPage = page;
+        }
+      },
+
+      get visiblePageNumbers() {
+        const pages: (number | string)[] = [];
+        const maxVisiblePages = 5;
+
+        if (this.totalPages <= maxVisiblePages) {
+          // If we have fewer pages than our max, show all of them
+          for (let i = 1; i <= this.totalPages; i++) {
+            pages.push(i);
+          }
+        } else {
+          // Always include first page, last page, and pages around current page
+          let startPage = Math.max(1, this.currentPage - Math.floor(maxVisiblePages / 2));
+          let endPage = Math.min(this.totalPages, startPage + maxVisiblePages - 1);
+
+          // Adjust if we're near the end
+          if (endPage - startPage + 1 < maxVisiblePages) {
+            startPage = Math.max(1, endPage - maxVisiblePages + 1);
+          }
+
+          // Add first page
+          if (startPage > 1) {
+            pages.push(1);
+            if (startPage > 2) pages.push("ellipsis");
+          }
+
+          // Add middle pages
+          for (let i = startPage; i <= endPage; i++) {
+            if (i !== 1 && i !== this.totalPages) {
+              pages.push(i);
+            }
+          }
+
+          // Add last page
+          if (endPage < this.totalPages) {
+            if (endPage < this.totalPages - 1) pages.push("ellipsis");
+            pages.push(this.totalPages);
+          }
+        }
+
+        return pages;
+      }
+    }));
+  });
+</script>

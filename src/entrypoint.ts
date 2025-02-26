@@ -7,10 +7,13 @@ import persist from "@alpinejs/persist";
 import collapse from "@alpinejs/collapse";
 // @ts-ignore - Has no associated types.
 import mask from "@alpinejs/mask";
+// @ts-ignore - Has no associated types.
+import focus from "@alpinejs/focus";
 
 export default (Alpine: Alpine) => {
   Alpine.plugin(intersect);
   Alpine.plugin(persist);
   Alpine.plugin(collapse);
   Alpine.plugin(mask);
+  Alpine.plugin(focus);
 };
