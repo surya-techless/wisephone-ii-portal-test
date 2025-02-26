@@ -58,7 +58,7 @@ const result = Astro.getActionResult(actions.wisephones.createWisephone);
                 {wisephones.map((wisephone) => (
                   <li class="w-full [&:not(:last-child)]:border-b border-slate-200">
                     <a
-                      href={`/dashboard/device/${wisephone.imei}`}
+                      href={`/dashboard/device/${wisephone.imei.toString().padEnd(15, "0")}`}
                       class="no-underline m-0 p-0 py-4 px-6 w-full grid grid-cols-[1fr_auto] items-center justify-center [&:not(:last-child)]:border-b border-slate-200 hover:bg-slate-50 cursor-pointer active:scale-[98%] transition-all duration-150"
                     >
                       <div class="flex flex-col w-full">

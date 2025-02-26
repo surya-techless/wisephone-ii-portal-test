@@ -174,7 +174,7 @@ const sortedAppsList = Object.fromEntries(
 
           <div class="inline-flex flex-wrap items-baseline w-full gap-2 mt-2 text-slate-500">
             <div x-show="!isEditing">
-              <div class="flex items-baseline gap-2">
+              <div class="flex items-center gap-2">
                 <span
                   class="hover:underline hover:cursor-pointer underline-offset-4"
                   @click="isEditing = true"
@@ -186,6 +186,9 @@ const sortedAppsList = Object.fromEntries(
                   @click="isEditing = true"
                   x-text="phoneNumber">{wisephone.phoneNumber}</span
                 >
+                <button class="btn btn-sm btn-ghost btn-circle" @click="isEditing = true">
+                  <Icon name="lucide:pencil" class="w-4 h-4" />
+                </button>
               </div>
             </div>
 
@@ -233,11 +236,45 @@ const sortedAppsList = Object.fromEntries(
           class="transition-transform duration-150 alert bg-slate-200 border-slate-300 text-slate-800 -rotate-1 hover:rotate-0"
         >
           <Icon name="lucide:info" class="w-4 h-4" />
-          <p>
-            <a href="https://wisephone.com/pages/activate" target="_blank" class="font-medium link text-slate-800"
-              >Activate a Techless Subscription</a
-            > to update this device's features.
-          </p>
+
+          <div>
+            <p>
+              <a href="https://wisephone.com/pages/activate" target="_blank" class="font-medium link text-slate-800"
+                >Activate a Techless Subscription</a
+              > to update this device's features.
+            </p>
+
+            <details
+              class="mt-3 transition-all duration-150 ease-in-out w-full"
+              x-data="{ isOpen: false }"
+              @toggle="isOpen = $event.target.open"
+              x-bind:class="{ 'p-6 pt-4 bg-slate-300 rounded-xl': isOpen }"
+            >
+              <summary
+                class="w-full font-medium text-slate-500 cursor-pointer hover:text-slate-800 hover:underline transition"
+              >
+                Already have a subscription?
+              </summary>
+              <ol class="list-decimal list-inside mt-3">
+                <li>
+                  Make sure the phone number is correct: <code
+                    class="px-2 py-1 bg-slate-200 rounded-md select-all font-sans font-medium"
+                    x-text="phoneNumber"></code>
+                  <ul class="ml-8 mt-1">
+                    <li class="list-disc">If the phone number is incorrect, update it.</li>
+                  </ul>
+                </li>
+                <li class="mt-3">
+                  Make sure the device's IMEI is correct: <code
+                    class="px-2 py-1 bg-slate-200 rounded-md select-all font-sans font-medium"
+                    x-text="imei"></code>
+                  <ul class="ml-8 mt-1">
+                    <li class="list-disc">If the IMEI is incorrect, remove this device and start over.</li>
+                  </ul>
+                </li>
+              </ol>
+            </details>
+          </div>
         </div>
 
         <ul class="list-item-container">
