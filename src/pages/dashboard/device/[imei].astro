@@ -8,7 +8,6 @@ import Footer from "@/components/Footer.astro";
 import { FEATURES, KNOX_USER_GROUPS, FAITH_TOOLS_APPS, getPackageNameFromPlayStoreUrl } from "@/libs/utils";
 import { fetchOttogridData } from "@/libs/ottogrid";
 import type { AppsList } from "@/types/apps";
-import NodeCache from "node-cache";
 
 // Initialize variables with default values
 let imei: string | undefined = Astro.params.imei;
@@ -49,48 +48,56 @@ try {
     return Astro.redirect("/dashboard?error=" + encodeURIComponent("Device information could not be loaded"));
   }
 
-  const subscribedUrl = new URL(`/webhook-is-user-subscribed`, "https://cameronpak-wisephoneii.web.val.run");
-
-  // Phone numbers are stored as XXX-XXX-XXXX, but the webhook expects XXXXXXXXXX
-  subscribedUrl.searchParams.set("phoneNumber", `${wisephone?.phoneNumber.replace(/[^0-9+]/g, "") || ""}`);
-  subscribedUrl.searchParams.set("imei", String(wisephone?.imei || ""));
-
-  // Create a new cache instance with standard TTL of 1 day (86400 seconds)
-  const subscriptionCache = new NodeCache({ stdTTL: 86400 });
-
+  // Check for bypass subscription first
   const bypassTechlessSubscription = await db
     .select()
     .from(BypassTechlessSubscription)
     .where(eq(BypassTechlessSubscription.imei, Number(imei)))
     .limit(1);
 
-  isSubscribed = bypassTechlessSubscription.length > 0 || false;
+  isSubscribed = bypassTechlessSubscription.length > 0;
 
-  if (!isSubscribed) {
-    // Create a cache key using the IMEI
-    const cacheKey = `subscription-${imei}`;
+  // Only check the subscription API if not already marked as subscribed
+  if (!isSubscribed && wisephone?.phoneNumber) {
+    try {
+      const subscribedUrl = new URL(`/webhook-is-user-subscribed`, "https://cameronpak-wisephoneii.web.val.run");
+      // Phone numbers are stored as XXX-XXX-XXXX, but the webhook expects XXXXXXXXXX
+      subscribedUrl.searchParams.set("phoneNumber", `${wisephone.phoneNumber.replace(/[^0-9+]/g, "") || ""}`);
+      subscribedUrl.searchParams.set("imei", String(wisephone?.imei || ""));
 
-    // Check if the result is cached
-    const cachedStatus = subscriptionCache.get(cacheKey);
+      // Use AbortController to add timeout functionality
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
 
-    if (cachedStatus === true) {
-      // Only use cached value if it's true
-      isSubscribed = true;
-    } else {
       try {
-        // Fetch fresh data if not in cache or cached as false
-        const result = await fetch(subscribedUrl, { method: "GET" });
-        const isSubscribedText = await result.text();
-        if (isSubscribedText.includes("bypass") || isSubscribedText.includes("is subscribed")) {
-          isSubscribed = true;
+        const result = await fetch(subscribedUrl, {
+          method: "GET",
+          signal: controller.signal
+        });
 
-          // Only cache positive subscription statuses
-          subscriptionCache.set(cacheKey, true);
+        clearTimeout(timeoutId);
+
+        if (result.ok) {
+          const isSubscribedText = await result.text();
+          if (isSubscribedText.includes("bypass") || isSubscribedText.includes("is subscribed")) {
+            isSubscribed = true;
+          }
+        } else {
+          console.error(`Subscription check failed with status: ${result.status}`);
+          // Continue with isSubscribed = false instead of crashing
         }
-      } catch (subscriptionError) {
-        console.error("Error checking subscription status:", subscriptionError);
-        // Continue with isSubscribed = false instead of crashing
+      } catch (fetchError) {
+        clearTimeout(timeoutId);
+        if (fetchError instanceof Error && fetchError.name === "AbortError") {
+          console.error("Subscription check timed out after 5 seconds");
+        } else {
+          console.error("Fetch error during subscription check:", fetchError);
+        }
+        // Continue with isSubscribed = false
       }
+    } catch (subscriptionError) {
+      console.error("Error checking subscription status:", subscriptionError);
+      // Continue with isSubscribed = false instead of crashing
     }
   }
 
@@ -133,19 +140,23 @@ try {
   // Process Ottogrid apps with error handling
   try {
     const appsFromOttogrid = await fetchOttogridData();
-    appsFromOttogrid.rows
-      .filter((row) => row.cells["Tool Drawer"] === "Yes")
-      .forEach((row) => {
-        const packageName = getPackageNameFromPlayStoreUrl(row.cells["Play Store URL"]);
-        if (!packageName) return;
+    if (appsFromOttogrid && appsFromOttogrid.rows) {
+      appsFromOttogrid.rows
+        .filter((row) => row.cells && row.cells["Tool Drawer"] === "Yes")
+        .forEach((row) => {
+          const packageName = getPackageNameFromPlayStoreUrl(row.cells["Play Store URL"]);
+          if (!packageName) return;
 
-        const app = installedApps.find((app) => app.packageName === packageName);
-        appsList[packageName] = {
-          source: "Tool Drawer",
-          installed: Boolean(app),
-          name: app?.appName || row.cells["Tool Name"]
-        };
-      });
+          const app = installedApps.find((app) => app.packageName === packageName);
+          appsList[packageName] = {
+            source: "Tool Drawer",
+            installed: Boolean(app),
+            name: app?.appName || row.cells["Tool Name"]
+          };
+        });
+    } else {
+      console.error("Ottogrid data structure is not as expected");
+    }
   } catch (error) {
     console.error("Error processing Ottogrid apps:", error);
   }
