@@ -21,9 +21,7 @@ if (!(await isAdmin(user.id))) {
 ---
 
 <Layout title="Dashboard" description="Manage your Wisephone II devices.">
-  <div class="container h-full p-6 mx-auto prose" x-data="{
-      isLoading: false,
-    }">
+  <div class="container h-full p-6 mx-auto prose" x-data="appState">
     <progress
       x-show="isLoading"
       x-cloak
@@ -36,11 +34,7 @@ if (!(await isAdmin(user.id))) {
     <main class="flex flex-col gap-6 py-12">
       <h1>Admin</h1>
       <section class="w-full">
-        <form
-          class="p-6 bg-white shadow-sm roundex-2xl"
-          x-data="subscriptionChecker"
-          @submit.prevent="checkSubscription()"
-        >
+        <form class="p-6 bg-white shadow-sm roundex-2xl" @submit.prevent="checkSubscription()">
           <div class="flex flex-col gap-4 p-0">
             <h2>Techless Subscription Checker</h2>
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -159,41 +153,10 @@ if (!(await isAdmin(user.id))) {
       <section class="mt-12">
         <div
           class="p-6 bg-white shadow-sm rounded-2xl"
-          x-data="wisephoneManager"
           x-init="fetchWisephones()"
           @loading-start="isLoading = true"
           @loading-end="isLoading = false"
         >
-          <!-- Remove the spinner loading indicator and replace with content skeleton -->
-          <div x-show="isLoading" class="animate-pulse" x-cloak>
-            <div class="h-6 mb-4 rounded bg-slate-200 w-36"></div>
-            <div class="h-10 mb-6 rounded bg-slate-200"></div>
-            <div class="h-12 mb-4 rounded bg-slate-200"></div>
-            <div class="grid grid-cols-5 gap-4 mb-6">
-              <div class="h-8 col-span-1 rounded bg-slate-200"></div>
-              <div class="h-8 col-span-1 rounded bg-slate-200"></div>
-              <div class="h-8 col-span-1 rounded bg-slate-200"></div>
-              <div class="h-8 col-span-1 rounded bg-slate-200"></div>
-              <div class="h-8 col-span-1 rounded bg-slate-200"></div>
-            </div>
-            <div class="space-y-3">
-              <div class="grid grid-cols-5 gap-4">
-                <div class="h-6 col-span-1 rounded bg-slate-200"></div>
-                <div class="h-6 col-span-1 rounded bg-slate-200"></div>
-                <div class="h-6 col-span-1 rounded bg-slate-200"></div>
-                <div class="h-6 col-span-1 rounded bg-slate-200"></div>
-                <div class="h-6 col-span-1 rounded bg-slate-200"></div>
-              </div>
-              <div class="grid grid-cols-5 gap-4">
-                <div class="h-6 col-span-1 rounded bg-slate-200"></div>
-                <div class="h-6 col-span-1 rounded bg-slate-200"></div>
-                <div class="h-6 col-span-1 rounded bg-slate-200"></div>
-                <div class="h-6 col-span-1 rounded bg-slate-200"></div>
-                <div class="h-6 col-span-1 rounded bg-slate-200"></div>
-              </div>
-            </div>
-          </div>
-
           <!-- Error alert -->
           <div x-show="error" class="p-4 mb-6 text-red-800 bg-red-100 rounded-lg" x-cloak>
             <p x-text="error"></p>
@@ -207,10 +170,9 @@ if (!(await isAdmin(user.id))) {
               <div class="relative">
                 <input
                   type="text"
-                  x-model="searchQuery"
+                  x-model.debounce.250ms="searchQuery"
                   placeholder="Search by IMEI, nickname, phone number, or user ID"
                   class="w-full pl-10 input input-bordered"
-                  @input="currentPage = 1"
                 />
                 <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
                   <svg
@@ -240,7 +202,7 @@ if (!(await isAdmin(user.id))) {
                   </tr>
                 </thead>
                 <tbody>
-                  <template x-for="phone in paginatedWisephones" :key="phone.imei">
+                  <template x-for="phone in wisephones" :key="phone.imei">
                     <tr class="[&:nth-child(even)]:!bg-slate-50 border-b-2 border-slate-100">
                       <td x-text="phone.imei"></td>
                       <td class="max-w-[160px] break-words" x-text="phone.nickname || '-'"></td>
@@ -267,7 +229,7 @@ if (!(await isAdmin(user.id))) {
                       </td>
                     </tr>
                   </template>
-                  <tr class="!bg-slate-50" x-show="filteredWisephones.length === 0 && !isLoading">
+                  <tr class="!bg-slate-50" x-show="wisephones.length === 0 && !isLoading">
                     <td colspan="5" class="py-4 text-center">
                       <template x-if="searchQuery">
                         <p>No wisephones found matching your search query.</p>
@@ -284,9 +246,9 @@ if (!(await isAdmin(user.id))) {
             <!-- Pagination Controls -->
             <div class="flex items-center justify-between gap-3 mt-6 max-sm:flex-col" x-show="totalPages > 0" x-cloak>
               <div class="text-sm text-slate-500">
-                Showing <span x-text="((currentPage - 1) * itemsPerPage) + 1"></span> to
-                <span x-text="Math.min(currentPage * itemsPerPage, filteredWisephones.length)"></span> of
-                <span x-text="filteredWisephones.length"></span> wisephones
+                Showing <span x-text="wisephones.length === 0 ? 0 : ((currentPage - 1) * itemsPerPage) + 1"></span> to
+                <span x-text="((currentPage - 1) * itemsPerPage) + wisephones.length"></span> of
+                <span x-text="totalCount"></span> wisephones
               </div>
 
               <div class="join">
@@ -506,59 +468,12 @@ if (!(await isAdmin(user.id))) {
    */
   document.addEventListener("alpine:init", () => {
     Alpine.data("appState", () => ({
-      isLoading: false
-    }));
-
-    /**
-     * Subscription checker component
-     */
-    Alpine.data("subscriptionChecker", () => ({
+      isLoading: false,
       phoneNumber: "",
       imei: "",
       subscriptionResult: null as SubscriptionCheckResult | null,
       subscriptionError: null as string | null,
       hasBeenSubmitted: false,
-      isLoading: false,
-
-      async checkSubscription() {
-        try {
-          this.isLoading = true;
-          // @ts-ignore - Alpine methods
-          this.$dispatch("loading-start");
-          this.subscriptionResult = null;
-          this.subscriptionError = null;
-
-          // Call the utility function - explicitly import to avoid errors
-          const result = await checkSubscription(this.phoneNumber, this.imei);
-
-          // Set the result
-          this.subscriptionResult = result;
-          this.hasBeenSubmitted = true;
-        } catch (error) {
-          console.error("Subscription check failed:", error);
-          this.subscriptionError =
-            error instanceof Error ? error.message : "Failed to check subscription. Please try again.";
-        } finally {
-          this.isLoading = false;
-          // @ts-ignore - Alpine methods
-          this.$dispatch("loading-end");
-        }
-      },
-
-      resetForm() {
-        this.phoneNumber = "";
-        this.imei = "";
-        this.subscriptionResult = null;
-        this.subscriptionError = null;
-        this.isLoading = false;
-        this.hasBeenSubmitted = false;
-      }
-    }));
-
-    /**
-     * Wisephone management component
-     */
-    Alpine.data("wisephoneManager", () => ({
       wisephones: [] as Wisephone[],
       error: null as string | null,
       editWisephone: null as Wisephone | null,
@@ -568,7 +483,8 @@ if (!(await isAdmin(user.id))) {
       wisephoneToDelete: null as Wisephone | null,
       currentPage: 1,
       itemsPerPage: 10,
-      isLoading: false,
+      totalCount: 0,
+      totalPages: 0,
 
       // Form fields
       formImei: "",
@@ -579,6 +495,8 @@ if (!(await isAdmin(user.id))) {
 
       init() {
         this.fetchWisephones();
+
+        this.$watch("searchQuery", (value) => this.handleSearch());
       },
 
       async fetchWisephones() {
@@ -588,13 +506,35 @@ if (!(await isAdmin(user.id))) {
           this.$dispatch("loading-start");
           this.error = null;
 
-          const response = await fetch("/api/wisephones");
+          // Build URL with pagination and search parameters
+          const url = new URL("/api/wisephones", window.location.origin);
+          url.searchParams.set("page", this.currentPage.toString());
+          url.searchParams.set("limit", this.itemsPerPage.toString());
+
+          // Add search parameter if there is a query
+          if (this.searchQuery.trim()) {
+            url.searchParams.set("search", this.searchQuery.trim());
+          }
+
+          const response = await fetch(url);
           if (!response.ok) {
             throw new Error("Failed to fetch wisephones");
           }
 
           const data = await response.json();
           this.wisephones = data.wisephones;
+
+          // Update pagination information
+          this.totalCount = data.pagination.totalCount;
+          this.totalPages = data.pagination.totalPages;
+
+          // Adjust current page if needed
+          if (this.currentPage > this.totalPages && this.totalPages > 0) {
+            this.currentPage = this.totalPages;
+            // Fetch again with adjusted page
+            await this.fetchWisephones();
+            return;
+          }
 
           // Fetch all bypass statuses in a single API call
           await this.fetchAllBypassStatuses();
@@ -732,51 +672,6 @@ if (!(await isAdmin(user.id))) {
         }
       },
 
-      get filteredWisephones() {
-        if (!this.searchQuery) return this.wisephones;
-
-        const query = this.searchQuery.toLowerCase();
-        return this.wisephones.filter(
-          (phone) =>
-            phone.imei.toString().includes(query) ||
-            (phone.nickname && phone.nickname.toLowerCase().includes(query)) ||
-            phone.phoneNumber.includes(query) ||
-            phone.userId.toLowerCase().includes(query) ||
-            // Also search in bypass status and reason
-            (query === "bypass" && phone.bypassSubscription) ||
-            (query === "bypassed" && phone.bypassSubscription) ||
-            (phone.bypassReason && phone.bypassReason.toLowerCase().includes(query))
-        );
-      },
-
-      get paginatedWisephones() {
-        const startIndex = (this.currentPage - 1) * this.itemsPerPage;
-        const endIndex = startIndex + this.itemsPerPage;
-        return this.filteredWisephones.slice(startIndex, endIndex);
-      },
-
-      get totalPages() {
-        return Math.ceil(this.filteredWisephones.length / this.itemsPerPage);
-      },
-
-      nextPage() {
-        if (this.currentPage < this.totalPages) {
-          this.currentPage++;
-        }
-      },
-
-      prevPage() {
-        if (this.currentPage > 1) {
-          this.currentPage--;
-        }
-      },
-
-      goToPage(page: number) {
-        if (page >= 1 && page <= this.totalPages) {
-          this.currentPage = page;
-        }
-      },
-
       get visiblePageNumbers() {
         const pages: (number | string)[] = [];
         const maxVisiblePages = 5;
@@ -817,6 +712,68 @@ if (!(await isAdmin(user.id))) {
         }
 
         return pages;
+      },
+
+      nextPage() {
+        if (this.currentPage < this.totalPages) {
+          this.currentPage++;
+          this.fetchWisephones();
+        }
+      },
+
+      prevPage() {
+        if (this.currentPage > 1) {
+          this.currentPage--;
+          this.fetchWisephones();
+        }
+      },
+
+      goToPage(page: number) {
+        if (page >= 1 && page <= this.totalPages) {
+          this.currentPage = page;
+          this.fetchWisephones();
+        }
+      },
+
+      handleSearch() {
+        this.currentPage = 1; // Reset to first page on search
+        this.$nextTick(() => {
+          this.fetchWisephones();
+        });
+      },
+
+      async checkSubscription() {
+        try {
+          this.isLoading = true;
+          // @ts-ignore - Alpine methods
+          this.$dispatch("loading-start");
+          this.subscriptionResult = null;
+          this.subscriptionError = null;
+
+          // Call the utility function - explicitly import to avoid errors
+          const result = await checkSubscription(this.phoneNumber, this.imei);
+
+          // Set the result
+          this.subscriptionResult = result;
+          this.hasBeenSubmitted = true;
+        } catch (error) {
+          console.error("Subscription check failed:", error);
+          this.subscriptionError =
+            error instanceof Error ? error.message : "Failed to check subscription. Please try again.";
+        } finally {
+          this.isLoading = false;
+          // @ts-ignore - Alpine methods
+          this.$dispatch("loading-end");
+        }
+      },
+
+      resetForm() {
+        this.phoneNumber = "";
+        this.imei = "";
+        this.subscriptionResult = null;
+        this.subscriptionError = null;
+        this.isLoading = false;
+        this.hasBeenSubmitted = false;
       }
     }));
   });

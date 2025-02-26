@@ -1,5 +1,5 @@
 import type { APIRoute } from "astro";
-import { db, Wisephone } from "astro:db";
+import { db, Wisephone, like, or, asc, sql } from "astro:db";
 import { isAdmin } from "@/lib/auth/permissions";
 
 export const GET: APIRoute = async ({ locals, request }) => {
@@ -29,13 +29,63 @@ export const GET: APIRoute = async ({ locals, request }) => {
       });
     }
 
-    // Fetch all wisephones
-    const wisephones = await db.select().from(Wisephone).all();
+    // Parse pagination parameters from the URL
+    const url = new URL(request.url);
+    const page = parseInt(url.searchParams.get("page") || "1");
+    const limit = parseInt(url.searchParams.get("limit") || "10");
+    const searchQuery = url.searchParams.get("search") || "";
 
-    return new Response(JSON.stringify({ wisephones }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" }
-    });
+    // Calculate offset for pagination
+    const offset = (page - 1) * limit;
+
+    // Build where condition for search
+    let whereCondition;
+    if (searchQuery) {
+      whereCondition = or(
+        sql`cast(${Wisephone.imei} as text) like ${"%" + searchQuery + "%"}`,
+        like(Wisephone.nickname, `%${searchQuery}%`),
+        like(Wisephone.phoneNumber, `%${searchQuery}%`),
+        like(Wisephone.userId, `%${searchQuery}%`)
+      );
+    }
+
+    // Get total count for pagination
+    const totalCountResult = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(Wisephone)
+      .where(whereCondition)
+      .get();
+
+    const totalCount = totalCountResult?.count || 0;
+
+    // Get paginated wisephones
+    const wisephones = await db
+      .select()
+      .from(Wisephone)
+      .where(whereCondition)
+      .orderBy(asc(Wisephone.imei))
+      .limit(limit)
+      .offset(offset)
+      .all();
+
+    // Calculate total pages
+    const totalPages = Math.ceil(totalCount / limit);
+
+    return new Response(
+      JSON.stringify({
+        wisephones,
+        pagination: {
+          page,
+          limit,
+          totalCount,
+          totalPages
+        }
+      }),
+      {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+      }
+    );
   } catch (error) {
     console.error("Error fetching wisephones:", error);
     return new Response(
