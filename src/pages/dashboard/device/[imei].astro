@@ -203,24 +203,16 @@ try {
     class="container p-6 mx-auto prose"
     x-data="device"
     x-init={`
-      try {
-        // Convert objects to safe strings and handle potential serialization errors
-        const safeAppsListJson = ${JSON.stringify(sortedAppsList || {})};
-        appsList = typeof safeAppsListJson === 'object' ? safeAppsListJson : {};
-
-        imei = "${imei || ""}";
-        isSubscribed = ${Boolean(isSubscribed)};
-        nickname = \`${(wisephone?.nickname || "").replace(/`/g, "'")}\`;
-        phoneNumber = \`${(wisephone?.phoneNumber || "").replace(/`/g, "'")}\`;
-        originalNickname = \`${(wisephone?.nickname || "").replace(/`/g, "'")}\`;
-        originalPhoneNumber = \`${(wisephone?.phoneNumber || "").replace(/`/g, "'")}\`;
-
-        // Provide fallbacks for error messages
-        toastErrorMessage = "${(error || "").replace(/"/g, '\\"')}";
-        toastMessage = "${(success || "").replace(/"/g, '\\"')}";
-      } catch (e) {
-        console.error('Error during Alpine initialization:', e);
-      }
+      const safeAppsListJson = ${JSON.stringify(sortedAppsList || {})};
+      appsList = typeof safeAppsListJson === 'object' ? safeAppsListJson : {};
+      imei = "${imei || ""}";
+      isSubscribed = ${Boolean(isSubscribed)};
+      nickname = \`${(wisephone?.nickname || "").replace(/`/g, "'")}\`;
+      phoneNumber = \`${(wisephone?.phoneNumber || "").replace(/`/g, "'")}\`;
+      originalNickname = \`${(wisephone?.nickname || "").replace(/`/g, "'")}\`;
+      originalPhoneNumber = \`${(wisephone?.phoneNumber || "").replace(/`/g, "'")}\`;
+      toastErrorMessage = "${(error || "").replace(/"/g, '\\"')}";
+      toastMessage = "${(success || "").replace(/"/g, '\\"')}";
     `}
   >
     <Header activeTab="page" isProjectPublished={false} projectSlug={""} />
