@@ -27,12 +27,20 @@ const result = Astro.getActionResult(actions.wisephones.createWisephone);
     class="container h-full p-6 mx-auto prose"
     x-data="{
       showForm: false,
+      isLoading: false,
     }"
     x-init={`
       toastErrorMessage = '${result?.error?.message || ""}' || toastErrorMessage;
       toastMessage = '${result?.data?.success || ""}' || toastMessage;
     `}
   >
+    <progress
+      x-show="isLoading"
+      x-cloak
+      x-transition
+      class="absolute top-0 left-0 right-0 progress w-full"
+      style="--progress-color: var(--evergreen);"></progress>
+
     <Header activeTab="page" isProjectPublished={false} projectSlug={""} />
 
     <main class="flex flex-col gap-6 py-12">
@@ -58,12 +66,13 @@ const result = Astro.getActionResult(actions.wisephones.createWisephone);
                 {wisephones.map((wisephone) => (
                   <li class="w-full [&:not(:last-child)]:border-b border-slate-200">
                     <a
+                      @click="isLoading = true"
                       href={`/dashboard/device/${wisephone.imei.toString().padEnd(15, "0")}`}
                       class="no-underline m-0 p-0 py-4 px-6 w-full grid grid-cols-[1fr_auto] items-center justify-center [&:not(:last-child)]:border-b border-slate-200 hover:bg-slate-50 cursor-pointer active:scale-[98%] transition-all duration-150"
                     >
                       <div class="flex flex-col w-full">
-                        <p class="p-0 m-0 font-semibold">{wisephone.nickname}</p>
-                        <p class="p-0 m-0 text-slate-500">{wisephone.phoneNumber}</p>
+                        <p class="p-0 m-0 font-semibold line-clamp-1">{wisephone.nickname}</p>
+                        <p class="p-0 m-0 text-slate-500 line-clamp-1">{wisephone.phoneNumber}</p>
                       </div>
                       <Icon name="lucide:chevron-right" class="w-6 h-6" />
                     </a>

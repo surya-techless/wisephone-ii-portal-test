@@ -9,8 +9,8 @@ export const wisephones = {
     accept: "form",
     input: z.object({
       imei: z.number(),
-      nickname: z.string().optional(),
-      phoneNumber: z.string(),
+      nickname: z.string().max(64).optional(),
+      phoneNumber: z.string().min(12).max(12),
       userId: z.string()
     }),
     handler: async (input) => {
@@ -73,6 +73,7 @@ export const wisephones = {
       imei: z.number(),
       nickname: z
         .string()
+        .max(64)
         .optional()
         .refine(
           (val: string | undefined) => {
@@ -86,6 +87,8 @@ export const wisephones = {
         ),
       phoneNumber: z
         .string()
+        .min(12)
+        .max(12)
         .optional()
         .refine(
           (val) => {

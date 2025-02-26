@@ -8,6 +8,7 @@ import Footer from "@/components/Footer.astro";
 import { FEATURES, KNOX_USER_GROUPS, FAITH_TOOLS_APPS, getPackageNameFromPlayStoreUrl } from "@/libs/utils";
 import { fetchOttogridData } from "@/libs/ottogrid";
 import type { AppsList } from "@/types/apps";
+import NodeCache from "node-cache";
 
 const { imei } = Astro.params;
 
@@ -41,6 +42,9 @@ const subscribedUrl = new URL(`/webhook-is-user-subscribed`, "https://cameronpak
 subscribedUrl.searchParams.set("phoneNumber", `${wisephone.phoneNumber.replace(/[^0-9+]/g, "")}`);
 subscribedUrl.searchParams.set("imei", String(wisephone.imei));
 
+// Create a new cache instance with standard TTL of 1 day (86400 seconds)
+const subscriptionCache = new NodeCache({ stdTTL: 86400 });
+
 const bypassTechlessSubscription = await db
   .select()
   .from(BypassTechlessSubscription)
@@ -48,11 +52,27 @@ const bypassTechlessSubscription = await db
   .limit(1);
 
 let isSubscribed = bypassTechlessSubscription.length > 0 || false;
+
 if (!isSubscribed) {
-  const result = await fetch(subscribedUrl, { method: "GET" });
-  const isSubscribedText = await result.text();
-  if (isSubscribedText.includes("bypass") || isSubscribedText.includes("is subscribed")) {
+  // Create a cache key using the IMEI
+  const cacheKey = `subscription-${imei}`;
+
+  // Check if the result is cached
+  const cachedStatus = subscriptionCache.get(cacheKey);
+
+  if (cachedStatus === true) {
+    // Only use cached value if it's true
     isSubscribed = true;
+  } else {
+    // Fetch fresh data if not in cache or cached as false
+    const result = await fetch(subscribedUrl, { method: "GET" });
+    const isSubscribedText = await result.text();
+    if (isSubscribedText.includes("bypass") || isSubscribedText.includes("is subscribed")) {
+      isSubscribed = true;
+
+      // Only cache positive subscription statuses
+      subscriptionCache.set(cacheKey, true);
+    }
   }
 }
 
@@ -80,7 +100,6 @@ const success = [
 // Get the latest installed apps list
 const formData = new FormData();
 formData.append("imei", String(wisephone.imei));
-await Astro.callAction(actions.wisephones.syncInstalledApps, formData);
 
 const getInstalledAppsResult = await Astro.callAction(actions.wisephones.getInstalledApps, formData);
 const installedApps = getInstalledAppsResult?.data?.apps || [];
@@ -134,10 +153,10 @@ const sortedAppsList = Object.fromEntries(
       appsList = ${JSON.stringify(sortedAppsList)};
       imei = "${imei}";
       isSubscribed = ${isSubscribed};
-      nickname = "${wisephone.nickname}";
-      phoneNumber = "${wisephone.phoneNumber}";
-      originalNickname = "${wisephone.nickname}";
-      originalPhoneNumber = "${wisephone.phoneNumber}";
+      nickname = \`${wisephone.nickname}\`;
+      phoneNumber = \`${wisephone.phoneNumber}\`;
+      originalNickname = \`${wisephone.nickname}\`;
+      originalPhoneNumber = \`${wisephone.phoneNumber}\`;
       toastErrorMessage = "${error || ""}" || toastErrorMessage;
       toastMessage = "${success}" || toastMessage;
     `}
@@ -172,23 +191,25 @@ const sortedAppsList = Object.fromEntries(
             </button>
           </div>
 
-          <div class="inline-flex flex-wrap items-baseline w-full gap-2 mt-2 text-slate-500">
+          <div class="inline-flex flex-wrap items-baseline w-full gap-2 sm:mt-2 max-sm:mt-4 text-slate-500">
             <div x-show="!isEditing">
-              <div class="flex items-center gap-2">
+              <div class="flex max-sm:flex-col max-sm:items-start sm:items-center gap-2">
                 <span
-                  class="hover:underline hover:cursor-pointer underline-offset-4"
+                  class="hover:underline hover:cursor-pointer underline-offset-4 line-clamp-1 max-w-[200px] overflow-hidden text-ellipsis"
                   @click="isEditing = true"
                   x-text="nickname">{wisephone.nickname}</span
                 >
-                •
-                <span
-                  class="hover:underline hover:cursor-pointer underline-offset-4"
-                  @click="isEditing = true"
-                  x-text="phoneNumber">{wisephone.phoneNumber}</span
-                >
-                <button class="btn btn-sm btn-ghost btn-circle" @click="isEditing = true">
-                  <Icon name="lucide:pencil" class="w-4 h-4" />
-                </button>
+                <span class="max-sm:hidden">•</span>
+                <div class="flex items-center gap-2">
+                  <span
+                    class="hover:underline hover:cursor-pointer underline-offset-4"
+                    @click="isEditing = true"
+                    x-text="phoneNumber">{wisephone.phoneNumber}</span
+                  >
+                  <button class="btn btn-sm btn-ghost btn-circle" @click="isEditing = true">
+                    <Icon name="lucide:pencil" class="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -204,6 +225,7 @@ const sortedAppsList = Object.fromEntries(
                   name="nickname"
                   x-model="nickname"
                   class="input input-bordered"
+                  maxlength="50"
                   required
                 />
                 <input
@@ -213,6 +235,7 @@ const sortedAppsList = Object.fromEntries(
                   x-model="phoneNumber"
                   x-mask="999-999-9999"
                   class="input input-bordered"
+                  maxlength="12"
                   required
                 />
                 <input type="hidden" name="imei" :value="imei" />
@@ -300,7 +323,7 @@ const sortedAppsList = Object.fromEntries(
                   }`}
               >
                 <div class="w-full grid grid-cols-[1fr_auto] items-center justify-between gap-6">
-                  <div class="flex flex-col gap-2">
+                  <div class="flex flex-col gap-1">
                     <div class="inline-flex flex-wrap items-center gap-2">
                       <p>{feature.name}</p>
                       {feature.disclosure && (
@@ -347,14 +370,14 @@ const sortedAppsList = Object.fromEntries(
             </div>
 
             <div class="shadow rounded-2xl not-prose">
-              <div class="w-full grid rounded-t-2xl grid-rows-2 gap-3 top-0 z-10 bg-white bg-[var(--surface-secondary)] transition-transform py-6 pb-3 px-6 text-base border-b border-[var(--surface-tertiary)]">
+              <div class="w-full grid rounded-t-2xl grid-rows-2 gap-3 top-0 z-10 bg-white bg-[var(--surface-secondary)] transition-transform py-6 pb-4 px-6 text-base border-b border-[var(--surface-tertiary)]">
                 <input
                   type="text"
                   class="w-full input input-bordered"
                   x-model.debounce.200ms="appSearchQuery"
                   placeholder="Search for an app"
                 />
-                <div role="tablist" class="max-sm:hidden tabs tabs-boxed h-fit">
+                <div role="tablist" class="max-sm:hidden bg-slate-100 tabs tabs-boxed h-fit">
                   <a
                     role="tab"
                     class="tab"
@@ -389,6 +412,7 @@ const sortedAppsList = Object.fromEntries(
                 <select
                   @change="currentView = $event.target.value"
                   class="sm:hidden w-full border-2 !border-[var(--surface-tertiary)] select select-bordered"
+                  x-model="currentView"
                 >
                   <option value="tool-drawer">Tool Drawer</option>
                   <option value="faith-tools">faith.tools</option>
@@ -398,7 +422,7 @@ const sortedAppsList = Object.fromEntries(
 
               <ul class="list-item-container max-h-[425px] overflow-y-auto">
                 <template x-for="app in filteredApps">
-                  <li class="list-item !flex items-center justify-between gap-1">
+                  <li class="list-item !grid !bg-white grid-cols-[1fr_auto] items-center justify-between gap-2">
                     <div class="flex flex-col gap-1">
                       {/* I don't want people to click on the link and get distracted on mobile. */}
                       <a
@@ -406,7 +430,7 @@ const sortedAppsList = Object.fromEntries(
                         x-bind:href="'https://play.google.com/store/apps/details?id=' + app.packageName"
                         target="_blank"
                       >
-                        <p x-text="app.name" />
+                        <p x-text="app.name" class="line-clamp-2" />
                       </a>
                     </div>
 
@@ -487,6 +511,7 @@ const sortedAppsList = Object.fromEntries(
 
 <script>
   import Alpine from "alpinejs";
+  import { actions } from "astro:actions";
   import {
     type Feature,
     updateUnreachableAlpineState,
@@ -842,6 +867,13 @@ const sortedAppsList = Object.fromEntries(
         this.$watch("features", async (userGroups: string[]) => {
           await this.removeExclusiveGroups(userGroups);
         });
+
+        // Sync installed apps in the background
+        if (this.imei) {
+          const formData = new FormData();
+          formData.append("imei", String(this.imei));
+          await actions.wisephones.syncInstalledApps(formData);
+        }
       }
     };
   });
