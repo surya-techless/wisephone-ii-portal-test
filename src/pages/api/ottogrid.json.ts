@@ -1,5 +1,5 @@
 import type { APIRoute } from "astro";
-import { fetchOttogridData, cache, CACHE_KEY } from "@/libs/ottogrid";
+import { fetchOttogridData } from "@/libs/ottogrid";
 import { purgeCache } from "@netlify/functions";
 
 export const GET: APIRoute = async ({ request }) => {
@@ -18,14 +18,8 @@ export const GET: APIRoute = async ({ request }) => {
       }
     }
 
-    // Calculate remaining TTL from node-cache
-    const remainingTTL = cache.getTtl(CACHE_KEY)
-      ? Math.max(0, Math.floor((cache.getTtl(CACHE_KEY)! - Date.now()) / 1000))
-      : 0;
-
-    // Default TTL if none remaining (e.g., after force refresh)
-    const defaultTTL = 3600; // 1 hour
-    const effectiveTTL = forceRefresh ? defaultTTL : remainingTTL || defaultTTL;
+    // Set a fixed TTL for CDN caching since we can't rely on node-cache in serverless
+    const ttl = forceRefresh ? 3600 : 86400; // 1 hour if forced, 24 hours otherwise
 
     return new Response(JSON.stringify(data), {
       status: 200,
@@ -34,7 +28,7 @@ export const GET: APIRoute = async ({ request }) => {
         // Browser cache control - always check freshness
         "Cache-Control": "public, max-age=0, must-revalidate",
         // Netlify-specific CDN cache control with durable caching
-        "Netlify-CDN-Cache-Control": `public, durable, s-maxage=${effectiveTTL}, stale-while-revalidate=86400`,
+        "Netlify-CDN-Cache-Control": `public, durable, s-maxage=${ttl}, stale-while-revalidate=86400`,
         // Cache tag for targeted invalidation
         "Netlify-Cache-Tag": "ottogrid-data",
         // Vary on the forceRefresh parameter only
