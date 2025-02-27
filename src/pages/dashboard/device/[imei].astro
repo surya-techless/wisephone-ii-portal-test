@@ -5,7 +5,7 @@ import Icon from "astro-iconify";
 import Layout from "@/layouts/Layout.astro";
 import Header from "@/components/Header.astro";
 import Footer from "@/components/Footer.astro";
-import { FEATURES, KNOX_USER_GROUPS, FAITH_TOOLS_APPS, getPackageNameFromPlayStoreUrl } from "@/libs/utils";
+import { FEATURES, FAITH_TOOLS_APPS, getPackageNameFromPlayStoreUrl } from "@/libs/utils";
 import type { AppsList } from "@/types/apps";
 
 // Initialize variables with default values
@@ -343,11 +343,7 @@ try {
                       return this.$refs.switch;
                     },
                     handleToggle() {
-                      if (this.feature.knoxManageId === '${KNOX_USER_GROUPS.PRO}') {
-                        toggleProAndMinimalFeature(this.feature, this.getSwitchElement());
-                      } else {
-                        toggleFeature(this.feature, this.getSwitchElement());
-                      }
+                      toggleFeature(this.feature, this.getSwitchElement());
                     },
                     feature: ${JSON.stringify(feature, null, 2)},
                   }`}
@@ -546,7 +542,6 @@ try {
     type Feature,
     updateUnreachableAlpineState,
     KNOX_USER_GROUPS,
-    oldKnoxUserGroupsForSubscription,
     getPackageNameFromPlayStoreUrl
   } from "@/libs/utils";
   import { AppManagementService } from "@/services/AppManagementService";
@@ -579,7 +574,11 @@ try {
 
       // Computed properties
       get isToolDrawerEnabled() {
-        return this.isSubscribed && Array.isArray(this.features) && this.features.includes(KNOX_USER_GROUPS.PRO);
+        return (
+          this.isSubscribed &&
+          Array.isArray(this.features) &&
+          this.features.includes(KNOX_USER_GROUPS.ADD_ON_TOOL_DRAWER)
+        );
       },
       get isFaithToolsEnabled() {
         return this.isSubscribed && this.features.includes(KNOX_USER_GROUPS.ADD_ON_FAITH_TOOLS);
@@ -693,22 +692,28 @@ try {
 
           currentEnabled = this.isFeatureEnabled(feature.knoxManageId, feature.isInverse);
           const confirmMessage = currentEnabled ? feature.disableMessage : feature.enableMessage;
+          let updatedValue = !currentEnabled;
+          if (feature.isInverse) {
+            updatedValue = currentEnabled;
+          }
 
-          if (!confirm(confirmMessage)) return;
+          if (!confirm(confirmMessage)) {
+            return;
+          }
 
-          switchElement.checked = !currentEnabled;
+          switchElement.checked = !switchElement.checked;
 
           await featureManagement.toggleFeature({
             imei: this.imei,
             feature,
-            enabled: !currentEnabled
+            enabled: updatedValue
           });
 
           // Update features list
-          if (!currentEnabled) {
-            this.features.push(feature.knoxManageId);
-          } else {
+          if (!updatedValue) {
             this.features = this.features.filter((id) => id !== feature.knoxManageId);
+          } else {
+            this.features.push(feature.knoxManageId);
           }
 
           this.showSuccessToast(
@@ -718,42 +723,6 @@ try {
           console.error("Feature toggle failed:", error);
           this.showErrorToast(error instanceof Error ? error.message : "Feature update failed");
           switchElement.checked = currentEnabled;
-        }
-      },
-
-      async toggleProAndMinimalFeature(feature: Feature, switchElement: HTMLInputElement) {
-        try {
-          if (!this.isSubscribed) {
-            throw new Error("Oops! You must have an active Techless Subscription to enable features.");
-          }
-
-          const isToolDrawerEnabled = this.isFeatureEnabled(feature.knoxManageId);
-          if (!confirm(isToolDrawerEnabled ? feature.disableMessage : feature.enableMessage)) {
-            return;
-          }
-
-          switchElement.checked = !switchElement.checked;
-
-          await featureManagement.toggleProAndMinimalFeature({
-            imei: this.imei,
-            feature,
-            isToolDrawerEnabled
-          });
-
-          // Update the feature list
-          if (isToolDrawerEnabled) {
-            this.features = this.features.filter((group) => group !== KNOX_USER_GROUPS.PRO);
-          } else {
-            this.features.push(KNOX_USER_GROUPS.PRO);
-          }
-
-          this.showSuccessToast(
-            `Your device is being updated. ${feature.name} will be ${isToolDrawerEnabled ? "disabled" : "enabled"} shortly.`
-          );
-        } catch (error) {
-          console.error("Feature toggle failed:", error);
-          this.showErrorToast(error instanceof Error ? error.message : "Feature update failed");
-          switchElement.checked = !switchElement.checked; // Revert the switch state
         }
       },
 
@@ -780,7 +749,8 @@ try {
        * Gets the list of exclusive groups from the user's current groups
        */
       getExclusiveGroups(userGroups: string[]): string[] {
-        return userGroups.filter((group) => oldKnoxUserGroupsForSubscription.has(group));
+        // Unpaid and Subscribed are exclusive
+        return userGroups.filter((group) => group === KNOX_USER_GROUPS.UNPAID || group === KNOX_USER_GROUPS.SUBSCRIBED);
       },
 
       /**
@@ -795,9 +765,11 @@ try {
        * based on subscription status
        */
       async ensureBaseGroup(userGroups: string[]) {
-        const hasBaseGroup = userGroups.some((group) => oldKnoxUserGroupsForSubscription.has(group));
+        const hasBaseGroup = userGroups.some(
+          (group) => group === KNOX_USER_GROUPS.UNPAID || group === KNOX_USER_GROUPS.SUBSCRIBED
+        );
         if (!hasBaseGroup) {
-          const baseGroup = this.isSubscribed ? KNOX_USER_GROUPS.MINIMAL : KNOX_USER_GROUPS.UNPAID;
+          const baseGroup = this.isSubscribed ? KNOX_USER_GROUPS.SUBSCRIBED : KNOX_USER_GROUPS.UNPAID;
           await this.addFeatureToDevice(baseGroup);
         }
       },
@@ -818,16 +790,10 @@ try {
        */
       getIncompatibleFeatures(userGroups: string[]): string[] {
         return [
-          // Remove Unpaid if present with any other group
-          userGroups.includes(KNOX_USER_GROUPS.UNPAID) && KNOX_USER_GROUPS.UNPAID,
-          // Remove Healthy if Pro is present
-          userGroups.includes(KNOX_USER_GROUPS.PRO) &&
-            userGroups.includes(KNOX_USER_GROUPS.HEALTHY) &&
-            KNOX_USER_GROUPS.HEALTHY,
-          // Remove Minimal if Pro or Healthy is present
-          (userGroups.includes(KNOX_USER_GROUPS.PRO) || userGroups.includes(KNOX_USER_GROUPS.HEALTHY)) &&
-            userGroups.includes(KNOX_USER_GROUPS.MINIMAL) &&
-            KNOX_USER_GROUPS.MINIMAL
+          // Remove Unpaid if present with Subscribed
+          userGroups.includes(KNOX_USER_GROUPS.UNPAID) &&
+            userGroups.includes(KNOX_USER_GROUPS.SUBSCRIBED) &&
+            KNOX_USER_GROUPS.UNPAID
         ].filter(Boolean) as string[];
       },
 
@@ -836,7 +802,7 @@ try {
        */
       async addFeatureToDevice(knoxManageId: string) {
         const url = new URL(`/api/samsung-knox.json`, window.location.origin);
-        url.searchParams.set("action", "add-feature");
+        url.searchParams.set("action", "apply-feature");
         url.searchParams.set("imei", this.imei);
         url.searchParams.set("knoxManageId", knoxManageId);
         await fetch(url, { method: "POST" });

@@ -1,11 +1,13 @@
 import type { APIRoute } from "astro";
 import { SamsungKnoxService } from "@/libs/samsung-knox-service";
-import { oldKnoxUserGroupsForSubscription } from "@/libs/utils";
+
+type GetKnoxAction = "get-token" | "get-device-groups";
+type PostKnoxAction = "apply-feature" | "remove-feature" | "install-app" | "uninstall-app";
 
 export const GET: APIRoute = async (props) => {
   const { request } = props;
   const url = new URL(request.url);
-  const action = url.searchParams.get("action");
+  const action: GetKnoxAction = url.searchParams.get("action") as GetKnoxAction;
   const imei = url.searchParams.get("imei");
 
   try {
@@ -44,26 +46,9 @@ export const GET: APIRoute = async (props) => {
   }
 };
 
-/**
- * @description Removes all exclusive groups except the one being applied.
- * For example, a user in the Unpaid and Pro group will ultimately experience conflicts.
- * This function will remove the Unpaid group, allowing the Pro group to be applied.
- * @param knoxManageId - Samsung Knox Manage Group ID of the feature being applied.
- * @param imei - IMEI of the device.
- */
-async function removeExclusiveGroupConflicts(knoxManageId: string, imei: string) {
-  if (oldKnoxUserGroupsForSubscription.has(knoxManageId)) {
-    for (const groupId of oldKnoxUserGroupsForSubscription) {
-      if (groupId !== knoxManageId) {
-        await SamsungKnoxService.removeFeature(groupId, imei, false);
-      }
-    }
-  }
-}
-
 export const POST: APIRoute = async ({ request }) => {
   const url = new URL(request.url);
-  const action = url.searchParams.get("action");
+  const action: PostKnoxAction = url.searchParams.get("action") as PostKnoxAction;
   const imei = url.searchParams.get("imei");
 
   if (!imei) {
