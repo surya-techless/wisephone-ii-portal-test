@@ -206,6 +206,7 @@ try {
     x-data="device"
     x-init={`
       const safeAppsListJson = ${JSON.stringify(sortedAppsList || {})};
+      installedApps = ${JSON.stringify(installedApps || [])};
       appsList = typeof safeAppsListJson === 'object' ? safeAppsListJson : {};
       imei = "${imei || ""}";
       isSubscribed = ${Boolean(isSubscribed)};
@@ -604,6 +605,7 @@ try {
   Alpine.data("device", function () {
     return {
       appsList: {} as AppsList,
+      installedApps: [] as { packageName: string; appName: string }[],
       currentView: "installed" as CurrentView,
       appSearchQuery: "",
       features: [] as string[],
@@ -922,7 +924,7 @@ try {
                   if (!packageName) return;
 
                   // If the app is already in the list, preserve the installed status
-                  const isInstalled = this.appsList[packageName]?.installed || false;
+                  const isInstalled = this.installedApps.some((app) => app.packageName === packageName);
 
                   updatedAppsList[packageName] = {
                     source: "Tool Drawer",
