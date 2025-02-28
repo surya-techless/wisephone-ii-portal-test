@@ -1,11 +1,12 @@
 ---
-import { Wisephone, eq, db, BypassTechlessSubscription } from "astro:db";
+import { Wisephone, and, eq, db, BypassTechlessSubscription } from "astro:db";
 import { actions, type ActionInputError } from "astro:actions";
 import Icon from "astro-iconify";
 import Layout from "@/layouts/Layout.astro";
 import Header from "@/components/Header.astro";
 import Footer from "@/components/Footer.astro";
-import { FEATURES, FAITH_TOOLS_APPS, getPackageNameFromPlayStoreUrl } from "@/libs/utils";
+import { FEATURES, FAITH_TOOLS_APPS, getPackageNameFromPlayStoreUrl, isValidIMEI } from "@/libs/utils";
+import { isAdmin } from "@/lib/auth/permissions";
 import type { AppsList } from "@/types/apps";
 
 // Initialize variables with default values
@@ -18,10 +19,23 @@ let success = "";
 let installedApps: any[] = [];
 let appsList: AppsList = {};
 let sortedAppsList = {};
+let wisephones: (typeof Wisephone.$inferSelect)[] = [];
+let userIsAdmin = false;
+let isMyDevice = false;
+
+if (!Astro.locals.auth().userId) {
+  return Astro.redirect("/");
+}
+
+const user = await Astro.locals.currentUser();
+
+if (!user) {
+  return Astro.redirect("/");
+}
 
 try {
-  if (!imei || isNaN(Number(imei))) {
-    return Astro.redirect("/dashboard?error=" + encodeURIComponent("Invalid IMEI provided"));
+  if (!imei || !isValidIMEI(imei)) {
+    return Astro.redirect("/dashboard?error=" + encodeURIComponent("A Wisephone II with that IMEI was not found."));
   }
 
   const resultDelete = Astro.getActionResult(actions.wisephones.deleteWisephone);
@@ -30,17 +44,36 @@ try {
     return Astro.redirect("/dashboard?message=" + encodeURIComponent(resultDeleteMessage));
   }
 
-  const wisephones = await db
-    .select()
-    .from(Wisephone)
-    .where(eq(Wisephone.imei, Number(imei)))
-    .limit(1);
+  const userId = Astro.locals.auth().userId;
+
+  if (userId && user) {
+    userIsAdmin = await isAdmin(user.id);
+  }
+
+  if (userIsAdmin) {
+    wisephones = await db
+      .select()
+      .from(Wisephone)
+      .where(eq(Wisephone.imei, Number(imei)))
+      .limit(1);
+  } else {
+    // Admin users can see all devices
+    wisephones = await db
+      .select()
+      .from(Wisephone)
+      .where(and(eq(Wisephone.imei, Number(imei)), eq(Wisephone.userId, user.id)))
+      .limit(1);
+  }
 
   if (!wisephones || !wisephones.length) {
     return Astro.redirect("/dashboard?error=" + encodeURIComponent("Device not found"));
   }
 
   wisephone = wisephones[0];
+
+  if (wisephone?.userId === userId) {
+    isMyDevice = true;
+  }
 
   // Safety check - if wisephone is null or undefined, redirect to dashboard with error
   if (!wisephone) {
@@ -192,6 +225,22 @@ try {
       style="--progress-color: var(--evergreen);"></progress>
 
     <Header activeTab="page" isProjectPublished={false} projectSlug={""} />
+
+    {
+      userIsAdmin && !isMyDevice && (
+        <div class="mt-12 alert bg-slate-200 border-slate-300 text-slate-800">
+          <Icon name="lucide:shield-check" class="w-5 h-5" />
+
+          <div>
+            <p class="font-semibold m-0">You are an admin looking at a device that is not yours.</p>
+            <p class="m-0">
+              You may update the features of this device, but please be mindful that any changes made will result in a
+              notification being sent to the device owner that an update was made.
+            </p>
+          </div>
+        </div>
+      )
+    }
 
     <main class="flex flex-col gap-12 py-12">
       <section class="flex flex-col gap-6 not-prose">

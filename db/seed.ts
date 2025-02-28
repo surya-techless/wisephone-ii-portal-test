@@ -9,6 +9,12 @@ export default async function seed() {
       nickname: "Cam Pak",
       phoneNumber: "405-206-0654",
       userId: CAM_CLERK_ID
+    },
+    {
+      imei: 350256480766181,
+      nickname: "Kyle's Phone",
+      phoneNumber: "123-123-1234",
+      userId: "user_u5ern4me"
     }
   ]);
 

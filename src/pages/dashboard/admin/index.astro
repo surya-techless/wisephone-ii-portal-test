@@ -220,10 +220,28 @@ if (!(await isAdmin(user.id))) {
                         </div>
                       </td>
                       <td class="flex gap-2">
-                        <button @click="openEditModal(phone)" class="btn btn-sm btn-circle">
+                        <a
+                          title="View Device Features"
+                          aria-label="View Device Features"
+                          x-bind:href="`/dashboard/device/${phone.imei}`"
+                          class="btn btn-sm btn-circle"
+                        >
+                          <Icon name="lucide:eye" class="w-4 h-4" />
+                        </a>
+                        <button
+                          title="Edit Device Info"
+                          aria-label="Edit Device Info"
+                          @click="openEditModal(phone)"
+                          class="btn btn-sm btn-circle"
+                        >
                           <Icon name="lucide:pencil" class="w-4 h-4" />
                         </button>
-                        <button @click="confirmDelete(phone)" class="btn btn-sm btn-circle">
+                        <button
+                          title="Delete Device"
+                          aria-label="Delete Device"
+                          @click="confirmDelete(phone)"
+                          class="btn btn-sm btn-circle"
+                        >
                           <Icon name="lucide:trash" class="w-4 h-4" />
                         </button>
                       </td>

@@ -25,10 +25,7 @@ const result = Astro.getActionResult(actions.wisephones.createWisephone);
 <Layout title="Dashboard" description="Manage your Wisephone II devices.">
   <div
     class="container h-full p-6 mx-auto prose"
-    x-data="{
-      showForm: false,
-      isLoading: false,
-    }"
+    x-data="dashboard"
     x-init={`
       toastErrorMessage = '${result?.error?.message || ""}' || toastErrorMessage;
       toastMessage = '${result?.data?.success || ""}' || toastMessage;
@@ -93,35 +90,6 @@ const result = Astro.getActionResult(actions.wisephones.createWisephone);
         x-show="showForm"
         x-transition
         x-cloak
-        x-data="{
-          imei1: '',
-          imei2: '',
-          phoneNumber: '',
-          nickname: '',
-          imeiMatch: false,
-          hasBlurredImei: false,
-          validateImei() {
-            this.hasBlurredImei = true;
-            this.imeiMatch = this.imei1.length === 15 && this.imei1 === this.imei2;
-          },
-          isFormValid() {
-            return (
-              this.imei1.length === 15 &&
-              this.imei2.length === 15 &&
-              this.imeiMatch &&
-              this.phoneNumber.replace(/-/g, '').length === 10 &&
-              this.nickname.trim().length > 0
-            );
-          },
-          resetForm() {
-            this.imei1 = '';
-            this.imei2 = '';
-            this.phoneNumber = '';
-            this.nickname = '';
-            this.imeiMatch = false;
-            this.hasBlurredImei = false;
-          }
-        }"
         @reset.window="resetForm()"
       >
         <div class="flex flex-row justify-between w-full gap-4">
@@ -161,18 +129,27 @@ const result = Astro.getActionResult(actions.wisephones.createWisephone);
               x-mask="999999999999999"
               placeholder="350XXXXXXXXXXXX"
               class="w-full input input-bordered"
-              :class="{ 'input-error': imei1.length > 0 && imei1.length !== 15 }"
+              :class="{ 'input-error': !isImeiValid && hasBlurredImei }"
               pattern="[0-9]{15}"
               minlength="15"
               maxlength="15"
               title="Please enter exactly 15 digits"
+              @blur="validateImei(); hasBlurredImei = true;"
               required
             />
+            <label class="label" x-show="hasBlurredImei && (imei1.length > 0 && (imei1.length !== 15 || !isImeiValid))">
+              <span class="label-text-alt text-error" x-show="imei1.length > 0 && imei1.length !== 15">
+                IMEI must be exactly 15 digits
+              </span>
+              <span class="label-text-alt text-error" x-show="imei1.length === 15 && !isImeiValid">
+                Invalid IMEI. Please check the number and try again.
+              </span>
+            </label>
             <label class="label">
               <span class="label-text w-fit text-slate-500 [&_strong]:text-slate-500">
-                On the WiseOS home screen, tap <strong>"Settings"</strong> &gt; tap{" "}
-                <strong>"Open System Settings"</strong> &gt; scroll to and tap <strong>"About phone"</strong> &gt; hold down
-                on <strong>"IMEI (slot 1)"</strong> to copy the number.
+                On the WiseOS home screen, tap <strong>"Settings"</strong> → tap
+                <strong>"Open System Settings"</strong> → scroll to and tap <strong>"About phone"</strong> → hold down on
+                <strong>"IMEI (slot 1)"</strong> to copy the number.
               </span>
             </label>
           </div>
@@ -189,27 +166,26 @@ const result = Astro.getActionResult(actions.wisephones.createWisephone);
               x-mask="999999999999999"
               placeholder="350XXXXXXXXXXXX"
               class="w-full input input-bordered"
-              :class={`
-                input-error: (imei2.length > 0 && imei2.length !== 15) ||
-                (hasBlurredImei && !imeiMatch && imei2.length === 15)
-              `}
-              @blur="validateImei()"
+              :class="{ 'input-error': !isImeiValid && hasBlurredImeiVerification }"
               pattern="[0-9]{15}"
               minlength="15"
               maxlength="15"
               title="Please enter exactly 15 digits"
+              @blur="validateImei(); hasBlurredImeiVerification = true;"
               required
             />
-            <label class="block label">
-              <span
-                x-show="!hasBlurredImei || (hasBlurredImei && imeiMatch)"
-                class="label-text w-fit text-slate-500 [&_strong]:text-slate-500"
-              >
-                This is to ensure you have entered the correct IMEI. If you copied and pasted it, feel free to paste it
-                again.
+            <label
+              class="label"
+              x-show="hasBlurredImei && (imei2.length > 0 && ((imei2.length !== 15) || (imei2.length === 15 && imei1 !== imei2)))"
+            >
+              <span class="label-text-alt text-error" x-show="imei2.length > 0 && imei2.length !== 15">
+                IMEI must be exactly 15 digits
               </span>
-              <span x-show="hasBlurredImei && !imeiMatch && imei2.length === 15" class="text-red-800 label-text-alt">
-                IMEI numbers do not match. Please check your input and try again.
+              <span
+                class="label-text-alt text-error"
+                x-show="imei2.length === 15 && imei1.length === 15 && imei1 !== imei2"
+              >
+                IMEIs don't match
               </span>
             </label>
           </div>
@@ -260,3 +236,49 @@ const result = Astro.getActionResult(actions.wisephones.createWisephone);
     <Footer showLogo={false} />
   </div>
 </Layout>
+
+<script>
+  import Alpine from "alpinejs";
+  import { isValidIMEI } from "@/libs/utils";
+
+  document.addEventListener("alpine:init", () => {
+    Alpine.data("dashboard", () => ({
+      showForm: false,
+      isLoading: false,
+      imei1: "",
+      imei2: "",
+      phoneNumber: "",
+      nickname: "",
+      imeiMatch: false,
+      hasBlurredImei: false,
+      isImeiValid: true,
+
+      validateImei() {
+        this.imeiMatch = this.imei1 === this.imei2;
+
+        if (this.imei1.length === 15) {
+          this.isImeiValid = isValidIMEI(this.imei1);
+        } else {
+          this.isImeiValid = false;
+        }
+      },
+
+      isFormValid() {
+        return (
+          this.isImeiValid &&
+          this.imeiMatch &&
+          this.phoneNumber.replace(/-/g, "").length === 10 &&
+          this.nickname.trim().length > 0
+        );
+      },
+      resetForm() {
+        this.imei1 = "";
+        this.imei2 = "";
+        this.phoneNumber = "";
+        this.nickname = "";
+        this.imeiMatch = false;
+        this.hasBlurredImei = false;
+      }
+    }));
+  });
+</script>

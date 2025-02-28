@@ -1,4 +1,5 @@
 import { KNOX_CLIENT_SECRET, KNOX_CLIENT_ID, KNOX_REGION } from "astro:env/server";
+import { isValidIMEI } from "@/libs/utils";
 
 export type App = {
   appAction: string;
@@ -95,6 +96,20 @@ type KnoxAppListResponse = {
   };
 };
 
+/**
+ * Response structure for Knox API device info
+ */
+export type KnoxDeviceInfoResponse = {
+  resultCode: string;
+  resultMessage: string;
+  resultValue?: {
+    userId?: string;
+    deviceId?: string;
+    imei?: string;
+    [key: string]: any;
+  };
+};
+
 export class SamsungKnoxService {
   private static token: string | null = null;
   private static tokenExpiry: number | null = null;
@@ -151,29 +166,45 @@ export class SamsungKnoxService {
       return null;
     }
 
+    const userId = await this.getUserIdFromImei(imei);
+
+    if (!userId) {
+      throw new Error(`Device with IMEI ${imei} not found`);
+    }
+
     const queryParams = new URLSearchParams({
       groupId,
       applyProfile: applyProfile ? "1" : "0",
-      ...(imei && { userIds: imei })
+      ...(userId && { userIds: userId })
     });
 
     const apiUrl = `https://${KNOX_REGION}.manage.samsungknox.com/emm/oapi/group/insertGroupUnits`;
 
-    const response = await fetch(apiUrl, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${await this.getKnoxToken()}`,
-        "cache-control": "no-cache",
-        "content-type": "application/x-www-form-urlencoded"
-      },
-      body: queryParams
-    });
+    try {
+      const response = await fetch(apiUrl, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${await this.getKnoxToken()}`,
+          "cache-control": "no-cache",
+          "content-type": "application/x-www-form-urlencoded"
+        },
+        body: queryParams
+      });
 
-    if (!response.ok) {
-      throw new Error("Failed to add devices to group");
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        console.error("Knox API error:", errorData);
+        throw new Error(`Failed to add device ${imei} to group ${groupId}: ${response.status} ${response.statusText}`);
+      }
+
+      return response.json();
+    } catch (error) {
+      console.error("Knox feature application error:", error);
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error(`Unknown error applying feature to device ${imei}`);
     }
-
-    return response.json();
   }
 
   public static async removeFeature(
@@ -183,25 +214,43 @@ export class SamsungKnoxService {
   ): Promise<Record<string, any> | null> {
     const apiUrl = `https://${KNOX_REGION}.manage.samsungknox.com/emm/oapi/group/deleteGroupUnits`;
 
-    const response = await fetch(apiUrl, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${await this.getKnoxToken()}`,
-        "cache-control": "no-cache",
-        "content-type": "application/x-www-form-urlencoded"
-      },
-      body: new URLSearchParams({
-        groupId,
-        userIds: imei,
-        applyProfile: applyProfile ? "1" : "0"
-      })
-    });
+    const userId = await this.getUserIdFromImei(imei);
 
-    if (!response.ok) {
-      throw new Error("Failed to remove device from group");
+    if (!userId) {
+      throw new Error(`Device with IMEI ${imei} not found`);
     }
 
-    return response.json();
+    try {
+      const response = await fetch(apiUrl, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${await this.getKnoxToken()}`,
+          "cache-control": "no-cache",
+          "content-type": "application/x-www-form-urlencoded"
+        },
+        body: new URLSearchParams({
+          groupId,
+          userIds: userId,
+          applyProfile: applyProfile ? "1" : "0"
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        console.error("Knox API error:", errorData);
+        throw new Error(
+          `Failed to remove device ${imei} from group ${groupId}: ${response.status} ${response.statusText}`
+        );
+      }
+
+      return response.json();
+    } catch (error) {
+      console.error("Knox feature removal error:", error);
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error(`Unknown error removing feature from device ${imei}`);
+    }
   }
 
   public static async selectGroups(): Promise<Record<string, any> | null> {
@@ -313,6 +362,60 @@ export class SamsungKnoxService {
     }
 
     return response.json();
+  }
+
+  /**
+   * Get user ID from IMEI number
+   * @param imei - The IMEI number of the device
+   * @returns The user ID or null if not found
+   */
+  public static async getUserIdFromImei(imei: string): Promise<string | null> {
+    if (!imei) {
+      console.error("Empty IMEI provided");
+      throw new Error("IMEI is required");
+    }
+
+    // Validate IMEI format using our utility function
+    if (!isValidIMEI(imei)) {
+      console.error(`Invalid IMEI format or checksum: ${imei}`);
+      throw new Error(`Invalid IMEI: ${imei}. IMEI must be a valid 15-digit number.`);
+    }
+
+    const apiUrl = `https://${KNOX_REGION}.manage.samsungknox.com/emm/oapi/device/selectDeviceInfoByImei`;
+
+    try {
+      const response = await fetch(apiUrl, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${await this.getKnoxToken()}`,
+          "cache-control": "no-cache",
+          "content-type": "application/x-www-form-urlencoded"
+        },
+        body: new URLSearchParams({ imei })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        console.error("Knox API error:", errorData);
+        throw new Error(`Failed to fetch Knox device info for IMEI ${imei}: ${response.status} ${response.statusText}`);
+      }
+
+      const data = (await response.json()) as KnoxDeviceInfoResponse;
+
+      if (data.resultCode !== "0") {
+        // Log the specific error code and message from Knox API
+        console.error(`Knox API returned non-success code: ${data.resultCode} - ${data.resultMessage}`);
+        return null;
+      }
+
+      return data.resultValue?.userId ?? null;
+    } catch (error) {
+      console.error("Error fetching device info:", error);
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error(`Unknown error fetching device info for IMEI ${imei}`);
+    }
   }
 
   /**

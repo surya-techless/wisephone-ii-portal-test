@@ -1036,3 +1036,41 @@ export const FAITH_TOOLS_APPS: { id: number; Name: string; "Play Store URL": str
     "Play Store URL": "https://play.google.com/store/apps/details?id=com.fishmy.android"
   }
 ];
+
+/**
+ * Validates an IMEI number
+ * @param imei - The IMEI number to validate
+ * @returns Boolean indicating whether the IMEI is valid
+ */
+export function isValidIMEI(imei: string | number): boolean {
+  const imeiString = String(imei);
+
+  // Basic format check: IMEI should be 15 digits
+  if (!/^\d{15}$/.test(imeiString)) {
+    return false;
+  }
+
+  // Luhn algorithm check for IMEI validation
+  let sum = 0;
+  let shouldDouble = false;
+
+  // Start from the rightmost digit and work left
+  for (let i = imeiString.length - 1; i >= 0; i--) {
+    let digit = parseInt(imeiString.charAt(i));
+
+    // Double every second digit
+    if (shouldDouble) {
+      digit *= 2;
+      // If doubling results in a two-digit number, add the digits together
+      if (digit > 9) {
+        digit -= 9;
+      }
+    }
+
+    sum += digit;
+    shouldDouble = !shouldDouble;
+  }
+
+  // Valid IMEI numbers should have a sum that's a multiple of 10
+  return sum % 10 === 0;
+}
