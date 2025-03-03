@@ -27,14 +27,47 @@ if (userId) {
         <p class="max-w-sm text-sm text-center text-slate-500 text-balance">
           If this is your first time accessing the portal, please create a new account.
         </p>
-        <div class="flex items-center gap-3">
+        <div class="flex items-center gap-3" x-data="{ showAgeModal: false, isOver18: false }">
           <SignedOut>
-            <SignInButton asChild mode="modal" forceRedirectUrl="/dashboard">
+            <SignInButton mode="modal" forceRedirectUrl="/dashboard" asChild>
               <button class="btn btn-primary">Sign in</button>
             </SignInButton>
-            <SignUpButton asChild mode="modal" forceRedirectUrl="/dashboard">
-              <button class="btn btn-ghost">Sign up</button>
-            </SignUpButton>
+            <button class="btn btn-ghost" @click="showAgeModal = true">Sign up</button>
+
+            <!-- Age Verification Modal -->
+            <dialog id="age_verification_modal" class="modal" :open="showAgeModal">
+              <div class="modal-box">
+                <h3 class="text-lg font-bold mb-4">Before we get started</h3>
+
+                <form method="dialog" class="space-y-6" @submit.prevent>
+                  <div class="form-control">
+                    <label class="grid grid-cols-[1fr_auto] cursor-pointer label items-start justify-start gap-3">
+                      <input
+                        type="checkbox"
+                        x-model="isOver18"
+                        class="checkbox checkbox-primary border-2 border-slate-200 hover:border-slate-200 [&:checked]:border-[var(--evergreen)]"
+                        style="--chkbg: var(--evergreen); --chkfg: white;"
+                      />
+                      <span class="label-text"
+                        >I certify that I am 18 years of age or older and will only add myself and/or my children, who
+                        are under 18 and my legal dependents, to this account. I understand that I am responsible for
+                        managing all devices on my account.
+                      </span>
+                    </label>
+                  </div>
+
+                  <div class="modal-action flex gap-2">
+                    <button class="btn btn-ghost" @click="showAgeModal = false">Cancel</button>
+                    <SignUpButton mode="modal" forceRedirectUrl="/dashboard" asChild>
+                      <button class="btn btn-primary" :disabled="!isOver18">Sign up</button>
+                    </SignUpButton>
+                  </div>
+                </form>
+              </div>
+              <form method="dialog" class="modal-backdrop bg-[#000000ba]">
+                <button @click="showAgeModal = false">close</button>
+              </form>
+            </dialog>
           </SignedOut>
           <SignedIn>
             <a href="/dashboard" class="btn btn-primary">Go to Dashboard</a>
