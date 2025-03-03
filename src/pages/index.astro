@@ -27,12 +27,29 @@ if (userId) {
         <p class="max-w-sm text-sm text-center text-slate-500 text-balance">
           If this is your first time accessing the portal, please create a new account.
         </p>
-        <div class="flex items-center gap-3" x-data="{ showAgeModal: false, isOver18: false }">
+        <div class="flex items-center gap-3" x-data="{ showAgeModal: false, isOver18: $persist(false) }">
           <SignedOut>
             <SignInButton mode="modal" forceRedirectUrl="/dashboard" asChild>
-              <button class="btn btn-primary">Sign in</button>
+              <button
+                x-cloak
+                x-show="isOver18"
+                @click="showAgeModal = false"
+                class="btn btn-primary"
+                :disabled="!isOver18">Sign in</button
+              >
             </SignInButton>
-            <button class="btn btn-ghost" @click="showAgeModal = true">Sign up</button>
+            <SignUpButton mode="modal" forceRedirectUrl="/dashboard" asChild>
+              <button
+                x-cloak
+                x-show="isOver18"
+                @click="showAgeModal = false"
+                class="btn btn-ghost"
+                :disabled="!isOver18">Sign up</button
+              >
+            </SignUpButton>
+            <button x-cloak x-transition x-show="!isOver18" @click="showAgeModal = true" class="btn btn-primary"
+              >Get Started</button
+            >
 
             <!-- Age Verification Modal -->
             <dialog id="age_verification_modal" class="modal" :open="showAgeModal">
@@ -57,15 +74,15 @@ if (userId) {
                   </div>
 
                   <div class="modal-action flex gap-2">
-                    <button class="btn btn-ghost" @click="showAgeModal = false">Cancel</button>
-                    <SignUpButton mode="modal" forceRedirectUrl="/dashboard" asChild>
-                      <button class="btn btn-primary" :disabled="!isOver18">Sign up</button>
-                    </SignUpButton>
+                    <button class="btn btn-ghost" @click="showAgeModal = false; isOver18 = false">Cancel</button>
+                    <button class="btn btn-primary" :disabled="!isOver18" @click="showAgeModal = false; isOver18 = true"
+                      >Continue</button
+                    >
                   </div>
                 </form>
               </div>
               <form method="dialog" class="modal-backdrop bg-[#000000ba]">
-                <button @click="showAgeModal = false">close</button>
+                <button @click="showAgeModal = false; isOver18 = false">close</button>
               </form>
             </dialog>
           </SignedOut>
