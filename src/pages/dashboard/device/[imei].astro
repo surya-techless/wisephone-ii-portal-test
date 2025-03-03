@@ -1,5 +1,7 @@
 ---
 import { Wisephone, and, eq, db, BypassTechlessSubscription } from "astro:db";
+import { getUser } from "@/libs/clerk";
+import type { UserResource } from "@clerk/types";
 import { actions, type ActionInputError } from "astro:actions";
 import Icon from "astro-iconify";
 import Layout from "@/layouts/Layout.astro";
@@ -8,6 +10,7 @@ import Footer from "@/components/Footer.astro";
 import { FEATURES, FAITH_TOOLS_APPS, getPackageNameFromPlayStoreUrl, isValidIMEI } from "@/libs/utils";
 import { isAdmin } from "@/lib/auth/permissions";
 import type { AppsList } from "@/types/apps";
+import type { User } from "@clerk/astro/server";
 
 // Initialize variables with default values
 let imei: string | undefined = Astro.params.imei;
@@ -22,12 +25,13 @@ let sortedAppsList = {};
 let wisephones: (typeof Wisephone.$inferSelect)[] = [];
 let userIsAdmin = false;
 let isMyDevice = false;
+let user: UserResource | User | null = null;
 
 if (!Astro.locals.auth().userId) {
   return Astro.redirect("/");
 }
 
-const user = await Astro.locals.currentUser();
+user = await Astro.locals.currentUser();
 
 if (!user) {
   return Astro.redirect("/");
@@ -73,6 +77,10 @@ try {
 
   if (wisephone?.userId === userId) {
     isMyDevice = true;
+  }
+
+  if (userIsAdmin) {
+    user = await getUser(wisephone?.userId || "");
   }
 
   // Safety check - if wisephone is null or undefined, redirect to dashboard with error
@@ -198,6 +206,8 @@ try {
     "/dashboard?error=" + encodeURIComponent("An unexpected error occurred while loading the device. Please try again.")
   );
 }
+
+const userLink = `https://dashboard.clerk.com/apps/app_2rgOMLhYVKnV7kDDmTmy5elyOoW/instances/${import.meta.env.PROD ? "ins_2sRMEF9vIDPPQfI3z5DxjoeNrft" : "ins_2rgOMRgBb9ZJsjjQM3Cd8OpuycZ"}/users/${user?.id}`;
 ---
 
 <Layout title="Device Features" description="Manage the features of your Wisephone II device.">
@@ -238,6 +248,25 @@ try {
               You may update the features of this device, but please be mindful that any changes made will result in a
               notification being sent to the device owner that an update was made.
             </p>
+
+            <br />
+
+            <p class="m-0">This Wisephone is managed by:</p>
+
+            <ul class="my-0">
+              <li>
+                <a href={userLink} target="_blank" class="flex items-center gap-1 m-0 font-medium underline-offset-4">
+                  {user?.firstName} {user?.lastName}
+                  <Icon name="lucide:external-link" class="w-4 h-4" />
+                </a>
+              </li>
+              {user?.emailAddresses[0]?.emailAddress ? (
+                <li class="select-all">{user?.emailAddresses[0]?.emailAddress}</li>
+              ) : null}
+              {user?.phoneNumbers[0]?.phoneNumber ? (
+                <li class="select-all">{user?.phoneNumbers[0]?.phoneNumber}</li>
+              ) : null}
+            </ul>
           </div>
         </div>
       )

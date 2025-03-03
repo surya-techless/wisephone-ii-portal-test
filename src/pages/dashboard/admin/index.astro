@@ -514,7 +514,7 @@ if (!(await isAdmin(user.id))) {
       init() {
         this.fetchWisephones();
 
-        this.$watch("searchQuery", (value) => this.handleSearch());
+        this.$watch("searchQuery", (_value) => this.handleSearch());
       },
 
       async fetchWisephones() {
