@@ -23,7 +23,7 @@ export async function checkSubscription(phoneNumber: string, imei: string): Prom
     const formattedPhone = phoneNumber.replace(/[^0-9+]/g, "");
 
     // Create the subscription check URL
-    const subscribedUrl = new URL("/webhook-is-user-subscribed", "https://cameronpak-wisephoneii.web.val.run");
+    const subscribedUrl = new URL("/webhook-is-user-subscribed", "https://api.getwisephone.com/");
     subscribedUrl.searchParams.set("phoneNumber", formattedPhone);
     subscribedUrl.searchParams.set("imei", imei);
 

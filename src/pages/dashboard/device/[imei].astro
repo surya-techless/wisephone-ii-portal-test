@@ -90,7 +90,7 @@ try {
 
   if (!isSubscribed && wisephone?.phoneNumber) {
     try {
-      const subscribedUrl = new URL(`/webhook-is-user-subscribed`, "https://cameronpak-wisephoneii.web.val.run");
+      const subscribedUrl = new URL(`/webhook-is-user-subscribed`, "https://api.getwisephone.com/");
       // Phone numbers are stored as XXX-XXX-XXXX, but the webhook expects XXXXXXXXXX
       subscribedUrl.searchParams.set("phoneNumber", `${wisephone?.phoneNumber?.replace(/[^0-9+]/g, "") || ""}`);
       subscribedUrl.searchParams.set("imei", String(wisephone?.imei || ""));
