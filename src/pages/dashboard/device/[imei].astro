@@ -88,6 +88,44 @@ try {
 
   isSubscribed = bypassTechlessSubscription.length > 0;
 
+  if (!isSubscribed && wisephone?.phoneNumber) {
+    try {
+      const subscribedUrl = new URL(`/webhook-is-user-subscribed`, "https://cameronpak-wisephoneii.web.val.run");
+      // Phone numbers are stored as XXX-XXX-XXXX, but the webhook expects XXXXXXXXXX
+      subscribedUrl.searchParams.set("phoneNumber", `${wisephone?.phoneNumber?.replace(/[^0-9+]/g, "") || ""}`);
+      subscribedUrl.searchParams.set("imei", String(wisephone?.imei || ""));
+
+      console.log("Subscribed URL:", subscribedUrl);
+      try {
+        const result = await fetch(subscribedUrl, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json"
+          }
+        });
+
+        console.log("Subscription check result:", result);
+
+        if (result.ok) {
+          const isSubscribedText = await result.text();
+
+          if (isSubscribedText.includes("bypass") || isSubscribedText.includes("is subscribed")) {
+            isSubscribed = true;
+          }
+        } else {
+          console.error(`Subscription check failed with status: ${result.status}`);
+          // Continue with isSubscribed = false instead of crashing
+        }
+      } catch (fetchError) {
+        console.error("Fetch error during subscription check:", fetchError);
+        // Continue with isSubscribed = false
+      }
+    } catch (subscriptionError) {
+      console.error("Error checking subscription status:", subscriptionError);
+      // Continue with isSubscribed = false instead of crashing
+    }
+  }
+
   // Retrieve admin user data with proper error handling
   if (userIsAdmin) {
     try {
@@ -942,40 +980,6 @@ const userLink = user?.id
           this.showErrorToast("Failed to load Tool Drawer apps");
         } finally {
           this.isToolDrawerLoading = false;
-        }
-      },
-
-      async checkSubscriptionStatus() {
-        // Only check the subscription API if not already marked as subscribed
-        if (!this.isSubscribed && this.phoneNumber) {
-          try {
-            const subscribedUrl = new URL(`/webhook-is-user-subscribed`, "https://cameronpak-wisephoneii.web.val.run");
-            // Phone numbers are stored as XXX-XXX-XXXX, but the webhook expects XXXXXXXXXX
-            subscribedUrl.searchParams.set("phoneNumber", `${this.phoneNumber.replace(/[^0-9+]/g, "") || ""}`);
-            subscribedUrl.searchParams.set("imei", String(this.imei || ""));
-
-            try {
-              const result = await fetch(subscribedUrl, {
-                method: "GET"
-              });
-
-              if (result.ok) {
-                const isSubscribedText = await result.text();
-                if (isSubscribedText.includes("bypass") || isSubscribedText.includes("is subscribed")) {
-                  this.isSubscribed = true;
-                }
-              } else {
-                console.error(`Subscription check failed with status: ${result.status}`);
-                // Continue with isSubscribed = false instead of crashing
-              }
-            } catch (fetchError) {
-              console.error("Fetch error during subscription check:", fetchError);
-              // Continue with isSubscribed = false
-            }
-          } catch (subscriptionError) {
-            console.error("Error checking subscription status:", subscriptionError);
-            // Continue with isSubscribed = false instead of crashing
-          }
         }
       },
 
