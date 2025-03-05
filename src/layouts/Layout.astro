@@ -28,13 +28,14 @@ const {
 <!doctype html>
 <html
   x-data={`{
-    toastMessage: '${message}',
-    toastErrorMessage: '${error}'
+    toastMessage: \`${message}\`,
+    toastErrorMessage: \`${error}\`,
+    init() {
+      if (this.toastMessage || this.toastErrorMessage) {
+        history.replaceState({}, '', window.location.pathname);
+      }
+    }
   }`}
-  x-init={`
-    // remove URL params from the URL for message and error
-    history.replaceState({}, '', window.location.pathname);
-  `}
   lang="en"
   class="min-h-screen bg-slate-50"
 >
@@ -171,10 +172,3 @@ const {
     </div>
   </body>
 </html>
-
-<script>
-  // @ts-ignore
-  import * as htmx from "htmx.org";
-
-  window.htmx = htmx;
-</script>

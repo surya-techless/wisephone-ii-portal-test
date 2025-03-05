@@ -27,8 +27,8 @@ const result = Astro.getActionResult(actions.wisephones.createWisephone);
     class="container h-full p-6 mx-auto prose"
     x-data="dashboard"
     x-init={`
-      toastErrorMessage = \`${result?.error?.message || ""}\` || toastErrorMessage;
-      toastMessage = \`${result?.data?.success || ""}\` || toastMessage;
+      toastErrorMessage = \`${result?.error?.message.toString() || ""}\` || toastErrorMessage;
+      toastMessage = \`${result?.data?.success.toString() || ""}\` || toastMessage;
     `}
   >
     <progress
