@@ -115,7 +115,6 @@ export const updateUnreachableAlpineState = ({
 
 export const getPackageNameFromPlayStoreUrl = (playStoreUrl: string): string => {
   if (!playStoreUrl) {
-    console.error("No play store url provided");
     return "";
   }
 

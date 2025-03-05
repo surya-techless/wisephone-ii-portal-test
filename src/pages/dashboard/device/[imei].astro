@@ -1,5 +1,5 @@
 ---
-import { Wisephone, and, eq, db, BypassTechlessSubscription } from "astro:db";
+import { BypassTechlessSubscription, Wisephone, sql, and, eq, db } from "astro:db";
 import { getUser } from "@/libs/clerk";
 import type { UserResource } from "@clerk/types";
 import { actions, type ActionInputError } from "astro:actions";
@@ -58,14 +58,14 @@ try {
     wisephones = await db
       .select()
       .from(Wisephone)
-      .where(eq(Wisephone.imei, Number(imei)))
+      .where(sql`${Wisephone.imei} = ${imei}`)
       .limit(1);
   } else {
     // Admin users can see all devices
     wisephones = await db
       .select()
       .from(Wisephone)
-      .where(and(eq(Wisephone.imei, Number(imei)), eq(Wisephone.userId, user.id)))
+      .where(and(sql`${Wisephone.imei} = ${imei}`, eq(Wisephone.userId, user.id)))
       .limit(1);
   }
 
@@ -79,15 +79,6 @@ try {
     isMyDevice = true;
   }
 
-  if (userIsAdmin) {
-    user = await getUser(wisephone?.userId || "");
-  }
-
-  // Safety check - if wisephone is null or undefined, redirect to dashboard with error
-  if (!wisephone) {
-    return Astro.redirect("/dashboard?error=" + encodeURIComponent("Device information could not be loaded"));
-  }
-
   // Check for bypass subscription first
   const bypassTechlessSubscription = await db
     .select()
@@ -97,48 +88,24 @@ try {
 
   isSubscribed = bypassTechlessSubscription.length > 0;
 
-  // Only check the subscription API if not already marked as subscribed
-  if (!isSubscribed && wisephone?.phoneNumber) {
+  // Retrieve admin user data with proper error handling
+  if (userIsAdmin) {
     try {
-      const subscribedUrl = new URL(`/webhook-is-user-subscribed`, "https://cameronpak-wisephoneii.web.val.run");
-      // Phone numbers are stored as XXX-XXX-XXXX, but the webhook expects XXXXXXXXXX
-      subscribedUrl.searchParams.set("phoneNumber", `${wisephone.phoneNumber.replace(/[^0-9+]/g, "") || ""}`);
-      subscribedUrl.searchParams.set("imei", String(wisephone?.imei || ""));
-
-      // Use AbortController to add timeout functionality
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
-
-      try {
-        const result = await fetch(subscribedUrl, {
-          method: "GET",
-          signal: controller.signal
-        });
-
-        clearTimeout(timeoutId);
-
-        if (result.ok) {
-          const isSubscribedText = await result.text();
-          if (isSubscribedText.includes("bypass") || isSubscribedText.includes("is subscribed")) {
-            isSubscribed = true;
-          }
-        } else {
-          console.error(`Subscription check failed with status: ${result.status}`);
-          // Continue with isSubscribed = false instead of crashing
-        }
-      } catch (fetchError) {
-        clearTimeout(timeoutId);
-        if (fetchError instanceof Error && fetchError.name === "AbortError") {
-          console.error("Subscription check timed out after 5 seconds");
-        } else {
-          console.error("Fetch error during subscription check:", fetchError);
-        }
-        // Continue with isSubscribed = false
+      // Only attempt to get user if we have a valid userId
+      if (wisephone?.userId && typeof wisephone.userId === "string") {
+        user = await getUser(wisephone.userId);
+      } else {
+        console.warn("No valid userId found for wisephone:", wisephone);
       }
-    } catch (subscriptionError) {
-      console.error("Error checking subscription status:", subscriptionError);
-      // Continue with isSubscribed = false instead of crashing
+    } catch (userError) {
+      console.error("Error retrieving user data:", userError);
+      // Keep user = current user as fallback
     }
+  }
+
+  // Safety check - if wisephone is null or undefined, redirect to dashboard with error
+  if (!wisephone) {
+    return Astro.redirect("/dashboard?error=" + encodeURIComponent("Device information could not be loaded"));
   }
 
   const result = Astro.getActionResult(actions.wisephones.updateWisephone);
@@ -207,7 +174,9 @@ try {
   );
 }
 
-const userLink = `https://dashboard.clerk.com/apps/app_2rgOMLhYVKnV7kDDmTmy5elyOoW/instances/${import.meta.env.PROD ? "ins_2sRMEF9vIDPPQfI3z5DxjoeNrft" : "ins_2rgOMRgBb9ZJsjjQM3Cd8OpuycZ"}/users/${user?.id}`;
+const userLink = user?.id
+  ? `https://dashboard.clerk.com/apps/app_2rgOMLhYVKnV7kDDmTmy5elyOoW/instances/${import.meta.env.PROD ? "ins_2sRMEF9vIDPPQfI3z5DxjoeNrft" : "ins_2rgOMRgBb9ZJsjjQM3Cd8OpuycZ"}/users/${user.id}`
+  : "#";
 ---
 
 <Layout title="Device Features" description="Manage the features of your Wisephone II device.">
@@ -215,17 +184,16 @@ const userLink = `https://dashboard.clerk.com/apps/app_2rgOMLhYVKnV7kDDmTmy5elyO
     class="container p-6 mx-auto prose"
     x-data="device"
     x-init={`
-      const safeAppsListJson = ${JSON.stringify(sortedAppsList || {})};
       installedApps = ${JSON.stringify(installedApps || [])};
-      appsList = typeof safeAppsListJson === 'object' ? safeAppsListJson : {};
-      imei = "${imei || ""}";
+      appsList = ${JSON.stringify(sortedAppsList || {})};
+      imei = \`${imei || ""}\`;
       isSubscribed = ${Boolean(isSubscribed)};
       nickname = \`${(wisephone?.nickname || "").replace(/`/g, "'")}\`;
       phoneNumber = \`${(wisephone?.phoneNumber || "").replace(/`/g, "'")}\`;
       originalNickname = \`${(wisephone?.nickname || "").replace(/`/g, "'")}\`;
       originalPhoneNumber = \`${(wisephone?.phoneNumber || "").replace(/`/g, "'")}\`;
-      toastErrorMessage = "${(error || "").replace(/"/g, '\\"')}";
-      toastMessage = "${(success || "").replace(/"/g, '\\"')}";
+      toastErrorMessage = \`${(error || "").replace(/"/g, '\\"')}\`;
+      toastMessage = \`${(success || "").replace(/"/g, '\\"')}\`;
     `}
   >
     <progress
@@ -254,18 +222,21 @@ const userLink = `https://dashboard.clerk.com/apps/app_2rgOMLhYVKnV7kDDmTmy5elyO
             <p class="m-0">This Wisephone is managed by:</p>
 
             <ul class="my-0">
-              <li>
-                <a href={userLink} target="_blank" class="flex items-center gap-1 m-0 font-medium underline-offset-4">
-                  {user?.firstName} {user?.lastName}
-                  <Icon name="lucide:external-link" class="w-4 h-4" />
-                </a>
-              </li>
-              {user?.emailAddresses[0]?.emailAddress ? (
-                <li class="select-all">{user?.emailAddresses[0]?.emailAddress}</li>
+              {user?.id && (
+                <li>
+                  <a href={userLink} target="_blank" class="flex items-center gap-1 m-0 font-medium underline-offset-4">
+                    {user?.firstName || "Unknown"} {user?.lastName || "User"}
+                    <Icon name="lucide:external-link" class="w-4 h-4" />
+                  </a>
+                </li>
+              )}
+              {user?.emailAddresses && user.emailAddresses[0]?.emailAddress ? (
+                <li class="select-all">{user.emailAddresses[0].emailAddress}</li>
               ) : null}
-              {user?.phoneNumbers[0]?.phoneNumber ? (
-                <li class="select-all">{user?.phoneNumbers[0]?.phoneNumber}</li>
+              {user?.phoneNumbers && user.phoneNumbers[0]?.phoneNumber ? (
+                <li class="select-all">{user.phoneNumbers[0].phoneNumber}</li>
               ) : null}
+              {!user?.id && <li class="text-gray-500">User information unavailable</li>}
             </ul>
           </div>
         </div>
@@ -465,136 +436,134 @@ const userLink = `https://dashboard.clerk.com/apps/app_2rgOMLhYVKnV7kDDmTmy5elyO
 
       {/* @TODO: Can this install apps with Play Store hidden? */}
       {/* @TODO: Make search do imperfect matching */}
-      {
-        isSubscribed ? (
-          <section x-show="isToolDrawerEnabled || isFaithToolsEnabled" x-cloak x-collapse>
-            <div class="flex items-center justify-between mb-4">
-              <h2 class="text-2xl font-bold">
-                Manage Apps <span class="text-sm font-normal text-slate-500">(beta)</span>
-              </h2>
+      <section x-show="isSubscribed && (isToolDrawerEnabled || isFaithToolsEnabled)" x-cloak x-collapse>
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-2xl font-bold">
+            Manage Apps <span class="text-sm font-normal text-slate-500">(beta)</span>
+          </h2>
+        </div>
+
+        <div class="shadow rounded-2xl not-prose">
+          <div
+            class="w-full grid rounded-t-2xl grid-rows-2 gap-3 top-0 z-10 bg-white bg-[var(--surface-secondary)] transition-transform py-6 pb-4 px-6 text-base border-b border-[var(--surface-tertiary)]"
+          >
+            <input
+              type="text"
+              class="w-full input input-bordered"
+              x-model.debounce.200ms="appSearchQuery"
+              placeholder="Search for an app"
+            />
+            <div role="tablist" class="max-sm:hidden bg-slate-100 tabs tabs-boxed h-fit">
+              <a
+                role="tab"
+                class="tab"
+                x-show="isToolDrawerEnabled"
+                x-cloak
+                x-bind:class="{ 'tab-active !bg-[var(--evergreen)] !text-white': currentView === 'tool-drawer' }"
+                @click="currentView = 'tool-drawer'"
+              >
+                Tool Drawer
+              </a>
+              <a
+                role="tab"
+                class="tab"
+                x-show="isFaithToolsEnabled"
+                x-cloak
+                x-bind:class="{ 'tab-active !bg-[var(--evergreen)] !text-white': currentView === 'faith-tools' }"
+                @click="currentView = 'faith-tools'"
+              >
+                faith.tools
+              </a>
+              <a
+                role="tab"
+                class="tab"
+                x-bind:class="{ 'tab-active !bg-[var(--evergreen)] !text-white': currentView === 'installed' }"
+                @click="currentView = 'installed'"
+              >
+                Installed
+              </a>
             </div>
 
-            <div class="shadow rounded-2xl not-prose">
-              <div class="w-full grid rounded-t-2xl grid-rows-2 gap-3 top-0 z-10 bg-white bg-[var(--surface-secondary)] transition-transform py-6 pb-4 px-6 text-base border-b border-[var(--surface-tertiary)]">
-                <input
-                  type="text"
-                  class="w-full input input-bordered"
-                  x-model.debounce.200ms="appSearchQuery"
-                  placeholder="Search for an app"
-                />
-                <div role="tablist" class="max-sm:hidden bg-slate-100 tabs tabs-boxed h-fit">
+            {/* Make a select input for the tabs on mobile */}
+            <select
+              @change="currentView = $event.target.value"
+              class="sm:hidden w-full border-2 !border-[var(--surface-tertiary)] select select-bordered"
+              x-model="currentView"
+            >
+              <option value="tool-drawer">Tool Drawer</option>
+              <option value="faith-tools">faith.tools</option>
+              <option value="installed">Installed</option>
+            </select>
+          </div>
+
+          <ul class="list-item-container !rounded-none max-h-[425px] overflow-y-auto">
+            <template x-for="app in filteredApps">
+              <li class="list-item !grid !bg-white grid-cols-[1fr_auto] items-center justify-between gap-2">
+                <div class="flex flex-col gap-1">
+                  {/* I don't want people to click on the link and get distracted on mobile. */}
                   <a
-                    role="tab"
-                    class="tab"
-                    x-show="isToolDrawerEnabled"
-                    x-cloak
-                    x-bind:class="{ 'tab-active !bg-[var(--evergreen)] !text-white': currentView === 'tool-drawer' }"
-                    @click="currentView = 'tool-drawer'"
+                    class="no-underline max-sm:pointer-events-none underline-offset-4 hover:underline"
+                    x-bind:href="'https://play.google.com/store/apps/details?id=' + app.packageName"
+                    target="_blank"
                   >
-                    Tool Drawer
-                  </a>
-                  <a
-                    role="tab"
-                    class="tab"
-                    x-show="isFaithToolsEnabled"
-                    x-cloak
-                    x-bind:class="{ 'tab-active !bg-[var(--evergreen)] !text-white': currentView === 'faith-tools' }"
-                    @click="currentView = 'faith-tools'"
-                  >
-                    faith.tools
-                  </a>
-                  <a
-                    role="tab"
-                    class="tab"
-                    x-bind:class="{ 'tab-active !bg-[var(--evergreen)] !text-white': currentView === 'installed' }"
-                    @click="currentView = 'installed'"
-                  >
-                    Installed
+                    <p x-text="app.name" class="line-clamp-2"></p>
                   </a>
                 </div>
 
-                {/* Make a select input for the tabs on mobile */}
-                <select
-                  @change="currentView = $event.target.value"
-                  class="sm:hidden w-full border-2 !border-[var(--surface-tertiary)] select select-bordered"
-                  x-model="currentView"
-                >
-                  <option value="tool-drawer">Tool Drawer</option>
-                  <option value="faith-tools">faith.tools</option>
-                  <option value="installed">Installed</option>
-                </select>
-              </div>
+                <div class="grid" style="grid-template-areas: 'stack'">
+                  <button
+                    x-data="{ isInstalling: false }"
+                    x-show="!app.installed"
+                    @click="isInstalling = true; await installApp(app.packageName); isInstalling = false"
+                    class="relative btn btn-ghost btn-circle disabled:cursor-not-allowed"
+                    style="grid-area: stack"
+                  >
+                    <Icon name="lucide:plus" class="w-5 h-5" />
+                    <span
+                      x-transition
+                      x-show="isInstalling"
+                      class="absolute top-auto bottom-auto left-auto right-auto loading loading-spinner loading-sm"
+                    ></span>
+                  </button>
 
-              <ul class="list-item-container !rounded-none max-h-[425px] overflow-y-auto">
-                <template x-for="app in filteredApps">
-                  <li class="list-item !grid !bg-white grid-cols-[1fr_auto] items-center justify-between gap-2">
-                    <div class="flex flex-col gap-1">
-                      {/* I don't want people to click on the link and get distracted on mobile. */}
-                      <a
-                        class="no-underline max-sm:pointer-events-none underline-offset-4 hover:underline"
-                        x-bind:href="'https://play.google.com/store/apps/details?id=' + app.packageName"
-                        target="_blank"
-                      >
-                        <p x-text="app.name" class="line-clamp-2" />
-                      </a>
-                    </div>
+                  <button
+                    x-data="{ isLoading: false }"
+                    x-show="app.installed"
+                    x-cloak
+                    @click="isLoading = true; await uninstallApp(app.packageName); isLoading = false"
+                    class="relative btn btn-ghost btn-circle disabled:cursor-not-allowed"
+                    style="grid-area: stack"
+                  >
+                    <Icon name="lucide:trash-2" class="w-5 h-5 text-red-800" />
+                    <span
+                      x-transition
+                      x-show="isLoading"
+                      class="absolute top-auto bottom-auto left-auto right-auto loading loading-spinner loading-sm"
+                    ></span>
+                  </button>
+                </div>
+              </li>
+            </template>
 
-                    <div class="grid" style="grid-template-areas: 'stack'">
-                      <button
-                        x-data="{ isInstalling: false }"
-                        x-show="!app.installed"
-                        @click="isInstalling = true; await installApp(app.packageName); isInstalling = false"
-                        class="relative btn btn-ghost btn-circle disabled:cursor-not-allowed"
-                        style="grid-area: stack"
-                      >
-                        <Icon name="lucide:plus" class="w-5 h-5" />
-                        <span
-                          x-transition
-                          x-show="isInstalling"
-                          class="absolute top-auto bottom-auto left-auto right-auto loading loading-spinner loading-sm"
-                        />
-                      </button>
-
-                      <button
-                        x-data="{ isLoading: false }"
-                        x-show="app.installed"
-                        x-cloak
-                        @click="isLoading = true; await uninstallApp(app.packageName); isLoading = false"
-                        class="relative btn btn-ghost btn-circle disabled:cursor-not-allowed"
-                        style="grid-area: stack"
-                      >
-                        <Icon name="lucide:trash-2" class="w-5 h-5 text-red-800" />
-                        <span
-                          x-transition
-                          x-show="isLoading"
-                          class="absolute top-auto bottom-auto left-auto right-auto loading loading-spinner loading-sm"
-                        />
-                      </button>
-                    </div>
-                  </li>
-                </template>
-
-                <li
-                  class="bg-white bg-[var(--surface-secondary)] transition-transform py-4 px-6 text-base border-b border-[var(--surface-tertiary)] text-slate-500"
-                  x-transition
-                  x-show="!filteredApps.length && appSearchQuery"
-                  x-cloak
-                >
-                  <p>
-                    No apps found for "<span x-text="appSearchQuery" />"
-                  </p>
-                  <p class="mt-3" x-show="!isFaithToolsEnabled && appSearchQuery.toLowerCase().includes('bible')">
-                    Looking for a Bible? Turn on faith.tools integration.
-                  </p>
-                  <a class="mt-4 btn btn-primary" href="https://getwisephone.com/request-app" target="_blank">
-                    Request an app
-                  </a>
-                </li>
-              </ul>
-            </div>
-          </section>
-        ) : null
-      }
+            <li
+              class="bg-white bg-[var(--surface-secondary)] transition-transform py-4 px-6 text-base border-b border-[var(--surface-tertiary)] text-slate-500"
+              x-transition
+              x-show="!filteredApps.length && appSearchQuery"
+              x-cloak
+            >
+              <p>
+                No apps found for "<span x-text="appSearchQuery"></span>"
+              </p>
+              <p class="mt-3" x-show="!isFaithToolsEnabled && appSearchQuery.toLowerCase().includes('bible')">
+                Looking for a Bible? Turn on faith.tools integration.
+              </p>
+              <a class="mt-4 btn btn-primary" href="https://getwisephone.com/request-app" target="_blank">
+                Request an app
+              </a>
+            </li>
+          </ul>
+        </div>
+      </section>
       <form
         method="POST"
         action={actions.wisephones.deleteWisephone}
@@ -973,6 +942,40 @@ const userLink = `https://dashboard.clerk.com/apps/app_2rgOMLhYVKnV7kDDmTmy5elyO
           this.showErrorToast("Failed to load Tool Drawer apps");
         } finally {
           this.isToolDrawerLoading = false;
+        }
+      },
+
+      async checkSubscriptionStatus() {
+        // Only check the subscription API if not already marked as subscribed
+        if (!this.isSubscribed && this.phoneNumber) {
+          try {
+            const subscribedUrl = new URL(`/webhook-is-user-subscribed`, "https://cameronpak-wisephoneii.web.val.run");
+            // Phone numbers are stored as XXX-XXX-XXXX, but the webhook expects XXXXXXXXXX
+            subscribedUrl.searchParams.set("phoneNumber", `${this.phoneNumber.replace(/[^0-9+]/g, "") || ""}`);
+            subscribedUrl.searchParams.set("imei", String(this.imei || ""));
+
+            try {
+              const result = await fetch(subscribedUrl, {
+                method: "GET"
+              });
+
+              if (result.ok) {
+                const isSubscribedText = await result.text();
+                if (isSubscribedText.includes("bypass") || isSubscribedText.includes("is subscribed")) {
+                  this.isSubscribed = true;
+                }
+              } else {
+                console.error(`Subscription check failed with status: ${result.status}`);
+                // Continue with isSubscribed = false instead of crashing
+              }
+            } catch (fetchError) {
+              console.error("Fetch error during subscription check:", fetchError);
+              // Continue with isSubscribed = false
+            }
+          } catch (subscriptionError) {
+            console.error("Error checking subscription status:", subscriptionError);
+            // Continue with isSubscribed = false instead of crashing
+          }
         }
       },
 

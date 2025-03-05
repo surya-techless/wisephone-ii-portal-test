@@ -1,7 +1,7 @@
 import type { APIRoute } from "astro";
-import { db, Wisephone, eq, BypassTechlessSubscription } from "astro:db";
+import { db, Wisephone, eq, BypassTechlessSubscription, sql } from "astro:db";
 import { isAdmin } from "@/lib/auth/permissions";
-
+import { captureException } from "@sentry/astro";
 export const POST: APIRoute = async ({ locals, request }) => {
   try {
     // Check if user is authenticated
@@ -61,7 +61,11 @@ export const POST: APIRoute = async ({ locals, request }) => {
     }
 
     // Check if wisephone exists
-    const existingWisephone = await db.select().from(Wisephone).where(eq(Wisephone.imei, imei)).get();
+    const existingWisephone = await db
+      .select()
+      .from(Wisephone)
+      .where(sql`${Wisephone.imei} = ${imei}`)
+      .get();
 
     if (!existingWisephone) {
       return new Response(JSON.stringify({ error: "Wisephone not found" }), {
@@ -78,7 +82,7 @@ export const POST: APIRoute = async ({ locals, request }) => {
         phoneNumber,
         userId: wisephoneUserId
       })
-      .where(eq(Wisephone.imei, imei))
+      .where(sql`${Wisephone.imei} = ${imei}`)
       .returning()
       .get();
 
@@ -120,6 +124,7 @@ export const POST: APIRoute = async ({ locals, request }) => {
       }
     );
   } catch (error) {
+    captureException(error);
     console.error("Error updating wisephone:", error);
     return new Response(
       JSON.stringify({

@@ -14,7 +14,10 @@ export enum UserRole {
  * @returns Promise that resolves to boolean indicating if user is an admin
  */
 export async function isAdmin(userId: string): Promise<boolean> {
-  if (!userId) return false;
+  if (!userId) {
+    console.error("No user ID provided");
+    return false;
+  }
 
   try {
     // Query the UserPermission table for this user

@@ -1,6 +1,6 @@
 import { defineAction, ActionError } from "astro:actions";
 import { z } from "astro:schema";
-import { db, Wisephone, eq } from "astro:db";
+import { db, Wisephone, eq, sql } from "astro:db";
 import { SamsungKnoxService } from "@/libs/samsung-knox-service";
 
 export const wisephones = {
@@ -44,7 +44,11 @@ export const wisephones = {
     }),
     handler: async ({ imei }) => {
       try {
-        const wisephone = await db.select().from(Wisephone).where(eq(Wisephone.imei, imei)).get();
+        const wisephone = await db
+          .select()
+          .from(Wisephone)
+          .where(sql`${Wisephone.imei} = ${imei}`)
+          .get();
 
         if (!wisephone) {
           throw new ActionError({
@@ -108,7 +112,7 @@ export const wisephones = {
         const updatedWisephone = await db
           .update(Wisephone)
           .set(input)
-          .where(eq(Wisephone.imei, input.imei))
+          .where(sql`${Wisephone.imei} = ${input.imei}`)
           .returning()
           .get();
 
@@ -140,7 +144,11 @@ export const wisephones = {
     }),
     handler: async ({ imei }) => {
       try {
-        const deletedWisephone = await db.delete(Wisephone).where(eq(Wisephone.imei, imei)).returning().get();
+        const deletedWisephone = await db
+          .delete(Wisephone)
+          .where(sql`${Wisephone.imei} = ${imei}`)
+          .returning()
+          .get();
 
         if (!deletedWisephone) {
           throw new ActionError({
@@ -186,7 +194,11 @@ export const wisephones = {
     handler: async (input) => {
       try {
         // First verify the Wisephone exists
-        const wisephone = await db.select().from(Wisephone).where(eq(Wisephone.imei, input.imei)).get();
+        const wisephone = await db
+          .select()
+          .from(Wisephone)
+          .where(sql`${Wisephone.imei} = ${input.imei}`)
+          .get();
 
         if (!wisephone) {
           throw new ActionError({
@@ -228,7 +240,11 @@ export const wisephones = {
     handler: async (input) => {
       try {
         // First verify the Wisephone exists
-        const wisephone = await db.select().from(Wisephone).where(eq(Wisephone.imei, input.imei)).get();
+        const wisephone = await db
+          .select()
+          .from(Wisephone)
+          .where(sql`${Wisephone.imei} = ${input.imei}`)
+          .get();
 
         if (!wisephone) {
           throw new ActionError({
@@ -266,7 +282,11 @@ export const wisephones = {
     handler: async ({ imei }) => {
       try {
         // First verify the Wisephone exists
-        const wisephone = await db.select().from(Wisephone).where(eq(Wisephone.imei, imei)).get();
+        const wisephone = await db
+          .select()
+          .from(Wisephone)
+          .where(sql`${Wisephone.imei} = ${imei}`)
+          .get();
 
         if (!wisephone) {
           throw new ActionError({
@@ -300,7 +320,11 @@ export const wisephones = {
     handler: async ({ imei }) => {
       try {
         // First verify the Wisephone exists
-        const wisephone = await db.select().from(Wisephone).where(eq(Wisephone.imei, imei)).get();
+        const wisephone = await db
+          .select()
+          .from(Wisephone)
+          .where(sql`${Wisephone.imei} = ${imei}`)
+          .get();
 
         if (!wisephone) {
           throw new ActionError({

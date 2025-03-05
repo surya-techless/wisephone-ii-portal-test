@@ -1,7 +1,8 @@
 // src/pages/api/wisephones/delete.ts
 import type { APIRoute } from "astro";
-import { db, Wisephone, eq, BypassTechlessSubscription } from "astro:db";
+import { db, Wisephone, eq, sql, BypassTechlessSubscription } from "astro:db";
 import { isAdmin } from "@/lib/auth/permissions";
+import { captureException } from "@sentry/astro";
 
 export const POST: APIRoute = async ({ locals, request }) => {
   try {
@@ -43,7 +44,11 @@ export const POST: APIRoute = async ({ locals, request }) => {
     }
 
     // Check if wisephone exists
-    const existingWisephone = await db.select().from(Wisephone).where(eq(Wisephone.imei, imei)).get();
+    const existingWisephone = await db
+      .select()
+      .from(Wisephone)
+      .where(sql`${Wisephone.imei} = ${imei}`)
+      .get();
 
     if (!existingWisephone) {
       return new Response(JSON.stringify({ error: "Wisephone not found" }), {
@@ -53,7 +58,7 @@ export const POST: APIRoute = async ({ locals, request }) => {
     }
 
     // Delete the wisephone
-    await db.delete(Wisephone).where(eq(Wisephone.imei, imei));
+    await db.delete(Wisephone).where(sql`${Wisephone.imei} = ${imei}`);
 
     // Also delete any bypass entries for this IMEI
     await db.delete(BypassTechlessSubscription).where(eq(BypassTechlessSubscription.imei, imei));
@@ -68,6 +73,7 @@ export const POST: APIRoute = async ({ locals, request }) => {
       }
     );
   } catch (error) {
+    captureException(error);
     console.error("Error deleting wisephone:", error);
     return new Response(
       JSON.stringify({

@@ -1,5 +1,6 @@
 import type { APIRoute } from "astro";
 import { fetchOttogridData } from "@/libs/ottogrid";
+import { captureException } from "@sentry/astro";
 
 /**
  * This endpoint manually refreshes the Tool Drawer cache.
@@ -43,6 +44,7 @@ export const GET: APIRoute = async ({ request }) => {
       }
     );
   } catch (error) {
+    captureException(error);
     console.error("Error refreshing cache:", error);
     return new Response(
       JSON.stringify({

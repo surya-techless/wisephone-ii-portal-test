@@ -1,4 +1,5 @@
 import type { APIRoute } from "astro";
+import { captureException } from "@sentry/astro";
 import { fetchOttogridData } from "@/libs/ottogrid";
 
 export const GET: APIRoute = async ({ request }) => {
@@ -21,6 +22,7 @@ export const GET: APIRoute = async ({ request }) => {
       }
     });
   } catch (error) {
+    captureException(error);
     console.error("Error in ottogrid API route:", error);
     return new Response(JSON.stringify({ error: "Failed to fetch tool drawer data" }), {
       status: 500,

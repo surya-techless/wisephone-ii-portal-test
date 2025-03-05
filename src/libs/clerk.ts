@@ -1,4 +1,5 @@
-import { PUBLIC_CLERK_PUBLISHABLE_KEY, CLERK_SECRET_KEY } from "astro:env/server";
+import { CLERK_SECRET_KEY } from "astro:env/server";
+import { PUBLIC_CLERK_PUBLISHABLE_KEY } from "astro:env/client";
 import { createClerkClient } from "@clerk/astro/server";
 
 const clerk = createClerkClient({
@@ -8,6 +9,12 @@ const clerk = createClerkClient({
 
 export async function getUser(userId: string) {
   try {
+    // If userId is empty or not a string, return null immediately
+    if (!userId || typeof userId !== "string") {
+      console.warn("Invalid or missing userId provided to getUser:", userId);
+      return null;
+    }
+
     const user = await clerk.users.getUser(userId);
     return user;
   } catch (error) {

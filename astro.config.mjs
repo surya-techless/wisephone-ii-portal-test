@@ -34,17 +34,14 @@ export default defineConfig({
   },
   output: "server",
   adapter: netlify(),
-  experimental: {
-    serverIslands: true,
-    env: {
-      schema: {
-        PUBLIC_CLERK_PUBLISHABLE_KEY: envField.string({ context: "server", access: "public" }),
-        CLERK_SECRET_KEY: envField.string({ context: "server", access: "secret" }),
-        KNOX_REGION: envField.string({ context: "server", access: "public" }),
-        KNOX_CLIENT_ID: envField.string({ context: "server", access: "secret" }),
-        KNOX_CLIENT_SECRET: envField.string({ context: "server", access: "secret" }),
-        OTTOGRID_API_KEY: envField.string({ context: "server", access: "secret" })
-      }
+  env: {
+    schema: {
+      PUBLIC_CLERK_PUBLISHABLE_KEY: envField.string({ context: "server", access: "public" }),
+      CLERK_SECRET_KEY: envField.string({ context: "server", access: "secret" }),
+      KNOX_REGION: envField.string({ context: "server", access: "public" }),
+      KNOX_CLIENT_ID: envField.string({ context: "server", access: "secret" }),
+      KNOX_CLIENT_SECRET: envField.string({ context: "server", access: "secret" }),
+      OTTOGRID_API_KEY: envField.string({ context: "server", access: "secret" })
     }
   }
 });

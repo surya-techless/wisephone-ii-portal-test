@@ -1,6 +1,7 @@
 import type { APIRoute } from "astro";
 import { db, BypassTechlessSubscription, sql } from "astro:db";
 import { isAdmin } from "@/lib/auth/permissions";
+import { captureException } from "@sentry/astro";
 
 export const GET: APIRoute = async ({ locals, params }) => {
   try {
@@ -49,6 +50,7 @@ export const GET: APIRoute = async ({ locals, params }) => {
       headers: { "Content-Type": "application/json" }
     });
   } catch (error) {
+    captureException(error);
     console.error("Error fetching bypass status:", error);
     return new Response(
       JSON.stringify({
