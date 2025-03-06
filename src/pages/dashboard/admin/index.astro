@@ -82,36 +82,28 @@ if (!(await isAdmin(user.id))) {
             </div>
 
             <!-- Subscription Result Display -->
-            <div class="mt-4" x-show="subscriptionResult !== null" x-cloak x-collapse>
+            <div class="mt-4" x-show="isSubscribed !== null" x-cloak x-collapse>
               <div
                 class="p-4 rounded-lg"
                 :class={`{
-                  'bg-green-100 text-green-800': subscriptionResult?.status === 'subscribed',
-                  'bg-red-100 text-red-800': subscriptionResult?.status === 'not-subscribed'
+                  'bg-green-100 text-green-800': isSubscribed,
+                  'bg-red-100 text-red-800': !isSubscribed
                 }`}
               >
                 <div class="flex items-center gap-2">
                   <span
                     class="text-lg"
                     :class={`{
-                      'text-green-600': subscriptionResult?.status === 'subscribed',
-                      'text-red-600': subscriptionResult?.status === 'not-subscribed'
+                      'text-green-600': isSubscribed,
+                      'text-red-600': !isSubscribed
                     }`}
                   >
-                    <template x-if="subscriptionResult?.status === 'subscribed'">✓</template>
-                    <template x-if="subscriptionResult?.status === 'not-subscribed'">✗</template>
+                    <template x-if="isSubscribed">✓</template>
+                    <template x-if="!isSubscribed">✗</template>
                   </span>
                   <div class="flex-1">
-                    <p
-                      class="p-0 m-0 font-medium whitespace-normal"
-                      x-show="subscriptionResult?.status === 'subscribed'"
-                    >
-                      Active Subscription Found
-                    </p>
-                    <p
-                      class="p-0 m-0 font-medium break-words whitespace-normal"
-                      x-show="subscriptionResult?.status === 'not-subscribed'"
-                    >
+                    <p class="p-0 m-0 font-medium whitespace-normal" x-show="isSubscribed">Active Subscription Found</p>
+                    <p class="p-0 m-0 font-medium break-words whitespace-normal" x-show="!isSubscribed">
                       No Active Subscription Found for that IMEI and phone number combination
                     </p>
                   </div>
@@ -139,7 +131,7 @@ if (!(await isAdmin(user.id))) {
                   type="button"
                   class="btn btn-ghost"
                   @click="resetForm()"
-                  x-show="hasBeenSubmitted && (phoneNumber || imei || subscriptionResult || subscriptionError)"
+                  x-show="hasBeenSubmitted && (phoneNumber || imei || isSubscribed !== null || subscriptionError)"
                   x-transition
                 >
                   Reset
@@ -468,7 +460,7 @@ if (!(await isAdmin(user.id))) {
 </Layout>
 
 <script>
-  import { checkSubscription, type SubscriptionCheckResult } from "@/lib/subscriptions/checkSubscription";
+  import { validateIsSubscribed } from "@/libs/stripe";
   import Alpine from "alpinejs";
 
   // Define TypeScript interfaces for our components
@@ -489,7 +481,7 @@ if (!(await isAdmin(user.id))) {
       isLoading: false,
       phoneNumber: "",
       imei: "",
-      subscriptionResult: null as SubscriptionCheckResult | null,
+      isSubscribed: null as boolean | null,
       subscriptionError: null as string | null,
       hasBeenSubmitted: false,
       wisephones: [] as Wisephone[],
@@ -765,14 +757,13 @@ if (!(await isAdmin(user.id))) {
           this.isLoading = true;
           // @ts-ignore - Alpine methods
           this.$dispatch("loading-start");
-          this.subscriptionResult = null;
           this.subscriptionError = null;
 
           // Call the utility function - explicitly import to avoid errors
-          const result = await checkSubscription(this.phoneNumber, this.imei);
+          const isSubscribed = await validateIsSubscribed({ phoneNumber: this.phoneNumber, imei: this.imei });
 
           // Set the result
-          this.subscriptionResult = result;
+          this.isSubscribed = isSubscribed;
           this.hasBeenSubmitted = true;
         } catch (error) {
           console.error("Subscription check failed:", error);
@@ -788,7 +779,7 @@ if (!(await isAdmin(user.id))) {
       resetForm() {
         this.phoneNumber = "";
         this.imei = "";
-        this.subscriptionResult = null;
+        this.isSubscribed = null;
         this.subscriptionError = null;
         this.isLoading = false;
         this.hasBeenSubmitted = false;
