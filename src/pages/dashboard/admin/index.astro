@@ -759,6 +759,8 @@ if (!(await isAdmin(user.id))) {
           this.$dispatch("loading-start");
           this.subscriptionError = null;
 
+          // @TODO - Add a check to see if they have bypassed subscription
+
           // Call the utility function - explicitly import to avoid errors
           const isSubscribed = await validateIsSubscribed({ phoneNumber: this.phoneNumber, imei: this.imei });
 
