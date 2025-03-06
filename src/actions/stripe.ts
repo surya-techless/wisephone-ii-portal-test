@@ -13,7 +13,9 @@ const stripeInstance = new Stripe(
   }
 );
 
-const TECHLESS_SUBSCRIPTION_PRICE_ID = "price_1Q1BZYATGtdZ0VDD72eOr0Cm";
+const TECHLESS_SUBSCRIPTION_PRICE_ID = import.meta.env.PROD
+  ? "price_1Q0nXWATGtdZ0VDDDU27pLKx"
+  : "price_1Q1BZYATGtdZ0VDD72eOr0Cm";
 
 export const stripe = {
   createSubscriptionPage: defineAction({
