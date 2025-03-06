@@ -31,6 +31,7 @@
     "@iconify-json/lucide-lab": "^1.2.0",
     "@netlify/functions": "^3.0.0",
     "@sentry/astro": "^9.2.0",
+    "@stripe/stripe-js": "^5.9.2",
     "alpinejs": "^3.14.1",
     "astro": "^5.4.2",
     "astro-iconify": "^1.2.0",
@@ -41,8 +42,10 @@
     "htmx.org": "2.0.1",
     "isbot": "^5.1.17",
     "isomorphic-dompurify": "^2.15.0",
+    "js-confetti": "^0.12.0",
     "lottie-web": "^5.12.2",
     "marked": "^14.1.2",
+    "stripe": "^17.7.0",
     "trix": "^2.1.6",
     "uqr": "^0.1.2"
   },

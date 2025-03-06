@@ -1,0 +1,77 @@
+---
+interface Props {
+  customerEmail: string;
+  deviceIMEI: string;
+}
+
+const { customerEmail, deviceIMEI } = Astro.props as Props;
+---
+
+<div
+  x-data="stripe"
+  x-init={`
+    customerEmail = \`${customerEmail}\`;
+    deviceIMEI = \`${deviceIMEI}\`;
+  `}
+>
+  <button class="btn btn-primary" :disabled="!isLoaded" @click="handleClick">Activate Subscription</button>
+  <dialog x-ref="stripeDialog" id="stripe-dialog" class="modal">
+    <div style="background-color: rgb(247, 246, 242)" class="modal-box">
+      <div id="stripe-element"></div>
+    </div>
+    <form method="dialog" class="modal-backdrop">
+      <button>close</button>
+    </form>
+  </dialog>
+</div>
+
+<script>
+  import { loadStripe, type Stripe } from "@stripe/stripe-js";
+  import { actions } from "astro:actions";
+  import Alpine from "alpinejs";
+  import { STRIPE_PUBLIC_KEY } from "@/libs/utils";
+
+  document.addEventListener("alpine:init", () => {
+    Alpine.data("stripe", function () {
+      return {
+        customerEmail: "",
+        deviceIMEI: "",
+        isLoaded: false,
+        isEmbedded: false,
+        stripeInstance: undefined as Stripe | undefined,
+        sessionClientSecret: undefined as string | undefined,
+        async handleClick() {
+          if (!this.sessionClientSecret) {
+            const data = await actions.stripe.createSubscriptionPage.orThrow({
+              customerEmail: this.customerEmail,
+              deviceIMEI: this.deviceIMEI
+            });
+            this.sessionClientSecret = data.session.client_secret as string;
+          }
+
+          if (!this.isEmbedded) {
+            const checkout = await this.stripeInstance?.initEmbeddedCheckout({
+              clientSecret: this.sessionClientSecret
+            });
+            checkout?.mount("#stripe-element");
+            this.isEmbedded = true;
+          }
+
+          (this.$refs.stripeDialog as HTMLDialogElement).showModal();
+        },
+        async initializeStripe() {
+          const stripe = await loadStripe(STRIPE_PUBLIC_KEY);
+          if (!stripe) {
+            throw new Error("Stripe is not loaded");
+          }
+
+          this.stripeInstance = stripe;
+          this.isLoaded = true;
+        },
+        init() {
+          this.initializeStripe();
+        }
+      };
+    });
+  });
+</script>

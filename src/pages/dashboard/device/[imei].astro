@@ -2,15 +2,17 @@
 import { BypassTechlessSubscription, Wisephone, sql, and, eq, db } from "astro:db";
 import { getUser } from "@/libs/clerk";
 import type { UserResource } from "@clerk/types";
+import type { User } from "@clerk/astro/server";
 import { actions, type ActionInputError } from "astro:actions";
 import Icon from "astro-iconify";
+import { validateIsSubscribed } from "@/libs/stripe";
 import Layout from "@/layouts/Layout.astro";
 import Header from "@/components/Header.astro";
 import Footer from "@/components/Footer.astro";
+import TechlessSubscriptionButton from "@/components/TechlessSubscriptionButton.astro";
 import { FEATURES, FAITH_TOOLS_APPS, getPackageNameFromPlayStoreUrl, isValidIMEI } from "@/libs/utils";
 import { isAdmin } from "@/lib/auth/permissions";
 import type { AppsList } from "@/types/apps";
-import type { User } from "@clerk/astro/server";
 
 // Initialize variables with default values
 let imei: string | undefined = Astro.params.imei;
@@ -90,36 +92,10 @@ try {
 
   if (!isSubscribed && wisephone?.phoneNumber) {
     try {
-      const subscribedUrl = new URL(`/webhook-is-user-subscribed`, "https://api.getwisephone.com/");
-      // Phone numbers are stored as XXX-XXX-XXXX, but the webhook expects XXXXXXXXXX
-      subscribedUrl.searchParams.set("phoneNumber", `${wisephone?.phoneNumber?.replace(/[^0-9+]/g, "") || ""}`);
-      subscribedUrl.searchParams.set("imei", String(wisephone?.imei || ""));
-
-      console.log("Subscribed URL:", subscribedUrl);
-      try {
-        const result = await fetch(subscribedUrl, {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json"
-          }
-        });
-
-        console.log("Subscription check result:", result);
-
-        if (result.ok) {
-          const isSubscribedText = await result.text();
-
-          if (isSubscribedText.includes("bypass") || isSubscribedText.includes("is subscribed")) {
-            isSubscribed = true;
-          }
-        } else {
-          console.error(`Subscription check failed with status: ${result.status}`);
-          // Continue with isSubscribed = false instead of crashing
-        }
-      } catch (fetchError) {
-        console.error("Fetch error during subscription check:", fetchError);
-        // Continue with isSubscribed = false
-      }
+      isSubscribed = await validateIsSubscribed({
+        imei: String(wisephone?.imei || ""),
+        phoneNumber: `${wisephone?.phoneNumber?.replace(/[^0-9+]/g, "") || ""}`
+      });
     } catch (subscriptionError) {
       console.error("Error checking subscription status:", subscriptionError);
       // Continue with isSubscribed = false instead of crashing
@@ -379,11 +355,19 @@ const userLink = user?.id
           <Icon name="lucide:info" class="w-4 h-4" />
 
           <div>
-            <p>
-              <a href="https://wisephone.com/pages/activate" target="_blank" class="font-medium link text-slate-800"
-                >Activate a Techless Subscription</a
-              > to update this device's features.
+            <h3 class="text-xl font-bold !m-0">Next Step</h3>
+            <p class="mb-2">
+              Activate a Techless Subscription to unlock your Wisephone's full potential. <a
+                class="link underline-offset-2 text-slate-500"
+                href="https://wisephone.com/pages/plans"
+                target="_blank">Learn more</a
+              >
             </p>
+
+            <TechlessSubscriptionButton
+              deviceIMEI={wisephone?.imei || ""}
+              customerEmail={user?.emailAddresses[0]?.emailAddress || ""}
+            />
 
             <details
               class="w-full mt-3 transition-all duration-150 ease-in-out"
@@ -624,6 +608,7 @@ const userLink = user?.id
 <script>
   import Alpine from "alpinejs";
   import { actions } from "astro:actions";
+  import JSConfetti from "js-confetti";
   import {
     type Feature,
     updateUnreachableAlpineState,
@@ -983,10 +968,43 @@ const userLink = user?.id
         }
       },
 
+      showConfetti() {
+        const confetti = new JSConfetti();
+        confetti.addConfetti();
+      },
+
+      async validateStripeSession() {
+        const sessionId = new URLSearchParams(window.location.search).get("session_id");
+        if (!sessionId) {
+          return;
+        }
+
+        // Remove the session_id url param
+        const url = new URL(window.location.href);
+        url.searchParams.delete("session_id");
+        window.history.replaceState({}, "", url.toString());
+
+        const session = await actions.stripe.validateSubscription.orThrow({ sessionId, imei: this.imei });
+        if (!session) {
+          return;
+        }
+
+        if (session.isSubscribed) {
+          this.showSuccessToast("Congratulations! You're subscribed.");
+          this.isSubscribed = true;
+          this.showConfetti();
+        } else {
+          this.showErrorToast("Subscription validation failed. Please try again.");
+        }
+      },
+
       async init() {
-        this.$watch("imei", async () => {
+        this.$watch("imei", async (value) => {
           try {
             await this.getFeatures();
+            if (this.imei) {
+              this.validateStripeSession();
+            }
           } catch (error) {
             console.error("Failed to load features:", error);
           } finally {

@@ -47,6 +47,10 @@ interface ImportMetaEnv {
   readonly OTTOGRID_API_KEY: string;
   /** https://docs.sentry.io/platforms/javascript/guides/astro/#configure */
   readonly SENTRY_AUTH_TOKEN: string;
+  /** https://docs.stripe.com/api */
+  readonly STRIPE_SECRET_KEY: string;
+  /** https://developers.gigs.com/ */
+  readonly GIGS_API_KEY: string;
 }
 
 interface ImportMeta {

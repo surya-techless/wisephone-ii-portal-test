@@ -20,6 +20,9 @@ const wisephones = await db.select().from(Wisephone).where(eq(Wisephone.userId, 
 const derivedHasNoWisephone = wisephones.length === 0;
 
 const result = Astro.getActionResult(actions.wisephones.createWisephone);
+if (result?.data?.success && result?.data?.wisephone?.imei) {
+  return Astro.redirect(`/dashboard/device/${result.data.wisephone.imei.toString().padEnd(15, "0")}`);
+}
 ---
 
 <Layout title="Dashboard" description="Manage your Wisephone II devices.">

@@ -1078,3 +1078,7 @@ export function isValidIMEI(imei: string | number): boolean {
   // Valid IMEI numbers should have a sum that's a multiple of 10
   return sum % 10 === 0;
 }
+
+export const STRIPE_PUBLIC_KEY = import.meta.env.PROD
+  ? "pk_live_51H2HO9ATGtdZ0VDDSWdTIkdOIDgT98W2wHukewQ8E2eMrUtkFGSUBiieGHM2HIxvqeYXP4bgHIT8E8pySI57En1T00q4Lov4Yy"
+  : "pk_test_51H2HO9ATGtdZ0VDDAmDRcW7ybhQo0QQeKyGg61wQIoA0JisO5MvCyuu213xEEFIs4tEU8hbgbl1YyY8oiGbEhAQh00RPI0ElVC";
