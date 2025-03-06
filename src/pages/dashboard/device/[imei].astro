@@ -534,13 +534,25 @@ const userLink = user?.id
 
                 <div class="grid" style="grid-template-areas: 'stack'">
                   <button
-                    x-data="{ isInstalling: false }"
+                    x-data={`{
+                      isInstalling: false,
+                      async handleClick() {
+                        isLoading = true;
+                        if (confirm('Are you sure you want to install ' + app.name + '?')) {
+                          this.isInstalling = true;
+                          await installApp(app.packageName);
+                        }
+                        this.isInstalling = false;
+                        isLoading = false;
+                      }
+                    }`}
                     x-show="!app.installed"
-                    @click="isInstalling = true; await installApp(app.packageName); isInstalling = false"
-                    class="relative btn btn-ghost btn-circle disabled:cursor-not-allowed"
+                    @click="handleClick()"
+                    class="relative btn btn-outline rounded-full border-slate-200 border-2 hover:border-slate-300 hover:bg-slate-100 hover:text-slate-800 disabled:cursor-not-allowed"
                     style="grid-area: stack"
                   >
-                    <Icon name="lucide:plus" class="w-5 h-5" />
+                    <Icon name="lucide:download" class="w-5 h-5" />
+                    Install App
                     <span
                       x-transition
                       x-show="isInstalling"
@@ -549,17 +561,29 @@ const userLink = user?.id
                   </button>
 
                   <button
-                    x-data="{ isLoading: false }"
+                    x-data={`{
+                      isUninstalling: false,
+                      async handleClick() {
+                        isLoading = true;
+                        if (confirm('Are you sure you want to uninstall ' + app.name + '?')) {
+                          this.isUninstalling = true;
+                          await uninstallApp(app.packageName)
+                        }
+                        this.isUninstalling = false;
+                        isLoading = false;
+                      }
+                    }`}
                     x-show="app.installed"
                     x-cloak
-                    @click="isLoading = true; await uninstallApp(app.packageName); isLoading = false"
-                    class="relative btn btn-ghost btn-circle disabled:cursor-not-allowed"
+                    @click="handleClick()"
+                    class="relative btn btn-outline rounded-full text-red-800 border-slate-200 border-2 hover:border-slate-300 hover:bg-slate-100 hover:text-red-800 disabled:cursor-not-allowed"
                     style="grid-area: stack"
                   >
                     <Icon name="lucide:trash-2" class="w-5 h-5 text-red-800" />
+                    Uninstall App
                     <span
                       x-transition
-                      x-show="isLoading"
+                      x-show="isUninstalling"
                       class="absolute top-auto bottom-auto left-auto right-auto loading loading-spinner loading-sm"
                     ></span>
                   </button>
