@@ -1033,6 +1033,11 @@ export const FAITH_TOOLS_APPS: { id: number; Name: string; "Play Store URL": str
     id: 2050,
     Name: "Daily Bible Devotion & Prayer",
     "Play Store URL": "https://play.google.com/store/apps/details?id=com.fishmy.android"
+  },
+  {
+    id: 2243,
+    Name: "iBreviary",
+    "Play Store URL": "https://play.google.com/store/apps/details?id=com.netguru.ibreviary&hl=en"
   }
 ];
 
