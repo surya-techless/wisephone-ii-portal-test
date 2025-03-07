@@ -460,7 +460,7 @@ if (!(await isAdmin(user.id))) {
 </Layout>
 
 <script>
-  import { validateIsSubscribed } from "@/libs/stripe";
+  import { actions } from "astro:actions";
   import Alpine from "alpinejs";
 
   // Define TypeScript interfaces for our components
@@ -762,10 +762,13 @@ if (!(await isAdmin(user.id))) {
           // @TODO - Add a check to see if they have bypassed subscription
 
           // Call the utility function - explicitly import to avoid errors
-          const isSubscribed = await validateIsSubscribed({ phoneNumber: this.phoneNumber, imei: this.imei });
+          const result = await actions.wisephones.validateIsUserSubscribed.orThrow({
+            phoneNumber: this.phoneNumber,
+            imei: this.imei
+          });
 
           // Set the result
-          this.isSubscribed = isSubscribed;
+          this.isSubscribed = result.isSubscribed || false;
           this.hasBeenSubmitted = true;
         } catch (error) {
           console.error("Subscription check failed:", error);

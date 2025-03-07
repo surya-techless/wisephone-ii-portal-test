@@ -2,6 +2,7 @@ import { defineAction, ActionError } from "astro:actions";
 import { z } from "astro:schema";
 import { db, Wisephone, eq, sql } from "astro:db";
 import { SamsungKnoxService } from "@/libs/samsung-knox-service";
+import { validateIsSubscribed } from "@/libs/stripe";
 
 export const wisephones = {
   // Create a new Wisephone
@@ -346,6 +347,21 @@ export const wisephones = {
           message: `Failed to sync installed apps list: ${error instanceof Error ? error.message : "Unknown error"}`
         });
       }
+    }
+  }),
+
+  validateIsUserSubscribed: defineAction({
+    input: z.object({
+      imei: z.string(),
+      phoneNumber: z.string().min(12).max(12)
+    }),
+    handler: async (input) => {
+      const isSubscribed = await validateIsSubscribed({ phoneNumber: input.phoneNumber, imei: input.imei });
+
+      return {
+        success: "User is subscribed",
+        isSubscribed
+      };
     }
   })
 };
