@@ -15,7 +15,7 @@ export const wisephones = {
     }),
     handler: async (input) => {
       try {
-        const newWisephone = await db.insert(Wisephone).values(input).returning().get();
+        const newWisephone = await db.insert(Wisephone).values(input).returning();
 
         return {
           success: "Wisephone created successfully!",
