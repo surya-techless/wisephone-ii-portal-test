@@ -1,4 +1,5 @@
 ---
+import { actions, type ActionInputError } from "astro:actions";
 import Icon from "astro-iconify";
 import Header from "@/components/Header.astro";
 import Layout from "@/layouts/Layout.astro";
@@ -18,10 +19,25 @@ if (!user) {
 if (!(await isAdmin(user.id))) {
   return Astro.redirect("/");
 }
+
+const result = Astro.getActionResult(actions.wisephones.forceUpdateDevice);
+const error = [result?.error as ActionInputError<typeof actions.wisephones.forceUpdateDevice>]
+  .filter(Boolean)
+  .flatMap((err) => err.issues.map((issue) => issue.message))
+  .join("\n");
+
+const success = [result?.data?.success as string].filter(Boolean).join("\n");
 ---
 
 <Layout title="Dashboard" description="Manage your Wisephone II devices.">
-  <div class="container h-full p-6 mx-auto prose" x-data="appState">
+  <div
+    class="container h-full p-6 mx-auto prose"
+    x-data="appState"
+    x-init={`
+      toastErrorMessage = \`${(error || "").replace(/"/g, '\\"')}\`;
+      toastMessage = \`${(success || "").replace(/"/g, '\\"')}\`;
+    `}
+  >
     <progress
       x-show="isLoading"
       x-cloak
@@ -33,6 +49,7 @@ if (!(await isAdmin(user.id))) {
 
     <main class="flex flex-col gap-6 py-12">
       <h1>Admin</h1>
+
       <section class="w-full">
         <form class="p-6 bg-white shadow-sm rounded-2xl" @submit.prevent="checkSubscription()">
           <div class="flex flex-col gap-4 p-0">
@@ -91,16 +108,6 @@ if (!(await isAdmin(user.id))) {
                 }`}
               >
                 <div class="flex items-center gap-2">
-                  <span
-                    class="text-lg"
-                    :class={`{
-                      'text-green-600': isSubscribed,
-                      'text-red-600': !isSubscribed
-                    }`}
-                  >
-                    <template x-if="isSubscribed">✓</template>
-                    <template x-if="!isSubscribed">✗</template>
-                  </span>
                   <div class="flex-1">
                     <p class="p-0 m-0 font-medium whitespace-normal" x-show="isSubscribed">Active Subscription Found</p>
                     <p class="p-0 m-0 font-medium break-words whitespace-normal" x-show="!isSubscribed">
@@ -139,6 +146,46 @@ if (!(await isAdmin(user.id))) {
               </div>
             </div>
           </div>
+        </form>
+      </section>
+
+      <section class="mt-12">
+        <form
+          method="POST"
+          x-data="{ imei: '' }"
+          class="p-6 bg-white shadow-sm rounded-2xl"
+          action={actions.wisephones.forceUpdateDevice}
+        >
+          <h2>Force Update Phone</h2>
+          <p>Updates the device to the latest WiseOS version and forces it to pull in updates from Samsung Knox.</p>
+
+          <div class="mt-4 form-control">
+            <input
+              type="text"
+              x-model.trim="imei"
+              x-mask="999999999999999"
+              name="imei"
+              placeholder="350XXXXXXXXXXXX"
+              pattern="[0-9]{15}"
+              minlength="15"
+              maxlength="15"
+              class="w-full input input-bordered"
+              :class="{ 'input-error': imei.length > 0 && imei.length !== 15 }"
+              required
+            />
+            <label class="label" x-show="imei.length > 0 && imei.length !== 15">
+              <span class="label-text-alt text-error">Please enter a valid 15-digit IMEI number</span>
+            </label>
+          </div>
+
+          <button
+            type="submit"
+            class="mt-6 btn btn-primary"
+            :disabled="imei.length !== 15 || isLoading"
+            :class="{ 'btn-disabled': imei.length !== 15 || isLoading }"
+          >
+            Force Update</button
+          >
         </form>
       </section>
 

@@ -695,4 +695,44 @@ export class SamsungKnoxService {
 
     return data;
   }
+
+  public static async pushProfile(imei: string): Promise<{
+    resultCode: string;
+    resultMessage: string;
+    resultValue: any;
+  }> {
+    const deviceId = await this.getDeviceIdFromImei(imei);
+
+    if (!deviceId) {
+      throw new Error("Device not found");
+    }
+
+    const apiUrl = `https://${KNOX_REGION}.manage.samsungknox.com/emm/oapi/mdm/commonOTCServiceWrapper/sendDeviceControlForUpdateProfile`;
+
+    const params = new URLSearchParams({
+      deviceId
+    });
+
+    const response = await fetch(apiUrl, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${await this.getKnoxToken()}`,
+        "cache-control": "no-cache",
+        "content-type": "application/x-www-form-urlencoded"
+      },
+      body: params
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to push profile");
+    }
+
+    const data = await response.json();
+
+    if (!data.resultValue) {
+      throw new Error("Failed to push profile");
+    }
+
+    return data;
+  }
 }

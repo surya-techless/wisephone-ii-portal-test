@@ -3,6 +3,7 @@ import { z } from "astro:schema";
 import { db, Wisephone, eq, sql } from "astro:db";
 import { SamsungKnoxService } from "@/libs/samsung-knox-service";
 import { validateIsSubscribed } from "@/libs/stripe";
+import { isValidIMEI } from "@/libs/utils";
 
 export const wisephones = {
   // Create a new Wisephone
@@ -361,6 +362,37 @@ export const wisephones = {
       return {
         success: "User is subscribed",
         isSubscribed
+      };
+    }
+  }),
+
+  forceUpdateDevice: defineAction({
+    accept: "form",
+    input: z.object({
+      imei: z.string()
+    }),
+    handler: async ({ imei }) => {
+      if (!isValidIMEI(imei)) {
+        throw new ActionError({
+          code: "BAD_REQUEST",
+          message: "Invalid IMEI"
+        });
+      }
+
+      // Pushing the profile updates tells the device to pull in the latest updates from Knox.
+      const pushProfileResult = await SamsungKnoxService.pushProfile(imei.toString());
+
+      // Force install the latest WiseOS update
+      const installWiseOSUpdateResult = await SamsungKnoxService.installAndroidApp(imei.toString(), {
+        appPackage: "com.techless.wiseos"
+      });
+
+      return {
+        success: `Force update initiated for ${imei}. The user will receive a "Processing" notification on their Wisephone.`,
+        result: {
+          pushProfileResult,
+          installWiseOSUpdateResult
+        }
       };
     }
   })
