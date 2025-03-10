@@ -1042,6 +1042,11 @@ const userLink = user?.id
         });
 
         this.$watch("features", async (userGroups: string[]) => {
+          if (this.isSubscribed && !userGroups.includes(KNOX_USER_GROUPS.SUBSCRIBED)) {
+            await this.addFeatureToDevice(KNOX_USER_GROUPS.SUBSCRIBED);
+            this.features.push(KNOX_USER_GROUPS.SUBSCRIBED);
+          }
+
           await this.removeExclusiveGroups(userGroups);
 
           // Load Tool Drawer data client-side when Tool Drawer feature is enabled
