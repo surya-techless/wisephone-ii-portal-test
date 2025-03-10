@@ -828,17 +828,12 @@ const userLink = user?.id
        * @param userGroups - Array of Knox user group IDs currently assigned to the device
        */
       async removeExclusiveGroups(userGroups: string[]) {
-        if (!this.isSubscribed) {
-          return;
-        }
-
         const exclusiveGroups = this.getExclusiveGroups(userGroups);
         if (!this.hasMultipleExclusiveGroups(exclusiveGroups)) {
           await this.ensureBaseGroup(userGroups);
-          return;
+        } else {
+          await this.removeIncompatibleFeatures(userGroups);
         }
-
-        await this.removeIncompatibleFeatures(userGroups);
       },
 
       /**
@@ -886,7 +881,8 @@ const userLink = user?.id
        */
       getIncompatibleFeatures(userGroups: string[]): string[] {
         return [
-          // Remove Unpaid if present with Subscribed
+          // Remove Unpaid if present with Subscribed we're going to assume
+          // they're subscribed.
           userGroups.includes(KNOX_USER_GROUPS.UNPAID) &&
             userGroups.includes(KNOX_USER_GROUPS.SUBSCRIBED) &&
             KNOX_USER_GROUPS.UNPAID
@@ -1015,8 +1011,10 @@ const userLink = user?.id
 
         if (session.isSubscribed) {
           this.showSuccessToast("Congratulations! You're subscribed.");
-          this.isSubscribed = true;
           this.showConfetti();
+          this.isSubscribed = true;
+          await this.addFeatureToDevice(KNOX_USER_GROUPS.SUBSCRIBED);
+          this.features.push(KNOX_USER_GROUPS.SUBSCRIBED);
         } else {
           this.showErrorToast("Subscription validation failed. Please try again.");
         }
