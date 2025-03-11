@@ -15,6 +15,7 @@ export type Feature = {
   isInverse?: boolean;
   isBeta?: boolean;
   disclosure?: string;
+  isAdminOnly?: boolean;
 };
 
 export const KNOX_USER_GROUPS = {
@@ -39,7 +40,8 @@ export const KNOX_USER_GROUPS = {
   // Used to be called PRO. This can stack on top of MINIMAL.
   ADD_ON_TOOL_DRAWER: "300830f61c574b9db37dabbae1e79aa9",
   // Used to be called MINIMAL
-  SUBSCRIBED: "1bd53a63998245e69d190612e7ae5b39"
+  SUBSCRIBED: "1bd53a63998245e69d190612e7ae5b39",
+  ADD_ON_WISEOS_PROTECT: "55293c1dc2d74fa786c4da2cb1b7aaa3"
 };
 
 export const FEATURES: Record<string, Feature> = {
@@ -93,6 +95,20 @@ export const FEATURES: Record<string, Feature> = {
     enableMessage: "I acknowledge turning on this feature enables the hotspot feature on this device.",
     disableMessage: "I acknowledge turning off this feature disables the hotspot feature on this device.",
     isInverse: true
+  },
+  WISEOS_PROTECT: {
+    knoxManageId: KNOX_USER_GROUPS.ADD_ON_WISEOS_PROTECT,
+    lucideIcon: "shield-check",
+    name: "WiseOS Protect",
+    description: "Protect your device even more with Cloudflare One filtering.",
+    disclosure:
+      "Cloudflare One filtering acts like a gatekeeper that checks if a website is safe and allowed before you can visit it, keeping you safe from bad sites and ensuring you only access approved ones. While Wisephone doesn't have a browser, there are third-party apps that have hidden in-app browser. This feature adds an additional layer of protection to these apps.",
+    enableMessage:
+      "I acknowledge this will install the Cloudflare One app and automatically open it. This requires you to turn it on in the Cloudflare One app.",
+    disableMessage: "I acknowledge this will uninstall the Cloudflare One app and the associated protections.",
+    isBeta: true,
+    isEnabled: true,
+    isAdminOnly: true
   }
 };
 

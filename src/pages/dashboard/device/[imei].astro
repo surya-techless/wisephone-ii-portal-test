@@ -63,6 +63,8 @@ try {
       .where(sql`${Wisephone.imei} = ${imei}`)
       .limit(1);
   } else {
+    features = features.filter((feature) => !feature.isAdminOnly);
+
     // Admin users can see all devices
     wisephones = await db
       .select()
@@ -426,10 +428,11 @@ const userLink = user?.id
                       <p>{feature.name}</p>
                       {feature.disclosure && (
                         <button @click.stop="alert('Disclosure: ' + feature.disclosure)" class="text-xs text-gray-500">
-                          <Icon name="lucide:triangle-alert" class="w-4 h-4 text-[var(--rust)]" />
+                          <Icon name="lucide:info" class="w-4 h-4" />
                         </button>
                       )}
                       {feature.isBeta && <span class="text-xs text-gray-500">(beta)</span>}
+                      {feature?.isAdminOnly && <span class="text-xs text-gray-500">(only admins can see this)</span>}
                     </div>
                     <p class="text-sm text-gray-500">{feature.description}</p>
                   </div>
