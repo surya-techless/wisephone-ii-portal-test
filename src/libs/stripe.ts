@@ -34,12 +34,20 @@ export async function validateSubscription(
       return false;
     }
 
-    const subscriptions = await stripe.subscriptions.list({
-      customer: customers.data[0].id,
-      status: "active"
-    });
+    // For each customer, because sometimes there are dupilicates,
+    // we need to check if the customer has an active subscription
+    for (const customer of customers.data) {
+      const subscriptions = await stripe.subscriptions.list({
+        customer: customer.id,
+        status: "active"
+      });
 
-    return subscriptions.data.length > 0;
+      if (subscriptions.data.length > 0) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   if (provider === "gigs") {
