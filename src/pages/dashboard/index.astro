@@ -1,10 +1,11 @@
 ---
 import { actions, type ActionInputError } from "astro:actions";
 import { db, eq, Wisephone } from "astro:db";
+import Icon from "astro-iconify";
 import Header from "@/components/Header.astro";
 import Layout from "@/layouts/Layout.astro";
 import Footer from "@/components/Footer.astro";
-import Icon from "astro-iconify";
+import AstroActionToastResponse from "@/components/AstroActionToastResponse.astro";
 
 if (!Astro.locals.auth().userId) {
   return Astro.redirect("/");
@@ -19,18 +20,18 @@ if (!user) {
 const wisephones = await db.select().from(Wisephone).where(eq(Wisephone.userId, user.id));
 const derivedHasNoWisephone = wisephones.length === 0;
 
-const result = Astro.getActionResult(actions.wisephones.createWisephone);
-const error = [result?.error as ActionInputError<typeof actions.wisephones.createWisephone>].filter(Boolean).join("\n");
-const success = [result?.data?.success as string].filter(Boolean).join("\n");
+const actionResult = Astro.getActionResult(actions.wisephones.createWisephone);
 ---
 
 <Layout title="Dashboard" description="Manage your Wisephone II devices.">
+  <AstroActionToastResponse actionResult={actionResult} />
+
   <div
     class="container h-full p-6 mx-auto prose"
     x-data="dashboard"
     x-init={`
-      toastErrorMessage = \`${error || ""}\` || toastErrorMessage;
-      toastMessage = \`${success || ""}\` || toastMessage;
+      toastErrorMessage = toastErrorMessage;
+      toastMessage = toastMessage;
     `}
   >
     <progress

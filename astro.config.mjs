@@ -24,7 +24,7 @@ export default defineConfig({
       // This means we don't capture any video replays - Save Money
       replaysSessionSampleRate: 0.1,
       replaysOnErrorSampleRate: 1.0,
-      debug: process.env.NODE_ENV !== "production",
+      // debug: process.env.NODE_ENV !== "production",
       sourceMapsUploadOptions: {
         project: "wisephone-ii-portal",
         authToken: SENTRY_AUTH_TOKEN

@@ -1,0 +1,17 @@
+---
+import type { ActionError } from "astro:actions";
+
+const { actionResult } = Astro.props;
+
+const errorMessage = [actionResult?.error as ActionError<any>].filter(Boolean).join("\n");
+const successMessage = [actionResult?.data?.success as string].filter(Boolean).join("\n");
+---
+
+<div
+  x-init={`
+    toastErrorMessage = \`${(errorMessage || "").replace(/"/g, '\\"')}\`;
+    toastMessage = \`${(successMessage || "").replace(/"/g, '\\"')}\`;
+    $el.remove();
+  `}
+>
+</div>
