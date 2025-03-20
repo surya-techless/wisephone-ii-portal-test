@@ -24,7 +24,7 @@ export const wisephones = {
           wisephone: newWisephone
         };
       } catch (error: any) {
-        if (error?.code === "SQLITE_CONSTRAINT_PRIMARYKEY") {
+        if (error?.code === "SQLITE_CONSTRAINT_PRIMARYKEY" || error?.code === "SQLITE_CONSTRAINT") {
           throw new ActionError({
             code: "CONFLICT",
             message: `Wisephone (${input.imei}) is already registered on another account. To add it to this account, please remove it from the other account first.`
@@ -32,7 +32,7 @@ export const wisephones = {
         }
 
         throw new ActionError({
-          code: "INTERNAL_SERVER_ERROR",
+          code: "BAD_REQUEST",
           message: `Failed to create Wisephone: ${error instanceof Error ? error.message : "Unknown error"}`
         });
       }
@@ -65,7 +65,7 @@ export const wisephones = {
         };
       } catch (error) {
         throw new ActionError({
-          code: "INTERNAL_SERVER_ERROR",
+          code: "BAD_REQUEST",
           message: `Failed to get Wisephone: ${error instanceof Error ? error.message : "Unknown error"}`
         });
       }
@@ -131,7 +131,7 @@ export const wisephones = {
         };
       } catch (error) {
         throw new ActionError({
-          code: "INTERNAL_SERVER_ERROR",
+          code: "BAD_REQUEST",
           message: `Failed to update Wisephone: ${error instanceof Error ? error.message : "Unknown error"}`
         });
       }
@@ -165,7 +165,7 @@ export const wisephones = {
         };
       } catch (error) {
         throw new ActionError({
-          code: "INTERNAL_SERVER_ERROR",
+          code: "BAD_REQUEST",
           message: `Failed to delete Wisephone: ${error instanceof Error ? error.message : "Unknown error"}`
         });
       }
@@ -224,7 +224,7 @@ export const wisephones = {
         };
       } catch (error) {
         throw new ActionError({
-          code: "INTERNAL_SERVER_ERROR",
+          code: "BAD_REQUEST",
           message: `Failed to install app: ${error instanceof Error ? error.message : "Unknown error"}`
         });
       }
@@ -268,7 +268,7 @@ export const wisephones = {
         };
       } catch (error) {
         throw new ActionError({
-          code: "INTERNAL_SERVER_ERROR",
+          code: "BAD_REQUEST",
           message: `Failed to uninstall app: ${error instanceof Error ? error.message : "Unknown error"}`
         });
       }
@@ -306,7 +306,7 @@ export const wisephones = {
         };
       } catch (error) {
         throw new ActionError({
-          code: "INTERNAL_SERVER_ERROR",
+          code: "BAD_REQUEST",
           message: `Failed to get installed apps: ${error instanceof Error ? error.message : "Unknown error"}`
         });
       }
@@ -344,7 +344,7 @@ export const wisephones = {
         };
       } catch (error) {
         throw new ActionError({
-          code: "INTERNAL_SERVER_ERROR",
+          code: "BAD_REQUEST",
           message: `Failed to sync installed apps list: ${error instanceof Error ? error.message : "Unknown error"}`
         });
       }
