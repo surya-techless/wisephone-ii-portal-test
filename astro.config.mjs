@@ -1,10 +1,13 @@
 import { defineConfig, envField } from "astro/config";
+import { loadEnv } from "vite";
 import tailwind from "@astrojs/tailwind";
 import alpinejs from "@astrojs/alpinejs";
 import netlify from "@astrojs/netlify";
 import db from "@astrojs/db";
 import clerk from "@clerk/astro";
 import sentry from "@sentry/astro";
+
+const { SENTRY_AUTH_TOKEN } = loadEnv(process.env.NODE_ENV, process.cwd(), "");
 
 // https://astro.build/config
 export default defineConfig({
@@ -23,15 +26,10 @@ export default defineConfig({
       replaysOnErrorSampleRate: 1.0,
       sourceMapsUploadOptions: {
         project: "wisephone-ii-portal",
-        authToken: process.env.SENTRY_AUTH_TOKEN
+        authToken: SENTRY_AUTH_TOKEN
       }
     })
   ],
-  vite: {
-    optimizeDeps: {
-      exclude: ["astro:db"]
-    }
-  },
   output: "server",
   adapter: netlify(),
   env: {
