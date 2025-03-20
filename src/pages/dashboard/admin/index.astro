@@ -23,9 +23,7 @@ if (!(await isAdmin(user.id))) {
 const result = Astro.getActionResult(actions.wisephones.forceUpdateDevice);
 const error = [result?.error as ActionInputError<typeof actions.wisephones.forceUpdateDevice>]
   .filter(Boolean)
-  .flatMap((err) => err.issues.map((issue) => issue.message))
   .join("\n");
-
 const success = [result?.data?.success as string].filter(Boolean).join("\n");
 ---
 
