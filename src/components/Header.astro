@@ -12,7 +12,7 @@ import Icon from "astro-iconify";
     </a>
 
     <div class="flex items-center self-center gap-2 justify-self-end">
-      <IsAdmin>
+      <IsAdmin server:defer>
         <a href="/dashboard/admin" class="btn btn-sm btn-ghost btn-circle">
           <Icon name="lucide:shield-ellipsis" class="w-5 h-5" />
         </a>
