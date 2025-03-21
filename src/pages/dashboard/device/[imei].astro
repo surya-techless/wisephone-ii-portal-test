@@ -6,6 +6,7 @@ import type { User } from "@clerk/astro/server";
 import { actions, type ActionInputError } from "astro:actions";
 import Icon from "astro-iconify";
 import { validateIsSubscribed } from "@/libs/stripe";
+import { SamsungKnoxService } from "@/libs/samsung-knox-service";
 import Layout from "@/layouts/Layout.astro";
 import Header from "@/components/Header.astro";
 import Footer from "@/components/Footer.astro";
@@ -28,7 +29,7 @@ let wisephones: (typeof Wisephone.$inferSelect)[] = [];
 let userIsAdmin = false;
 let isMyDevice = false;
 let user: UserResource | User | null = null;
-
+let wisephoneUsesSecondaryImeiAndShouldBeBlocked = false;
 if (!Astro.locals.auth().userId) {
   return Astro.redirect("/");
 }
@@ -82,6 +83,14 @@ try {
   if (wisephone?.userId === userId) {
     isMyDevice = true;
   }
+
+  const knoxDevice = await SamsungKnoxService.getDeviceFromImei(imei);
+
+  // If the Wisephone is set up with IMEI slot 2, then that means
+  // the wrong IMEI was used to setup this device. It most likely
+  // is a kid who found a way around the system. Props to the kid who
+  // told us about this workaround.
+  wisephoneUsesSecondaryImeiAndShouldBeBlocked = Boolean(knoxDevice?.resultValue?.secondaryImei === imei);
 
   // Check for bypass subscription first
   const bypassTechlessSubscription = await db
@@ -348,8 +357,36 @@ const userLink = user?.id
           </div>
         </div>
 
+        {
+          wisephoneUsesSecondaryImeiAndShouldBeBlocked && (
+            <div class="alert bg-slate-200 border-slate-300 text-slate-800">
+              <Icon name="lucide:triangle-alert" class="w-5 h-5" />
+
+              <div>
+                <p class="font-semibold m-0">This device was set up using IMEI slot 2</p>
+                <p class="m-0">
+                  For security and proper device management, only primary IMEI registration is supported. If you believe
+                  this is an error, please contact support.
+                </p>
+                <form
+                  class="mt-2"
+                  method="POST"
+                  action={actions.wisephones.deleteWisephone}
+                  onsubmit="return confirm('Are you sure you want to remove this Wisephone from your devices? This action cannot be undone.')"
+                >
+                  <input type="hidden" name="imei" :value="imei" />
+                  <button type="submit" class="text-red-800 btn btn-ghost btn-sm hover:bg-red-700">
+                    <Icon name="lucide:trash-2" class="w-4 h-4" />
+                    Remove Wisephone from My Devices
+                  </button>
+                </form>
+              </div>
+            </div>
+          )
+        }
+
         <div
-          x-show="!isSubscribed"
+          x-show={`!isSubscribed && ${!wisephoneUsesSecondaryImeiAndShouldBeBlocked}`}
           x-cloak
           x-transition
           class="transition-transform duration-150 alert bg-slate-200 border-slate-300 text-slate-800 -rotate-1 hover:rotate-0"

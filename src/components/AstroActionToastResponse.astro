@@ -9,8 +9,14 @@ const successMessage = [actionResult?.data?.success as string].filter(Boolean).j
 
 <div
   x-init={`
-    toastErrorMessage = \`${(errorMessage || "").replace(/"/g, '\\"')}\`;
-    toastMessage = \`${(successMessage || "").replace(/"/g, '\\"')}\`;
+    if (${Boolean(errorMessage)}) {
+      toastErrorMessage = \`${(errorMessage || "").replace(/"/g, '\\"')}\`;
+    }
+
+    if (${Boolean(successMessage)}) {
+      toastMessage = \`${(successMessage || "").replace(/"/g, '\\"')}\`;
+    }
+
     $el.remove();
   `}
 >

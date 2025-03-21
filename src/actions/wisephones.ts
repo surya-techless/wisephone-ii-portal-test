@@ -17,6 +17,25 @@ export const wisephones = {
     }),
     handler: async (input) => {
       try {
+        // 1. Get Wisephone from IMEI in Knox
+        // 2. Ensure it's using the primary IMEI
+        // 3. If it is, create the Wisephone
+        const knoxDevice = await SamsungKnoxService.getDeviceFromImei(input.imei.toString());
+
+        if (!knoxDevice) {
+          throw new ActionError({
+            code: "NOT_FOUND",
+            message: "Wisephone not found"
+          });
+        }
+
+        if (knoxDevice.resultValue?.secondaryImei.toString() === input.imei.toString()) {
+          throw new ActionError({
+            code: "BAD_REQUEST",
+            message: "This device is using IMEI slot 2. Please enter IMEI slot 1 to register."
+          });
+        }
+
         const newWisephone = await db.insert(Wisephone).values(input).returning();
 
         return {

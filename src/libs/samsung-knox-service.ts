@@ -419,11 +419,11 @@ export class SamsungKnoxService {
   }
 
   /**
-   * Get device ID from IMEI number
+   * Get device information from IMEI number
    * @param imei - The IMEI number of the device
-   * @returns The device ID or null if not found
+   * @returns The device information or null if not found
    */
-  public static async getDeviceIdFromImei(imei: string): Promise<string | null> {
+  public static async getDeviceFromImei(imei: string): Promise<KnoxDeviceInfoResponse | null> {
     const apiUrl = `https://${KNOX_REGION}.manage.samsungknox.com/emm/oapi/device/selectDeviceInfoByImei`;
 
     try {
@@ -441,9 +441,23 @@ export class SamsungKnoxService {
         throw new Error("Failed to fetch device info");
       }
 
-      const data = await response.json();
+      const data = (await response.json()) as KnoxDeviceInfoResponse;
+      return data;
+    } catch (error) {
+      console.error("Error fetching device info:", error);
+      return null;
+    }
+  }
 
-      return data.resultValue?.deviceId ?? null;
+  /**
+   * Get device ID from IMEI number
+   * @param imei - The IMEI number of the device
+   * @returns The device ID or null if not found
+   */
+  public static async getDeviceIdFromImei(imei: string): Promise<string | null> {
+    try {
+      const deviceInfo = await this.getDeviceFromImei(imei);
+      return deviceInfo?.resultValue?.deviceId ?? null;
     } catch (error) {
       console.error("Error fetching device ID:", error);
       return null;
