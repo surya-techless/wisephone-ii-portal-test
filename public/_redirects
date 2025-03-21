@@ -1,2 +1,3 @@
 # Redirect default Netlify subdomain to primary domain
-https://wpii-portal.netlify.app/* https://portal.getwisephone.com/:splat 301!
+https://wpii-portal.netlify.app/* https://portal.wisephone.com/:splat 301!
+https://portal.getwisephone.com/* https://portal.wisephone.com/:splat 301!
