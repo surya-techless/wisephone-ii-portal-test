@@ -63,7 +63,7 @@
   "private": true,
   "description": "A portal for the Wisephone II",
   "author": "Cameron Pak",
-  "homepage": "https://portal.getwisephone.com",
+  "homepage": "https://portal.wisephone.com",
   "engines": {
     "node": ">=20.3.0",
     "npm": ">=10.0.0"

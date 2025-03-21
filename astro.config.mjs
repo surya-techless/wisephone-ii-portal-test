@@ -11,7 +11,7 @@ const { SENTRY_AUTH_TOKEN } = loadEnv(process.env.NODE_ENV, process.cwd(), "");
 
 // https://astro.build/config
 export default defineConfig({
-  site: "https://portal.getwisephone.com",
+  site: "https://portal.wisephone.com",
   integrations: [
     db(),
     tailwind(),
