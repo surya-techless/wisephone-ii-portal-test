@@ -24,7 +24,7 @@ const actionResult = Astro.getActionResult(actions.wisephones.createWisephone);
 ---
 
 <Layout title="Dashboard" description="Manage your Wisephone II devices.">
-  <AstroActionToastResponse actionResult={actionResult} />
+  {actionResult ? <AstroActionToastResponse actionResult={actionResult} /> : null}
 
   <div class="container h-full p-6 mx-auto prose" x-data="dashboard">
     <progress
