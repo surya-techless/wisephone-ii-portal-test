@@ -3,21 +3,23 @@ import type { ActionError } from "astro:actions";
 
 const { actionResult } = Astro.props;
 
-const errorMessage = [actionResult?.error as ActionError<any>].filter(Boolean).join("\n");
-const successMessage = [actionResult?.data?.success as string].filter(Boolean).join("\n");
+const errorMessage = [actionResult?.error || ""].filter(Boolean).join("\n");
+const successMessage = [actionResult?.data?.success || ""].filter(Boolean).join("\n");
 ---
 
 <div
-  x-init={`
-    if (${Boolean(errorMessage)}) {
-      toastErrorMessage = \`${(errorMessage || "").replace(/"/g, '\\"')}\`;
-    }
+  x-data={`{
+    init() {
+      if (${Boolean(errorMessage)}) {
+        toastErrorMessage = \`${(errorMessage || "").replace(/"/g, '\\"')}\`;
+      }
 
-    if (${Boolean(successMessage)}) {
-      toastMessage = \`${(successMessage || "").replace(/"/g, '\\"')}\`;
-    }
+      if (${Boolean(successMessage)}) {
+        toastMessage = \`${(successMessage || "").replace(/"/g, '\\"')}\`;
+      }
 
-    $el.remove();
-  `}
+      $el.remove();
+    }
+  }`}
 >
 </div>
