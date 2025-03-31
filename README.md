@@ -48,6 +48,37 @@ npm run dev
 - `npm run db:update` - Update database schema
 - `npm run format` - Format code with Prettier
 - `npm run update-packages` - Update all packages
+- `npm run test:e2e` - Run end-to-end tests with Playwright
+- `npm run test:gui` - Run tests with Playwright's GUI
+
+## Testing
+
+This project uses Playwright for end-to-end testing. Tests are located in the `tests` directory.
+
+### Running Tests
+
+```bash
+# Run all tests in headless mode
+npm run test:e2e
+
+# Run tests with Playwright's interactive UI
+npm run test:gui
+```
+
+### Interpreting Test Results
+
+- Playwright tests output results in the terminal showing passed/failed tests
+- Failed tests include screenshots and traces for debugging
+- When using `test:gui`, you can:
+  - View test execution in real-time
+  - Inspect element selectors
+  - Step through test execution
+  - View and debug test traces
+
+### Test Configuration
+
+Tests run against multiple browsers (Chrome, Safari) and are configured in `playwright.config.ts`.
+The testing environment integrates with Clerk for authentication testing via `global.setup.ts`.
 
 ## Tech Stack
 

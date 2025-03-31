@@ -114,12 +114,13 @@ const actionResult = Astro.getActionResult(actions.wisephones.createWisephone);
           @submit.prevent="$el.checkValidity() && isFormValid() ? $el.submit() : null"
         >
           <div class="w-full form-control">
-            <label class="label">
+            <label for="imei" class="label">
               <span class="label-text">Wisephone IMEI (slot 1)</span>
               <span class="label-text-alt">Required</span>
             </label>
             <input
               type="text"
+              id="imei"
               name="imei"
               x-model.trim="imei1"
               x-mask="999999999999999"
@@ -151,12 +152,13 @@ const actionResult = Astro.getActionResult(actions.wisephones.createWisephone);
           </div>
 
           <div class="w-full form-control">
-            <label class="label">
+            <label for="imei2" class="label">
               <span class="label-text">Enter the IMEI one more time</span>
               <span class="label-text-alt">Required</span>
             </label>
             <input
               type="text"
+              id="imei2"
               name="imei2"
               x-model.trim="imei2"
               x-mask="999999999999999"
@@ -187,12 +189,13 @@ const actionResult = Astro.getActionResult(actions.wisephones.createWisephone);
           </div>
 
           <div class="w-full form-control">
-            <label class="label">
+            <label for="phoneNumber" class="label">
               <span class="label-text">Wisephone Phone Number</span>
               <span class="label-text-alt">Required</span>
             </label>
             <input
               type="tel"
+              id="phoneNumber"
               x-model.trim="phoneNumber"
               name="phoneNumber"
               x-mask="999-999-9999"
@@ -205,11 +208,12 @@ const actionResult = Astro.getActionResult(actions.wisephones.createWisephone);
           </div>
 
           <div class="w-full form-control">
-            <label class="label">
+            <label for="nickname" class="label">
               <span class="label-text">Give this Wisephone a name or owner</span>
               <span class="label-text-alt">Required</span>
             </label>
             <input
+              id="nickname"
               x-model.trim="nickname"
               type="text"
               name="nickname"

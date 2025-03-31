@@ -22,3 +22,9 @@ pnpm-debug.log*
 
 # Netlify build
 .netlify/
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/

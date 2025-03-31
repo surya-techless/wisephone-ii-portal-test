@@ -11,7 +11,9 @@
     "build": "astro check && astro build --remote",
     "preview": "astro preview",
     "db:update": "astro db push --remote",
-    "format": "prettier -w ."
+    "format": "prettier -w .",
+    "test:e2e": "playwright test",
+    "test:gui": "playwright test --ui"
   },
   "dependencies": {
     "@alpinejs/collapse": "^3.14.1",
@@ -50,6 +52,8 @@
     "uqr": "^0.1.2"
   },
   "devDependencies": {
+    "@clerk/testing": "^1.4.33",
+    "@playwright/test": "^1.51.1",
     "@tailwindcss/typography": "^0.5.15",
     "@types/alpinejs": "^3.13.10",
     "@types/better-sqlite3": "^7.6.11",
