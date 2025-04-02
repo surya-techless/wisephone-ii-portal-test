@@ -41,7 +41,8 @@ export const stripe = {
         },
         // Required param replaced by Stripe, and we can't have it percent encoded
         return_url: returnUrl.toString() + "?session_id={CHECKOUT_SESSION_ID}",
-        automatic_tax: { enabled: true }
+        automatic_tax: { enabled: true },
+        allow_promotion_codes: true
       });
 
       return {
