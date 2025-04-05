@@ -30,11 +30,11 @@ export default defineConfig({
     {
       name: "chromium",
       use: { ...devices["iPhone 15 Plus"], ...devices["Desktop Chrome"] }
-    },
-    {
-      name: "webkit",
-      use: { ...devices["Desktop Safari"] }
     }
+    // {
+    //   name: "webkit",
+    //   use: { ...devices["Desktop Safari"] }
+    // }
     // {
     //   name: "firefox",
     //   use: { ...devices["Desktop Firefox"] }

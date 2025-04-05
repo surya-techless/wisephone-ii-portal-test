@@ -690,7 +690,7 @@ const userLink = user?.id
   Alpine.data("device", function () {
     return {
       appsList: {} as AppsList,
-      installedApps: [] as { packageName: string; appName: string }[],
+      installedApps: [] as { packageName: string; appName: string; isGoogleManaged: "Y" | "N" }[],
       currentView: "installed" as CurrentView,
       appSearchQuery: "",
       features: [] as string[],
@@ -746,7 +746,11 @@ const userLink = user?.id
         const view = this.currentView;
         switch (view) {
           case "installed":
-            return apps.filter(([, app]) => app.installed);
+            const installedApps = this.installedApps
+              .filter((app) => app.isGoogleManaged === "Y")
+              .map((app) => [app.packageName || app.appName, { installed: true, name: app.appName, source: "Tool Drawer" }] as [string, Omit<AppEntry, "packageName">])
+              .sort((a, b) => a[1].name.localeCompare(b[1].name));
+            return installedApps;
           case "faith-tools":
             return apps.filter(([, app]) => app.source === "faith.tools");
           case "tool-drawer":
