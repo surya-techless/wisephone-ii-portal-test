@@ -141,7 +141,7 @@ li.list-item:last-child {
 
 /* Hack for Clerk sign up component */
 .cl-formFieldLabel__phoneNumber-field::after {
-  content: "Your #, not necessarily the Wisephone's #";
+  content: "This will be the account owner's phone #";
   @apply text-xs font-normal text-gray-500;
 }
 
