@@ -1,5 +1,5 @@
 /**
- * Utility to check if a device has an active Techless subscription or bypass
+ * Utility to check if a device has an active WiseOS Subscription or bypass
  */
 
 /**

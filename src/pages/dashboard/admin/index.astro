@@ -51,7 +51,7 @@ const success = [result?.data?.success as string].filter(Boolean).join("\n");
       <section class="w-full">
         <form class="p-6 bg-white shadow-sm rounded-2xl" @submit.prevent="checkSubscription()">
           <div class="flex flex-col gap-4 p-0">
-            <h2>Techless Subscription Checker</h2>
+            <h2>WiseOS Subscription Checker</h2>
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div class="w-full form-control">
                 <label class="label">
@@ -421,11 +421,9 @@ const success = [result?.data?.success as string].filter(Boolean).join("\n");
                       class="checkbox checkbox-primary border-2 border-slate-200 hover:border-slate-200 [&:checked]:border-[var(--evergreen)]"
                       style="--chkbg: var(--evergreen); --chkfg: white;"
                     />
-                    <span class="font-medium">Bypass Techless Subscription</span>
+                    <span class="font-medium">Bypass WiseOS Subscription</span>
                   </label>
-                  <p class="mt-1 text-sm text-slate-500">
-                    Mark this device as bypassed for Techless subscription checks
-                  </p>
+                  <p class="mt-1 text-sm text-slate-500">Mark this device as bypassed for WiseOS Subscription checks</p>
                 </div>
 
                 <div class="mb-4 form-control" x-show="formBypassSubscription" x-transition>
