@@ -115,8 +115,9 @@ export const FEATURES: Record<string, Feature> = {
     knoxManageId: KNOX_USER_GROUPS.ADD_ON_DISABLE_FACTORY_RESET,
     lucideIcon: "lock",
     name: "Allow Factory Reset",
-    description:
-      "Controls whether the device can be factory reset. When enabled, factory reset is allowed. When disabled, factory reset is locked to prevent unauthorized resets.",
+    disclosure:
+      "When enabled, factory reset is allowed. When disabled, factory reset is locked to prevent unauthorized resets.",
+    description: "Controls whether the device can be factory reset.",
     isEnabled: true,
     enableMessage:
       "I acknowledge turning on this feature will only lock the ability to factory reset the device. This prevents others from resetting the phone, for any reason. No changes will be made to the device at this time.",
