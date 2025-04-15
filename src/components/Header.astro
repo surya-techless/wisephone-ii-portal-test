@@ -13,7 +13,14 @@ import Icon from "astro-iconify";
 
     <div class="flex items-center self-center gap-2 justify-self-end">
       <IsAdmin server:defer>
-        <a href="/dashboard/admin" class="btn btn-sm btn-ghost btn-circle">
+        <a
+          x-data="{ visible: false }"
+          x-init="setTimeout(() => visible = true, 250)"
+          x-transition.opacity
+          x-transition.duration.500ms
+          href="/dashboard/admin"
+          class="btn btn-sm btn-ghost btn-circle"
+        >
           <Icon name="lucide:shield-ellipsis" class="w-5 h-5" />
         </a>
       </IsAdmin>
