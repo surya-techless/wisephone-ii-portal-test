@@ -108,9 +108,9 @@ export const FEATURES: Record<string, Feature> = {
     description: "Controls whether the device can be factory reset.",
     isEnabled: true,
     enableMessage:
-      "I acknowledge turning on this feature will only lock the ability to factory reset the device. This prevents others from resetting the phone, for any reason. No changes will be made to the device at this time.",
+      "I acknowledge turning on this feature will only enable the ability to factory reset the device.\n\nThis allows the device to be reset if needed. No changes will be made to the device at this time.",
     disableMessage:
-      "I acknowledge turning off this feature will only unlock the ability to factory reset the device. This allows the device to be reset if needed. No changes will be made to the device at this time.",
+      "I acknowledge turning off this feature will only disable the ability to factory reset the device.\n\nThis prevents others from resetting the phone, for any reason. No changes will be made to the device at this time.",
     isInverse: true
   },
   WISEOS_PROTECT: {
