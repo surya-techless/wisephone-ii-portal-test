@@ -100,20 +100,6 @@ export const FEATURES: Record<string, Feature> = {
       "I acknowledge turning off this feature will only disable the hotspot functionality on this device. This prevents the device from sharing its internet connection with other devices, given you have a compatible service plan.",
     isInverse: true
   },
-  WISEOS_PROTECT: {
-    knoxManageId: KNOX_USER_GROUPS.ADD_ON_WISEOS_PROTECT,
-    lucideIcon: "shield-check",
-    name: "WiseOS Protect",
-    description: "Protect your device even more with Cloudflare One filtering.",
-    disclosure:
-      "Cloudflare One filtering acts like a gatekeeper that checks if a website is safe and allowed before you can visit it, keeping you safe from bad sites and ensuring you only access approved ones. While Wisephone doesn't have a browser, there are third-party apps that have hidden in-app browser. This feature adds an additional layer of protection to these apps.",
-    enableMessage:
-      "I acknowledge this will install the Cloudflare One app and automatically open it. This requires you to turn it on in the Cloudflare One app.",
-    disableMessage: "I acknowledge this will uninstall the Cloudflare One app and the associated protections.",
-    isBeta: true,
-    isEnabled: true,
-    isAdminOnly: true
-  },
   ALLOW_FACTORY_RESET: {
     knoxManageId: KNOX_USER_GROUPS.ADD_ON_DISABLE_FACTORY_RESET,
     lucideIcon: "lock",
@@ -127,6 +113,20 @@ export const FEATURES: Record<string, Feature> = {
     disableMessage:
       "I acknowledge turning off this feature will only unlock the ability to factory reset the device. This allows the device to be reset if needed. No changes will be made to the device at this time.",
     isInverse: true
+  },
+  WISEOS_PROTECT: {
+    knoxManageId: KNOX_USER_GROUPS.ADD_ON_WISEOS_PROTECT,
+    lucideIcon: "shield-check",
+    name: "1.1.1.1 for Families",
+    description: "Add an additional layer of security and protection with 1.1.1.1 for Families filtering.",
+    disclosure:
+      "Filtering that checks if a website is safe and allowed before you can visit it, keeping you safe from bad sites and ensuring you only access approved ones. While Wisephone doesn't have a browser, there are third-party apps that have hidden in-app browser. This feature adds an additional layer of protection to these apps.",
+    enableMessage:
+      "I acknowledge this will install the Cloudflare One app and automatically open it. This requires you to turn it on in the Cloudflare One app.",
+    disableMessage: "I acknowledge this will uninstall the Cloudflare One app and the associated protections.",
+    isBeta: true,
+    isEnabled: true,
+    isAdminOnly: true
   }
 };
 
