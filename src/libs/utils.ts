@@ -52,8 +52,7 @@ export const FEATURES: Record<string, Feature> = {
     isEnabled: true,
     isBeta: true,
     name: "Tool Drawer",
-    description:
-      "Access safe, vetted third-party apps. A collection of practical apps that avoid addiction and distraction.",
+    description: "Access a collection of practical apps that avoid addiction and distraction.",
     enableMessage:
       "Third-party apps may display in-app ads, content, and experiences not managed by Techless. Enable Tool Drawer apps at your discretion. If you are battling addiction, we recommend not enabling the Tool Drawer.",
     disableMessage:
@@ -125,8 +124,7 @@ export const FEATURES: Record<string, Feature> = {
       "I acknowledge this will install the Cloudflare 1.1.1.1 app and automatically open it. This requires you to turn it on in the Cloudflare 1.1.1.1 app.",
     disableMessage: "I acknowledge this will uninstall the Cloudflare 1.1.1.1 app and the associated protections.",
     isBeta: true,
-    isEnabled: true,
-    isAdminOnly: true
+    isEnabled: true
   }
 };
 
