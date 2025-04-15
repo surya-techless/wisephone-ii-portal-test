@@ -91,10 +91,13 @@ export const FEATURES: Record<string, Feature> = {
     knoxManageId: KNOX_USER_GROUPS.ADD_ON_DISABLE_HOTSPOT,
     lucideIcon: "signal",
     name: "Allow Hotspot",
-    description:
-      "This determines if the hotspot feature on this device is allowed. Requires a compatible service plan to use hotspot.",
-    enableMessage: "I acknowledge turning on this feature enables the hotspot feature on this device.",
-    disableMessage: "I acknowledge turning off this feature disables the hotspot feature on this device.",
+    disclosure:
+      "When enabled, hotspot functionality is allowed. When disabled, hotspot is locked to prevent unauthorized tethering.",
+    description: "Controls whether the device can be used as a mobile hotspot.",
+    enableMessage:
+      "I acknowledge turning on this feature will only enable the hotspot functionality on this device. This allows the device to share its internet connection with other devices, given you have a compatible service plan.",
+    disableMessage:
+      "I acknowledge turning off this feature will only disable the hotspot functionality on this device. This prevents the device from sharing its internet connection with other devices, given you have a compatible service plan.",
     isInverse: true
   },
   WISEOS_PROTECT: {
@@ -111,7 +114,7 @@ export const FEATURES: Record<string, Feature> = {
     isEnabled: true,
     isAdminOnly: true
   },
-  DISABLE_FACTORY_RESET: {
+  ALLOW_FACTORY_RESET: {
     knoxManageId: KNOX_USER_GROUPS.ADD_ON_DISABLE_FACTORY_RESET,
     lucideIcon: "lock",
     name: "Allow Factory Reset",
