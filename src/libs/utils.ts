@@ -122,8 +122,8 @@ export const FEATURES: Record<string, Feature> = {
     disclosure:
       "Filtering that checks if a website is safe and allowed before you can visit it, keeping you safe from bad sites and ensuring you only access approved ones. While Wisephone doesn't have a browser, there are third-party apps that have hidden in-app browser. This feature adds an additional layer of protection to these apps.",
     enableMessage:
-      "I acknowledge this will install the Cloudflare One app and automatically open it. This requires you to turn it on in the Cloudflare One app.",
-    disableMessage: "I acknowledge this will uninstall the Cloudflare One app and the associated protections.",
+      "I acknowledge this will install the Cloudflare 1.1.1.1 app and automatically open it. This requires you to turn it on in the Cloudflare 1.1.1.1 app.",
+    disableMessage: "I acknowledge this will uninstall the Cloudflare 1.1.1.1 app and the associated protections.",
     isBeta: true,
     isEnabled: true,
     isAdminOnly: true
