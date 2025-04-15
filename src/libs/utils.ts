@@ -23,6 +23,7 @@ export const KNOX_USER_GROUPS = {
   ADD_ON_FOSSIFY_APPS: "c7ab2ff7da4b47ea86bc13ff173109a0",
   ADD_ON_FAITH_TOOLS: "5ae84219a2ea4372a42f9da57c00d325",
   ADD_ON_DISABLE_HOTSPOT: "f463ade53b1f43f5bf2f540a99395c2d",
+  ADD_ON_DISABLE_FACTORY_RESET: "2af281b5d6764f06801c5925d5aa06e4",
   ADD_ON_GOOGLE_APPS: "2023496b363e4a639a379fe5efedd171",
   /**
    * @deprecated This is no longer used.
@@ -109,6 +110,18 @@ export const FEATURES: Record<string, Feature> = {
     isBeta: true,
     isEnabled: true,
     isAdminOnly: true
+  },
+  DISABLE_FACTORY_RESET: {
+    knoxManageId: KNOX_USER_GROUPS.ADD_ON_DISABLE_FACTORY_RESET,
+    lucideIcon: "lock",
+    name: "Allow Factory Reset",
+    description: "Enable the ability for the Wisephone to be factory reset.",
+    isEnabled: true,
+    enableMessage:
+      "I acknowledge turning on this feature will only lock the ability to factory reset the device. This prevents others from resetting the phone, for any reason. No changes will be made to the device at this time.",
+    disableMessage:
+      "I acknowledge turning off this feature will only unlock the ability to factory reset the device. This allows the device to be reset if needed. No changes will be made to the device at this time.",
+    isInverse: true
   }
 };
 
