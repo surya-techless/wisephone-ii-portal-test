@@ -79,10 +79,14 @@ test.describe("Home Page", () => {
   test("I can add a Wisephone", async ({ page }) => {
     await signIn(page);
 
+    await expect(page.getByRole("heading", { name: /Connect to your Wisephone/i })).toBeVisible();
+
     // Click Get Started to show the form
     await page.getByRole("button", { name: "Get Started" }).click();
 
     await expect(page.getByRole("heading", { name: /setup/i })).toBeVisible();
+
+    await page.getByRole("radio", { name: "My SIM card is inserted with calls and texts working" }).click();
 
     // Fill in the IMEI fields
     await page.getByLabel("Wisephone IMEI (slot 1)").fill("353994911040860");

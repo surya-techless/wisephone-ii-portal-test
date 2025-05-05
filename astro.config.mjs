@@ -1,7 +1,6 @@
 import { defineConfig, envField } from "astro/config";
 import { loadEnv } from "vite";
 import tailwind from "@astrojs/tailwind";
-import alpinejs from "@astrojs/alpinejs";
 import netlify from "@astrojs/netlify";
 import db from "@astrojs/db";
 import clerk from "@clerk/astro";
@@ -15,9 +14,6 @@ export default defineConfig({
   integrations: [
     db(),
     tailwind(),
-    alpinejs({
-      entrypoint: "/src/entrypoint"
-    }),
     clerk(),
     sentry({
       dsn: "https://5eb13a77d6b20ea29b280f60280399db@o4508453437308928.ingest.us.sentry.io/4508887396974592",

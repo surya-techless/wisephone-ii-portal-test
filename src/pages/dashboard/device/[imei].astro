@@ -668,445 +668,445 @@ const userLink = user?.id
   <div class="mb-12">
     <Footer showLogo={false} />
   </div>
-</Layout>
 
-<script>
-  import Alpine from "alpinejs";
-  import { actions } from "astro:actions";
-  import JSConfetti from "js-confetti";
-  import {
-    type Feature,
-    updateUnreachableAlpineState,
-    KNOX_USER_GROUPS,
-    getPackageNameFromPlayStoreUrl
-  } from "@/libs/utils";
-  import { AppManagementService } from "@/services/AppManagementService";
-  import { FeatureManagementService } from "@/services/FeatureManagementService";
-  import type { AppEntry, AppsList, CurrentView } from "@/types/apps";
+  <script>
+    import Alpine from "alpinejs";
+    import { actions } from "astro:actions";
+    import JSConfetti from "js-confetti";
+    import {
+      type Feature,
+      updateUnreachableAlpineState,
+      KNOX_USER_GROUPS,
+      getPackageNameFromPlayStoreUrl
+    } from "@/libs/utils";
+    import { AppManagementService } from "@/services/AppManagementService";
+    import { FeatureManagementService } from "@/services/FeatureManagementService";
+    import type { AppEntry, AppsList, CurrentView } from "@/types/apps";
 
-  // Create service instances
-  const appManagement = new AppManagementService();
-  const featureManagement = new FeatureManagementService();
+    // Create service instances
+    const appManagement = new AppManagementService();
+    const featureManagement = new FeatureManagementService();
 
-  Alpine.data("device", function () {
-    return {
-      appsList: {} as AppsList,
-      installedApps: [] as { packageName: string; appName: string; isGoogleManaged: "Y" | "N" }[],
-      currentView: "installed" as CurrentView,
-      appSearchQuery: "",
-      features: [] as string[],
-      isSubscribed: false,
-      isAiEnabled: false,
-      isEditing: false,
-      nickname: "",
-      phoneNumber: "",
-      originalNickname: "",
-      originalPhoneNumber: "",
-      imei: "",
-      isLoading: true,
-      isToolDrawerLoading: false,
-      isToolDrawerLoaded: false,
-      // @ts-ignore
-      isPhoneSetUp: this.$persist(false),
+    Alpine.data("device", function () {
+      return {
+        appsList: {} as AppsList,
+        installedApps: [] as { packageName: string; appName: string; isGoogleManaged: "Y" | "N" }[],
+        currentView: "installed" as CurrentView,
+        appSearchQuery: "",
+        features: [] as string[],
+        isSubscribed: false,
+        isAiEnabled: false,
+        isEditing: false,
+        nickname: "",
+        phoneNumber: "",
+        originalNickname: "",
+        originalPhoneNumber: "",
+        imei: "",
+        isLoading: true,
+        isToolDrawerLoading: false,
+        isToolDrawerLoaded: false,
+        // @ts-ignore
+        isPhoneSetUp: this.$persist(false),
 
-      // Computed properties
-      get isToolDrawerEnabled() {
-        return (
-          this.isSubscribed &&
-          Array.isArray(this.features) &&
-          this.features.includes(KNOX_USER_GROUPS.ADD_ON_TOOL_DRAWER)
-        );
-      },
-      get isFaithToolsEnabled() {
-        return this.isSubscribed && this.features.includes(KNOX_USER_GROUPS.ADD_ON_FAITH_TOOLS);
-      },
-      get completeSetupUrl() {
-        return `http://localhost?imei=${this.imei}&phone=${this.phoneNumber}&subscription=done`;
-      },
+        // Computed properties
+        get isToolDrawerEnabled() {
+          return (
+            this.isSubscribed &&
+            Array.isArray(this.features) &&
+            this.features.includes(KNOX_USER_GROUPS.ADD_ON_TOOL_DRAWER)
+          );
+        },
+        get isFaithToolsEnabled() {
+          return this.isSubscribed && this.features.includes(KNOX_USER_GROUPS.ADD_ON_FAITH_TOOLS);
+        },
+        get completeSetupUrl() {
+          return `http://localhost?imei=${this.imei}&phone=${this.phoneNumber}&subscription=done`;
+        },
 
-      // Memoized filtered apps computation
-      get filteredApps(): AppEntry[] {
-        return this.computeFilteredApps();
-      },
+        // Memoized filtered apps computation
+        get filteredApps(): AppEntry[] {
+          return this.computeFilteredApps();
+        },
 
-      // Methods
-      computeFilteredApps(): AppEntry[] {
-        if (!Object.keys(this.appsList).length) return [];
+        // Methods
+        computeFilteredApps(): AppEntry[] {
+          if (!Object.keys(this.appsList).length) return [];
 
-        const baseApps = !this.isFaithToolsEnabled
-          ? Object.entries(this.appsList).filter(([, app]) => app.source !== "faith.tools")
-          : Object.entries(this.appsList);
+          const baseApps = !this.isFaithToolsEnabled
+            ? Object.entries(this.appsList).filter(([, app]) => app.source !== "faith.tools")
+            : Object.entries(this.appsList);
 
-        const viewFiltered = this.filterAppsByView(baseApps);
-        const mappedApps = this.mapAppsToEntries(viewFiltered);
+          const viewFiltered = this.filterAppsByView(baseApps);
+          const mappedApps = this.mapAppsToEntries(viewFiltered);
 
-        return this.appSearchQuery ? this.filterAppsBySearch(mappedApps) : mappedApps;
-      },
+          return this.appSearchQuery ? this.filterAppsBySearch(mappedApps) : mappedApps;
+        },
 
-      filterAppsByView(apps: [string, Omit<AppEntry, "packageName">][]): [string, Omit<AppEntry, "packageName">][] {
-        const view = this.currentView;
-        switch (view) {
-          case "installed":
-            const installedApps = this.installedApps
-              .filter((app) => app.isGoogleManaged === "Y")
-              .map((app) => [app.packageName || app.appName, { installed: true, name: app.appName, source: "Tool Drawer" }] as [string, Omit<AppEntry, "packageName">])
-              .sort((a, b) => a[1].name.localeCompare(b[1].name));
-            return installedApps;
-          case "faith-tools":
-            return apps.filter(([, app]) => app.source === "faith.tools");
-          case "tool-drawer":
-            return apps.filter(([, app]) => app.source === "Tool Drawer");
-          default:
-            return apps;
-        }
-      },
+        filterAppsByView(apps: [string, Omit<AppEntry, "packageName">][]): [string, Omit<AppEntry, "packageName">][] {
+          const view = this.currentView;
+          switch (view) {
+            case "installed":
+              const installedApps = this.installedApps
+                .filter((app) => app.isGoogleManaged === "Y")
+                .map((app) => [app.packageName || app.appName, { installed: true, name: app.appName, source: "Tool Drawer" }] as [string, Omit<AppEntry, "packageName">])
+                .sort((a, b) => a[1].name.localeCompare(b[1].name));
+              return installedApps;
+            case "faith-tools":
+              return apps.filter(([, app]) => app.source === "faith.tools");
+            case "tool-drawer":
+              return apps.filter(([, app]) => app.source === "Tool Drawer");
+            default:
+              return apps;
+          }
+        },
 
-      mapAppsToEntries(apps: [string, Omit<AppEntry, "packageName">][]): AppEntry[] {
-        return apps.map(([packageName, { installed, name, source }]) => ({
-          packageName,
-          installed,
-          name,
-          source
-        }));
-      },
+        mapAppsToEntries(apps: [string, Omit<AppEntry, "packageName">][]): AppEntry[] {
+          return apps.map(([packageName, { installed, name, source }]) => ({
+            packageName,
+            installed,
+            name,
+            source
+          }));
+        },
 
-      filterAppsBySearch(apps: AppEntry[]): AppEntry[] {
-        const searchQuery = this.appSearchQuery.toLowerCase();
-        return apps.filter((app) => app.name.toLowerCase().includes(searchQuery));
-      },
+        filterAppsBySearch(apps: AppEntry[]): AppEntry[] {
+          const searchQuery = this.appSearchQuery.toLowerCase();
+          return apps.filter((app) => app.name.toLowerCase().includes(searchQuery));
+        },
 
-      isFeatureEnabled(knoxManageId: string, isInverse = false) {
-        const isEnabled = this.features.includes(knoxManageId);
-        return isInverse ? !isEnabled : isEnabled;
-      },
+        isFeatureEnabled(knoxManageId: string, isInverse = false) {
+          const isEnabled = this.features.includes(knoxManageId);
+          return isInverse ? !isEnabled : isEnabled;
+        },
 
-      showSuccessToast(message: string) {
-        updateUnreachableAlpineState({
-          sourceDataElement: document.documentElement,
-          key: "toastMessage",
-          value: message
-        });
-      },
-
-      showErrorToast(message: string) {
-        updateUnreachableAlpineState({
-          sourceDataElement: document.documentElement,
-          key: "toastErrorMessage",
-          value: message
-        });
-      },
-
-      async getFeatures() {
-        const url = new URL(`/api/samsung-knox.json`, window.location.origin);
-        url.searchParams.set("action", "get-device-groups");
-        url.searchParams.set("imei", this.imei);
-
-        const res = await fetch(url, { method: "GET" });
-        const features = await res.json();
-        this.features = features;
-      },
-
-      completeSetup() {
-        if (
-          confirm(
-            "Completing the setup will close the Portal and remove 'Setup' from your Wisephone II's home screen. Continue?"
-          )
-        ) {
-          this.isPhoneSetUp = true;
-          this.$nextTick(() => {
-            window.location.href = this.completeSetupUrl;
+        showSuccessToast(message: string) {
+          updateUnreachableAlpineState({
+            sourceDataElement: document.documentElement,
+            key: "toastMessage",
+            value: message
           });
-        }
-      },
+        },
 
-      async toggleFeature(feature: Feature, switchElement: HTMLInputElement) {
-        let currentEnabled = false;
+        showErrorToast(message: string) {
+          updateUnreachableAlpineState({
+            sourceDataElement: document.documentElement,
+            key: "toastErrorMessage",
+            value: message
+          });
+        },
 
-        try {
-          if (!this.isSubscribed) {
-            throw new Error("Active subscription required");
+        async getFeatures() {
+          const url = new URL(`/api/samsung-knox.json`, window.location.origin);
+          url.searchParams.set("action", "get-device-groups");
+          url.searchParams.set("imei", this.imei);
+
+          const res = await fetch(url, { method: "GET" });
+          const features = await res.json();
+          this.features = features;
+        },
+
+        completeSetup() {
+          if (
+            confirm(
+              "Completing the setup will close the Portal and remove 'Setup' from your Wisephone II's home screen. Continue?"
+            )
+          ) {
+            this.isPhoneSetUp = true;
+            this.$nextTick(() => {
+              window.location.href = this.completeSetupUrl;
+            });
           }
+        },
 
-          if (!feature?.knoxManageId) {
-            throw new Error("Invalid feature configuration");
+        async toggleFeature(feature: Feature, switchElement: HTMLInputElement) {
+          let currentEnabled = false;
+
+          try {
+            if (!this.isSubscribed) {
+              throw new Error("Active subscription required");
+            }
+
+            if (!feature?.knoxManageId) {
+              throw new Error("Invalid feature configuration");
+            }
+
+            currentEnabled = this.isFeatureEnabled(feature.knoxManageId, feature.isInverse);
+            const confirmMessage = currentEnabled ? feature.disableMessage : feature.enableMessage;
+            let updatedValue = !currentEnabled;
+            if (feature.isInverse) {
+              updatedValue = currentEnabled;
+            }
+
+            if (!confirm(confirmMessage)) {
+              return;
+            }
+
+            switchElement.checked = !switchElement.checked;
+
+            await featureManagement.toggleFeature({
+              imei: this.imei,
+              feature,
+              enabled: updatedValue
+            });
+
+            // Update features list
+            if (!updatedValue) {
+              this.features = this.features.filter((id) => id !== feature.knoxManageId);
+            } else {
+              this.features.push(feature.knoxManageId);
+            }
+
+            this.showSuccessToast(
+              `Your device is being updated. ${feature.name} will be ${!currentEnabled ? "enabled" : "disabled"} shortly.`
+            );
+          } catch (error) {
+            console.error("Feature toggle failed:", error);
+            this.showErrorToast(error instanceof Error ? error.message : "Feature update failed");
+            switchElement.checked = currentEnabled;
           }
+        },
 
-          currentEnabled = this.isFeatureEnabled(feature.knoxManageId, feature.isInverse);
-          const confirmMessage = currentEnabled ? feature.disableMessage : feature.enableMessage;
-          let updatedValue = !currentEnabled;
-          if (feature.isInverse) {
-            updatedValue = currentEnabled;
+        /**
+         * Ensures a device has the correct Knox user group configuration by managing exclusive group memberships.
+         * This prevents conflicts between incompatible feature combinations.
+         * @param userGroups - Array of Knox user group IDs currently assigned to the device
+         */
+        async removeExclusiveGroups(userGroups: string[]) {
+          const exclusiveGroups = this.getExclusiveGroups(userGroups);
+          if (!this.hasMultipleExclusiveGroups(exclusiveGroups)) {
+            await this.ensureBaseGroup(userGroups);
+          } else {
+            await this.removeIncompatibleFeatures(userGroups);
           }
+        },
 
-          if (!confirm(confirmMessage)) {
+        /**
+         * Gets the list of exclusive groups from the user's current groups
+         */
+        getExclusiveGroups(userGroups: string[]): string[] {
+          // Unpaid and Subscribed are exclusive
+          return userGroups.filter((group) => group === KNOX_USER_GROUPS.UNPAID || group === KNOX_USER_GROUPS.SUBSCRIBED);
+        },
+
+        /**
+         * Checks if the device has more than one exclusive group assigned
+         */
+        hasMultipleExclusiveGroups(exclusiveGroups: string[]): boolean {
+          return exclusiveGroups.length > 1;
+        },
+
+        /**
+         * Ensures the device has at least one base group (Minimal or Unpaid)
+         * based on subscription status
+         */
+        async ensureBaseGroup(userGroups: string[]) {
+          const hasBaseGroup = userGroups.some(
+            (group) => group === KNOX_USER_GROUPS.UNPAID || group === KNOX_USER_GROUPS.SUBSCRIBED
+          );
+          if (!hasBaseGroup) {
+            const baseGroup = this.isSubscribed ? KNOX_USER_GROUPS.SUBSCRIBED : KNOX_USER_GROUPS.UNPAID;
+            await this.addFeatureToDevice(baseGroup);
+          }
+        },
+
+        /**
+         * Removes incompatible feature combinations from the device
+         */
+        async removeIncompatibleFeatures(userGroups: string[]) {
+          const featuresToRemove = this.getIncompatibleFeatures(userGroups);
+          for (const knoxManageId of featuresToRemove) {
+            await this.removeFeatureFromDevice(knoxManageId);
+          }
+          window.location.reload();
+        },
+
+        /**
+         * Determines which features need to be removed to resolve conflicts
+         */
+        getIncompatibleFeatures(userGroups: string[]): string[] {
+          return [
+            // Remove Unpaid if present with Subscribed we're going to assume
+            // they're subscribed.
+            userGroups.includes(KNOX_USER_GROUPS.UNPAID) &&
+              userGroups.includes(KNOX_USER_GROUPS.SUBSCRIBED) &&
+              KNOX_USER_GROUPS.UNPAID
+          ].filter(Boolean) as string[];
+        },
+
+        /**
+         * Adds a feature to the device using the Knox API
+         */
+        async addFeatureToDevice(knoxManageId: string) {
+          const url = new URL(`/api/samsung-knox.json`, window.location.origin);
+          url.searchParams.set("action", "apply-feature");
+          url.searchParams.set("imei", this.imei);
+          url.searchParams.set("knoxManageId", knoxManageId);
+          await fetch(url, { method: "POST" });
+        },
+
+        /**
+         * Removes a feature from the device using the Knox API
+         */
+        async removeFeatureFromDevice(knoxManageId: string) {
+          const url = new URL(`/api/samsung-knox.json`, window.location.origin);
+          url.searchParams.set("action", "remove-feature");
+          url.searchParams.set("imei", this.imei);
+          url.searchParams.set("knoxManageId", knoxManageId);
+          await fetch(url, { method: "POST" });
+        },
+
+        async installApp(packageName: string) {
+          try {
+            if (!packageName || !this.appsList[packageName]) {
+              throw new Error("Invalid app selected");
+            }
+
+            await appManagement.installApp(this.imei, packageName);
+            this.appsList[packageName].installed = true;
+            this.showSuccessToast(`${this.appsList[packageName].name} will be installed shortly`);
+          } catch (error) {
+            console.error("App installation failed:", error);
+            this.showErrorToast("Failed to install app");
+          }
+        },
+
+        async uninstallApp(packageName: string) {
+          try {
+            await appManagement.uninstallApp(this.imei, packageName);
+            this.appsList[packageName].installed = false;
+            this.showSuccessToast(`${this.appsList[packageName].name} will be uninstalled shortly`);
+          } catch (error) {
+            console.error("App uninstallation failed:", error);
+            this.showErrorToast("Failed to uninstall app");
+          }
+        },
+
+        // Add a method to load the Tool Drawer data client-side
+        async loadToolDrawer() {
+          if (this.isToolDrawerLoaded || this.isToolDrawerLoading) {
             return;
           }
 
-          switchElement.checked = !switchElement.checked;
-
-          await featureManagement.toggleFeature({
-            imei: this.imei,
-            feature,
-            enabled: updatedValue
-          });
-
-          // Update features list
-          if (!updatedValue) {
-            this.features = this.features.filter((id) => id !== feature.knoxManageId);
-          } else {
-            this.features.push(feature.knoxManageId);
-          }
-
-          this.showSuccessToast(
-            `Your device is being updated. ${feature.name} will be ${!currentEnabled ? "enabled" : "disabled"} shortly.`
-          );
-        } catch (error) {
-          console.error("Feature toggle failed:", error);
-          this.showErrorToast(error instanceof Error ? error.message : "Feature update failed");
-          switchElement.checked = currentEnabled;
-        }
-      },
-
-      /**
-       * Ensures a device has the correct Knox user group configuration by managing exclusive group memberships.
-       * This prevents conflicts between incompatible feature combinations.
-       * @param userGroups - Array of Knox user group IDs currently assigned to the device
-       */
-      async removeExclusiveGroups(userGroups: string[]) {
-        const exclusiveGroups = this.getExclusiveGroups(userGroups);
-        if (!this.hasMultipleExclusiveGroups(exclusiveGroups)) {
-          await this.ensureBaseGroup(userGroups);
-        } else {
-          await this.removeIncompatibleFeatures(userGroups);
-        }
-      },
-
-      /**
-       * Gets the list of exclusive groups from the user's current groups
-       */
-      getExclusiveGroups(userGroups: string[]): string[] {
-        // Unpaid and Subscribed are exclusive
-        return userGroups.filter((group) => group === KNOX_USER_GROUPS.UNPAID || group === KNOX_USER_GROUPS.SUBSCRIBED);
-      },
-
-      /**
-       * Checks if the device has more than one exclusive group assigned
-       */
-      hasMultipleExclusiveGroups(exclusiveGroups: string[]): boolean {
-        return exclusiveGroups.length > 1;
-      },
-
-      /**
-       * Ensures the device has at least one base group (Minimal or Unpaid)
-       * based on subscription status
-       */
-      async ensureBaseGroup(userGroups: string[]) {
-        const hasBaseGroup = userGroups.some(
-          (group) => group === KNOX_USER_GROUPS.UNPAID || group === KNOX_USER_GROUPS.SUBSCRIBED
-        );
-        if (!hasBaseGroup) {
-          const baseGroup = this.isSubscribed ? KNOX_USER_GROUPS.SUBSCRIBED : KNOX_USER_GROUPS.UNPAID;
-          await this.addFeatureToDevice(baseGroup);
-        }
-      },
-
-      /**
-       * Removes incompatible feature combinations from the device
-       */
-      async removeIncompatibleFeatures(userGroups: string[]) {
-        const featuresToRemove = this.getIncompatibleFeatures(userGroups);
-        for (const knoxManageId of featuresToRemove) {
-          await this.removeFeatureFromDevice(knoxManageId);
-        }
-        window.location.reload();
-      },
-
-      /**
-       * Determines which features need to be removed to resolve conflicts
-       */
-      getIncompatibleFeatures(userGroups: string[]): string[] {
-        return [
-          // Remove Unpaid if present with Subscribed we're going to assume
-          // they're subscribed.
-          userGroups.includes(KNOX_USER_GROUPS.UNPAID) &&
-            userGroups.includes(KNOX_USER_GROUPS.SUBSCRIBED) &&
-            KNOX_USER_GROUPS.UNPAID
-        ].filter(Boolean) as string[];
-      },
-
-      /**
-       * Adds a feature to the device using the Knox API
-       */
-      async addFeatureToDevice(knoxManageId: string) {
-        const url = new URL(`/api/samsung-knox.json`, window.location.origin);
-        url.searchParams.set("action", "apply-feature");
-        url.searchParams.set("imei", this.imei);
-        url.searchParams.set("knoxManageId", knoxManageId);
-        await fetch(url, { method: "POST" });
-      },
-
-      /**
-       * Removes a feature from the device using the Knox API
-       */
-      async removeFeatureFromDevice(knoxManageId: string) {
-        const url = new URL(`/api/samsung-knox.json`, window.location.origin);
-        url.searchParams.set("action", "remove-feature");
-        url.searchParams.set("imei", this.imei);
-        url.searchParams.set("knoxManageId", knoxManageId);
-        await fetch(url, { method: "POST" });
-      },
-
-      async installApp(packageName: string) {
-        try {
-          if (!packageName || !this.appsList[packageName]) {
-            throw new Error("Invalid app selected");
-          }
-
-          await appManagement.installApp(this.imei, packageName);
-          this.appsList[packageName].installed = true;
-          this.showSuccessToast(`${this.appsList[packageName].name} will be installed shortly`);
-        } catch (error) {
-          console.error("App installation failed:", error);
-          this.showErrorToast("Failed to install app");
-        }
-      },
-
-      async uninstallApp(packageName: string) {
-        try {
-          await appManagement.uninstallApp(this.imei, packageName);
-          this.appsList[packageName].installed = false;
-          this.showSuccessToast(`${this.appsList[packageName].name} will be uninstalled shortly`);
-        } catch (error) {
-          console.error("App uninstallation failed:", error);
-          this.showErrorToast("Failed to uninstall app");
-        }
-      },
-
-      // Add a method to load the Tool Drawer data client-side
-      async loadToolDrawer() {
-        if (this.isToolDrawerLoaded || this.isToolDrawerLoading) {
-          return;
-        }
-
-        try {
-          this.isToolDrawerLoading = true;
-          const response = await fetch("/api/ottogrid.json");
-
-          if (!response.ok) {
-            throw new Error("Failed to load Tool Drawer data");
-          }
-
-          const data = await response.json();
-
-          // Process the data and update the appsList
-          if (data && data.rows && data.rows.length) {
-            const updatedAppsList = { ...this.appsList };
-
-            data.rows
-              .filter((row: any) => row && row.cells && row.cells["Tool Drawer"] === "Yes")
-              .forEach((row: any) => {
-                try {
-                  const packageName = getPackageNameFromPlayStoreUrl(row.cells["Play Store URL"]);
-                  if (!packageName) return;
-
-                  // If the app is already in the list, preserve the installed status
-                  const isInstalled = this.installedApps.some((app) => app.packageName === packageName);
-
-                  updatedAppsList[packageName] = {
-                    source: "Tool Drawer",
-                    installed: isInstalled,
-                    name: row.cells["Tool Name"] || "Unknown App"
-                  };
-                } catch (error) {
-                  console.error("Error processing app row:", error);
-                }
-              });
-
-            this.appsList = updatedAppsList;
-            this.isToolDrawerLoaded = true;
-          }
-        } catch (error) {
-          console.error("Error loading Tool Drawer:", error);
-          this.showErrorToast("Failed to load Tool Drawer apps");
-        } finally {
-          this.isToolDrawerLoading = false;
-        }
-      },
-
-      showConfetti() {
-        const confetti = new JSConfetti();
-        confetti.addConfetti();
-      },
-
-      async validateStripeSession() {
-        const sessionId = new URLSearchParams(window.location.search).get("session_id");
-        if (!sessionId) {
-          return;
-        }
-
-        // Remove the session_id url param
-        const url = new URL(window.location.href);
-        url.searchParams.delete("session_id");
-        window.history.replaceState({}, "", url.toString());
-
-        const session = await actions.stripe.validateSubscription.orThrow({ sessionId, imei: this.imei });
-        if (!session) {
-          return;
-        }
-
-        if (session.isSubscribed) {
-          this.showSuccessToast("Congratulations! You're subscribed.");
-          this.showConfetti();
-          this.isSubscribed = true;
-          await this.addFeatureToDevice(KNOX_USER_GROUPS.SUBSCRIBED);
-          this.features.push(KNOX_USER_GROUPS.SUBSCRIBED);
-        } else {
-          this.showErrorToast("Subscription validation failed. Please try again.");
-        }
-      },
-
-      async init() {
-        this.$watch("imei", async (value) => {
           try {
-            await this.getFeatures();
-            if (this.imei) {
-              this.validateStripeSession();
+            this.isToolDrawerLoading = true;
+            const response = await fetch("/api/ottogrid.json");
+
+            if (!response.ok) {
+              throw new Error("Failed to load Tool Drawer data");
+            }
+
+            const data = await response.json();
+
+            // Process the data and update the appsList
+            if (data && data.rows && data.rows.length) {
+              const updatedAppsList = { ...this.appsList };
+
+              data.rows
+                .filter((row: any) => row && row.cells && row.cells["Tool Drawer"] === "Yes")
+                .forEach((row: any) => {
+                  try {
+                    const packageName = getPackageNameFromPlayStoreUrl(row.cells["Play Store URL"]);
+                    if (!packageName) return;
+
+                    // If the app is already in the list, preserve the installed status
+                    const isInstalled = this.installedApps.some((app) => app.packageName === packageName);
+
+                    updatedAppsList[packageName] = {
+                      source: "Tool Drawer",
+                      installed: isInstalled,
+                      name: row.cells["Tool Name"] || "Unknown App"
+                    };
+                  } catch (error) {
+                    console.error("Error processing app row:", error);
+                  }
+                });
+
+              this.appsList = updatedAppsList;
+              this.isToolDrawerLoaded = true;
             }
           } catch (error) {
-            console.error("Failed to load features:", error);
+            console.error("Error loading Tool Drawer:", error);
+            this.showErrorToast("Failed to load Tool Drawer apps");
           } finally {
-            this.isLoading = false;
+            this.isToolDrawerLoading = false;
           }
-        });
+        },
 
-        this.$watch("isEditing", (value) => {
-          if (!value) {
-            this.nickname = this.originalNickname || "";
-            this.phoneNumber = this.originalPhoneNumber || "";
+        showConfetti() {
+          const confetti = new JSConfetti();
+          confetti.addConfetti();
+        },
+
+        async validateStripeSession() {
+          const sessionId = new URLSearchParams(window.location.search).get("session_id");
+          if (!sessionId) {
+            return;
           }
-        });
 
-        this.$watch("features", async (userGroups: string[]) => {
-          if (this.isSubscribed && !userGroups.includes(KNOX_USER_GROUPS.SUBSCRIBED)) {
+          // Remove the session_id url param
+          const url = new URL(window.location.href);
+          url.searchParams.delete("session_id");
+          window.history.replaceState({}, "", url.toString());
+
+          const session = await actions.stripe.validateSubscription.orThrow({ sessionId, imei: this.imei });
+          if (!session) {
+            return;
+          }
+
+          if (session.isSubscribed) {
+            this.showSuccessToast("Congratulations! You're subscribed.");
+            this.showConfetti();
+            this.isSubscribed = true;
             await this.addFeatureToDevice(KNOX_USER_GROUPS.SUBSCRIBED);
             this.features.push(KNOX_USER_GROUPS.SUBSCRIBED);
+          } else {
+            this.showErrorToast("Subscription validation failed. Please try again.");
           }
+        },
 
-          await this.removeExclusiveGroups(userGroups);
+        async init() {
+          this.$watch("imei", async (value) => {
+            try {
+              await this.getFeatures();
+              if (this.imei) {
+                this.validateStripeSession();
+              }
+            } catch (error) {
+              console.error("Failed to load features:", error);
+            } finally {
+              this.isLoading = false;
+            }
+          });
 
-          // Load Tool Drawer data client-side when Tool Drawer feature is enabled
-          if (this.isToolDrawerEnabled && !this.isToolDrawerLoaded) {
-            this.loadToolDrawer();
+          this.$watch("isEditing", (value) => {
+            if (!value) {
+              this.nickname = this.originalNickname || "";
+              this.phoneNumber = this.originalPhoneNumber || "";
+            }
+          });
+
+          this.$watch("features", async (userGroups: string[]) => {
+            if (this.isSubscribed && !userGroups.includes(KNOX_USER_GROUPS.SUBSCRIBED)) {
+              await this.addFeatureToDevice(KNOX_USER_GROUPS.SUBSCRIBED);
+              this.features.push(KNOX_USER_GROUPS.SUBSCRIBED);
+            }
+
+            await this.removeExclusiveGroups(userGroups);
+
+            // Load Tool Drawer data client-side when Tool Drawer feature is enabled
+            if (this.isToolDrawerEnabled && !this.isToolDrawerLoaded) {
+              this.loadToolDrawer();
+            }
+          });
+
+          // Sync installed apps in the background
+          if (this.imei) {
+            const formData = new FormData();
+            formData.append("imei", String(this.imei));
+            await actions.wisephones.syncInstalledApps(formData);
           }
-        });
-
-        // Sync installed apps in the background
-        if (this.imei) {
-          const formData = new FormData();
-          formData.append("imei", String(this.imei));
-          await actions.wisephones.syncInstalledApps(formData);
         }
-      }
-    };
-  });
-</script>
+      };
+    });
+  </script>
+</Layout>

@@ -269,51 +269,51 @@ const actionResult = Astro.getActionResult(actions.wisephones.createWisephone);
   <div class="mb-12">
     <Footer showLogo={false} />
   </div>
-</Layout>
 
-<script>
-  import Alpine from "alpinejs";
-  import { isValidIMEI } from "@/libs/utils";
+  <script>
+    import Alpine from "alpinejs";
+    import { isValidIMEI } from "@/libs/utils";
 
-  document.addEventListener("alpine:init", () => {
-    Alpine.data("dashboard", () => ({
-      showForm: false,
-      isLoading: false,
-      imei1: "",
-      imei2: "",
-      phoneNumber: "",
-      nickname: "",
-      imeiMatch: false,
-      hasBlurredImei: false,
-      hasBlurredImeiVerification: false,
-      isImeiValid: true,
-      simStatus: "",
-      validateImei() {
-        this.imeiMatch = this.imei1 === this.imei2;
+    document.addEventListener("alpine:init", () => {
+      Alpine.data("dashboard", () => ({
+        showForm: false,
+        isLoading: false,
+        imei1: "",
+        imei2: "",
+        phoneNumber: "",
+        nickname: "",
+        imeiMatch: false,
+        hasBlurredImei: false,
+        hasBlurredImeiVerification: false,
+        isImeiValid: true,
+        simStatus: "",
+        validateImei() {
+          this.imeiMatch = this.imei1 === this.imei2;
 
-        if (this.imei1.length === 15) {
-          this.isImeiValid = isValidIMEI(this.imei1);
-        } else {
-          this.isImeiValid = false;
+          if (this.imei1.length === 15) {
+            this.isImeiValid = isValidIMEI(this.imei1);
+          } else {
+            this.isImeiValid = false;
+          }
+        },
+
+        isFormValid() {
+          return (
+            this.isImeiValid &&
+            this.imeiMatch &&
+            this.phoneNumber.replace(/-/g, "").length === 10 &&
+            this.nickname.trim().length > 0
+          );
+        },
+        resetForm() {
+          this.imei1 = "";
+          this.imei2 = "";
+          this.phoneNumber = "";
+          this.nickname = "";
+          this.imeiMatch = false;
+          this.hasBlurredImei = false;
         }
-      },
-
-      isFormValid() {
-        return (
-          this.isImeiValid &&
-          this.imeiMatch &&
-          this.phoneNumber.replace(/-/g, "").length === 10 &&
-          this.nickname.trim().length > 0
-        );
-      },
-      resetForm() {
-        this.imei1 = "";
-        this.imei2 = "";
-        this.phoneNumber = "";
-        this.nickname = "";
-        this.imeiMatch = false;
-        this.hasBlurredImei = false;
-      }
-    }));
-  });
-</script>
+      }));
+    });
+  </script>
+</Layout>
