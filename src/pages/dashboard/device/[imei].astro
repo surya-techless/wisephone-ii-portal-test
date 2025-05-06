@@ -571,6 +571,12 @@ const userLink = user?.id
                   >
                     <p x-text="app.name" class="line-clamp-2"></p>
                   </a>
+                  <p
+                    x-cloak
+                    x-show="app.installed"
+                    x-text="`Ran ${getAppOpenCount(app.packageName) > 0 ? getAppOpenCount(app.packageName).toLocaleString() : '0'} times`"
+                    class="text-xs text-slate-500"
+                  >-</p>
                 </div>
 
                 <div class="grid" style="grid-template-areas: 'stack'">
@@ -589,7 +595,7 @@ const userLink = user?.id
                     }`}
                     x-show="!app.installed"
                     @click="handleClick()"
-                    class="relative btn btn-outline rounded-full border-slate-200 border-2 hover:border-slate-300 hover:bg-slate-100 hover:text-slate-800 disabled:cursor-not-allowed"
+                    class="relative btn btn-sm btn-outline rounded-full border-slate-200 border-2 hover:border-slate-300 hover:bg-slate-100 hover:text-slate-800 disabled:cursor-not-allowed"
                     style="grid-area: stack"
                   >
                     <Icon name="lucide:download" class="w-5 h-5" />
@@ -617,7 +623,7 @@ const userLink = user?.id
                     x-show="app.installed"
                     x-cloak
                     @click="handleClick()"
-                    class="relative btn btn-outline rounded-full text-red-800 border-slate-200 border-2 hover:border-slate-300 hover:bg-slate-100 hover:text-red-800 disabled:cursor-not-allowed"
+                    class="relative btn btn-outline btn-sm rounded-full text-red-800 border-slate-200 border-2 hover:border-slate-300 hover:bg-slate-100 hover:text-red-800 disabled:cursor-not-allowed"
                     style="grid-area: stack"
                   >
                     <Icon name="lucide:trash-2" class="w-5 h-5 text-red-800" />
@@ -690,7 +696,7 @@ const userLink = user?.id
     Alpine.data("device", function () {
       return {
         appsList: {} as AppsList,
-        installedApps: [] as { packageName: string; appName: string; isGoogleManaged: "Y" | "N" }[],
+        installedApps: [] as { packageName: string; appName: string; isGoogleManaged: "Y" | "N", runningCount: string }[],
         currentView: "installed" as CurrentView,
         appSearchQuery: "",
         features: [] as string[],
@@ -726,6 +732,11 @@ const userLink = user?.id
         // Memoized filtered apps computation
         get filteredApps(): AppEntry[] {
           return this.computeFilteredApps();
+        },
+
+        getAppOpenCount(packageName: string): number {
+          const app = this.installedApps.find((installedApp) => installedApp.packageName === packageName);
+          return app ? parseInt(app.runningCount) : 0;
         },
 
         // Methods
