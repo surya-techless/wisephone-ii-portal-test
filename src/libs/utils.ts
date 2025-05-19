@@ -1070,6 +1070,11 @@ export const FAITH_TOOLS_APPS: { id: number; Name: string; "Play Store URL": str
     id: 2243,
     Name: "iBreviary",
     "Play Store URL": "https://play.google.com/store/apps/details?id=com.netguru.ibreviary&hl=en"
+  },
+  {
+    id: 2771,
+    Name: "Alliance Catholic Credit Union",
+    "Play Store URL": "https://play.google.com/store/apps/details?id=com.allianceccu.android"
   }
 ];
 
