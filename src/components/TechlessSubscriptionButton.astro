@@ -8,13 +8,15 @@ const { customerEmail, deviceIMEI } = Astro.props as Props;
 ---
 
 <div
+  class="w-full"
   x-data="stripe"
   x-init={`
     customerEmail = \`${customerEmail}\`;
     deviceIMEI = \`${deviceIMEI}\`;
   `}
 >
-  <button class="btn btn-primary" :disabled="!isLoaded" @click="handleClick">Activate Subscription</button>
+  <button class="w-full btn btn-primary" :disabled="!isLoaded" @click="handleClick">Activate WiseOS Subscription</button
+  >
   <dialog x-ref="stripeDialog" id="stripe-dialog" class="modal">
     <div style="background-color: rgb(247, 246, 242)" class="modal-box">
       <div id="stripe-element"></div>

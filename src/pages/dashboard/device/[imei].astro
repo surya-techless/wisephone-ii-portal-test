@@ -389,31 +389,50 @@ const userLink = user?.id
           x-show={`!isSubscribed && ${!wisephoneUsesSecondaryImeiAndShouldBeBlocked}`}
           x-cloak
           x-transition
-          class="transition-transform duration-150 alert bg-slate-200 border-slate-300 text-slate-800 -rotate-1 hover:rotate-0"
+          class="flex flex-col items-start justify-center w-full p-6 bg-white shadow rounded-2xl"
         >
-          <Icon name="lucide:info" class="w-4 h-4" />
-
           <div>
-            <h3 class="text-xl font-bold !m-0">Next Step</h3>
-            <p class="mb-2">
-              Activate a <span class="tooltip tooltip-bottom" data-tip="Formerly Techless Subscription">WiseOS Subscription</span>
-              to unlock your Wisephone's full potential. <a
-                class="link underline-offset-2 text-slate-500"
-                href="https://wisephone.com/pages/plans"
-                target="_blank">Learn more</a
-              >
+            <h3 class="text-xl font-bold !m-0">Activate Your Wisephone</h3>
+            <p class="mb-2 text-slate-500">
+              To unlock your Wisephone's full potential, a WiseOS Subscription is required. Choose your preferred connectivity option below.
             </p>
 
-            <TechlessSubscriptionButton
-              deviceIMEI={wisephone?.imei || ""}
-              customerEmail={user?.emailAddresses[0]?.emailAddress || ""}
-            />
+            <div class="grid sm:grid-cols-2 max-sm:grid-cols-1 gap-4 mt-6">
+              <div class="card rounded-xl border border-[var(--surface-tertiary)] text-slate-800">
+                <div class="card-body p-6">
+                  <h3 class="text-lg font-bold !m-0">Wisephone Carrier Plan <span class='font-normal text-slate-500'>(Includes WiseOS Subscription)</span></h3>
+                  <p class="m-0 mt-2">
+                    Get all-in-one connectivity with our Wisephone Carrier Plan, which bundles your data, talk, and text with your WiseOS Subscription for a complete experience.
+                    <a class="link underline-offset-2 text-slate-500" href="https://wisephone.com/pages/plans" target="_blank">Learn more</a>
+                  </p>
+                  <a href="https://plans.techless.com" target="_blank" class="flex items-center gap-1 btn btn-primary mt-4">
+                    Activate Carrier Plan*
+                    <Icon name="lucide:external-link" class="w-4 h-4" />
+                  </a>
+                </div>
+              </div>
+              <div class="card rounded-xl border border-[var(--surface-tertiary)] text-slate-800">
+                <div class="card-body p-6">
+                  <h3 class="text-lg font-bold !m-0">Bring Your Own Carrier <span class='font-normal text-slate-500'>(WiseOS Subscription Required)</span></h3>
+                  <p class="m-0 mt-2">Continue using your existing carrier and unlock your Wisephone's features by activating your WiseOS Subscription. <a class="link underline-offset-2 text-slate-500" href="https://wisephone.com/pages/plans" target="_blank">Learn more</a></p>
+                  <TechlessSubscriptionButton
+                    deviceIMEI={wisephone?.imei || ""}
+                    customerEmail={user?.emailAddresses[0]?.emailAddress || ""}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <p class="italic m-0 mt-2 text-sm text-slate-500">
+              *This requires a separate account than this Portal to manage your carrier plan. You'll need to register
+              an account there when asked.
+            </p>
 
             <details
-              class="w-full mt-3 transition-all duration-150 ease-in-out"
+              class="w-full mt-6 transition-all duration-150 ease-in-out"
               x-data="{ isOpen: false }"
               @toggle="isOpen = $event.target.open"
-              x-bind:class="{ 'p-6 pt-4 bg-slate-300 rounded-xl': isOpen }"
+              x-bind:class="{ 'p-6 pt-4 bg-[var(--surface-tertiary)] rounded-xl': isOpen }"
             >
               <summary
                 class="w-full font-medium transition cursor-pointer text-slate-500 hover:text-slate-800 hover:underline"
@@ -423,7 +442,7 @@ const userLink = user?.id
               <ol class="mt-3 list-decimal list-inside">
                 <li>
                   Make sure the phone number is correct: <code
-                    class="px-2 py-1 font-sans font-medium rounded-md select-all bg-slate-200"
+                    class="px-2 py-1 font-sans font-medium rounded-md select-all bg-[var(--surface-primary)]"
                     x-text="phoneNumber"></code>
                   <ul class="mt-1 ml-8">
                     <li class="list-disc">If the phone number is incorrect, update it.</li>
@@ -431,7 +450,7 @@ const userLink = user?.id
                 </li>
                 <li class="mt-3">
                   Make sure the device's IMEI is correct: <code
-                    class="px-2 py-1 font-sans font-medium rounded-md select-all bg-slate-200"
+                    class="px-2 py-1 font-sans font-medium rounded-md select-all bg-[var(--surface-primary)]"
                     x-text="imei"></code>
                   <ul class="mt-1 ml-8">
                     <li class="list-disc">If the IMEI is incorrect, remove this device and start over.</li>
