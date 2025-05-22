@@ -84,9 +84,7 @@ test.describe("Home Page", () => {
     // Click Get Started to show the form
     await page.getByRole("button", { name: "Get Started" }).click();
 
-    await expect(page.getByRole("heading", { name: /setup/i })).toBeVisible();
-
-    await page.getByRole("radio", { name: "My SIM card is inserted with calls and texts working" }).click();
+    await expect(page.getByRole("heading", { name: /Add a Wisephone/i })).toBeVisible();
 
     // Fill in the IMEI fields
     await page.getByLabel("Wisephone IMEI (slot 1)").fill("353994911040860");
