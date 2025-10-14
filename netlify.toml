@@ -6,13 +6,6 @@
   NODE_VERSION = "20.3.0"
   NPM_VERSION = "10.0.0"
 
-# Redirects for SSR
-[[redirects]]
-  from = "/*"
-  to = "/.netlify/functions/ssr"
-  status = 200
-  force = false
-
 # Security headers
 [[headers]]
   for = "/*"
