@@ -3,7 +3,9 @@ import { STRIPE_SECRET_KEY, GIGS_API_KEY } from "astro:env/server";
 import { type SubscriptionList, type DeviceList, type Subscription } from "./types";
 
 export const stripe = new Stripe(
-  STRIPE_SECRET_KEY, // Use environment variable for both prod and dev
+  import.meta.env.PROD
+    ? STRIPE_SECRET_KEY
+    : "sk_test_51H2HO9ATGtdZ0VDD6qhj4b11PI5Rt8kWfTrI9Vms2lZmokvaVU3MXRoHTCbmJKdPoKc3lb06Y0xNlIyankVH6Hgz00nQApc96Y",
   {
     apiVersion: "2025-02-24.acacia",
     typescript: true
