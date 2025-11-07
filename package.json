@@ -59,8 +59,9 @@
     "@types/better-sqlite3": "^7.6.11",
     "daisyui": "^4.12.10",
     "esbuild": "^0.25.0",
-    "prettier": "^3.3.3",
+    "prettier": "^3.6.2",
     "prettier-plugin-astro": "^0.14.1",
+    "prettier-plugin-tailwindcss": "^0.7.1",
     "tailwindcss": "^3.4.10",
     "typescript": "^5.6.2"
   },
