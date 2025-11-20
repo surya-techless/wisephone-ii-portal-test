@@ -1,5 +1,10 @@
 export type Feature = {
   knoxManageId: string;
+  /**
+   * Optional A16-specific group ID. If provided, this will be used for A16 devices instead of knoxManageId.
+   * If not provided, knoxManageId will be used for all devices.
+   */
+  a16KnoxManageId?: string;
   lucideIcon: string;
   isEnabled: boolean;
   name: string;
@@ -42,12 +47,24 @@ export const KNOX_USER_GROUPS = {
   ADD_ON_TOOL_DRAWER: "300830f61c574b9db37dabbae1e79aa9",
   // Used to be called MINIMAL
   SUBSCRIBED: "1bd53a63998245e69d190612e7ae5b39",
-  ADD_ON_WISEOS_PROTECT: "55293c1dc2d74fa786c4da2cb1b7aaa3"
+  ADD_ON_WISEOS_PROTECT: "55293c1dc2d74fa786c4da2cb1b7aaa3",
+
+  // A16 groups to support samsung A16 devices
+
+  A16_ADD_ON_DEV: "43e2d328b4d04862bf15c5809c5678ad",
+  A16_ADD_ON_DISABLE_FACTORY_RESET: "5f91f790e5354af18b635d33ca08cf24",
+  A16_ADD_ON_DISABLE_HOTSPOT: "3b37147c93e64abfb93b1f523fd8bb60",
+  A16_ADD_ON_TOOL_DRAWER: "f80f602cc98c49b0867fbb788c2e9bb4",
+  A16_ADD_ON_WISEOS_PROTECT: "8bc9034354c64e9cbd8567905eb0d994",
+  A16_SUBSCRIBED: "7c932e5455a444bcb40d56bcc0460ae0",
+  A16_UNPAID: "bc9ef35416a74023a26b28b46827bbf7",
+  A16_ADD_ON_GOOGLE_APPS: "3a4c1a51878f4610a2de2d54a50bc31b"
 };
 
 export const FEATURES: Record<string, Feature> = {
   TOOL_DRAWER: {
     knoxManageId: KNOX_USER_GROUPS.ADD_ON_TOOL_DRAWER,
+    a16KnoxManageId: KNOX_USER_GROUPS.A16_ADD_ON_TOOL_DRAWER,
     lucideIcon: "wrench",
     isEnabled: true,
     isBeta: true,
@@ -77,6 +94,7 @@ export const FEATURES: Record<string, Feature> = {
   GOOGLE_APPS: {
     isEnabled: true,
     knoxManageId: KNOX_USER_GROUPS.ADD_ON_GOOGLE_APPS,
+    a16KnoxManageId: KNOX_USER_GROUPS.A16_ADD_ON_GOOGLE_APPS,
     lucideIcon: "layout-grid",
     name: "Google Apps",
     description: "Get access to Google Messages, Google Maps, Google Photos, and Google Meet (new).",
@@ -88,6 +106,7 @@ export const FEATURES: Record<string, Feature> = {
   NO_HOTSPOT: {
     isEnabled: true,
     knoxManageId: KNOX_USER_GROUPS.ADD_ON_DISABLE_HOTSPOT,
+    a16KnoxManageId: KNOX_USER_GROUPS.A16_ADD_ON_DISABLE_HOTSPOT,
     lucideIcon: "signal",
     name: "Allow Hotspot",
     disclosure:
@@ -101,6 +120,7 @@ export const FEATURES: Record<string, Feature> = {
   },
   ALLOW_FACTORY_RESET: {
     knoxManageId: KNOX_USER_GROUPS.ADD_ON_DISABLE_FACTORY_RESET,
+    a16KnoxManageId: KNOX_USER_GROUPS.A16_ADD_ON_DISABLE_FACTORY_RESET,
     lucideIcon: "lock",
     name: "Allow Factory Reset",
     disclosure:
@@ -115,6 +135,7 @@ export const FEATURES: Record<string, Feature> = {
   },
   WISEOS_PROTECT: {
     knoxManageId: KNOX_USER_GROUPS.ADD_ON_WISEOS_PROTECT,
+    a16KnoxManageId: KNOX_USER_GROUPS.A16_ADD_ON_WISEOS_PROTECT,
     lucideIcon: "shield-check",
     name: "1.1.1.1 for Families",
     description: "Add an additional layer of security and protection with 1.1.1.1 for Families filtering.",

@@ -2,7 +2,7 @@ import type { APIRoute } from "astro";
 import { captureException } from "@sentry/astro";
 import { SamsungKnoxService } from "@/libs/samsung-knox-service";
 
-type GetKnoxAction = "get-token" | "get-device-groups";
+type GetKnoxAction = "get-token" | "get-device-groups" | "get-device-info" | "get-all-groups";
 type PostKnoxAction = "apply-feature" | "remove-feature" | "install-app" | "uninstall-app";
 
 export const GET: APIRoute = async (props) => {
@@ -28,6 +28,18 @@ export const GET: APIRoute = async (props) => {
 
         const groups = await SamsungKnoxService.getGroupsForDevice(imei);
         return new Response(JSON.stringify(groups), { status: 200 });
+
+      case "get-device-info":
+        if (!imei) {
+          throw new Error("IMEI parameter required");
+        }
+
+        const deviceInfo = await SamsungKnoxService.getDeviceFromImei(imei);
+        return new Response(JSON.stringify(deviceInfo), { status: 200 });
+
+      case "get-all-groups":
+        const allGroups = await SamsungKnoxService.selectGroups();
+        return new Response(JSON.stringify(allGroups), { status: 200 });
 
       default:
         return new Response(
