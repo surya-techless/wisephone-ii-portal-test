@@ -1,0 +1,158 @@
+---
+// src/components/DashboardSidebar.astro
+import WisephoneLogo from "@/components/WisephoneLogo.astro";
+import IsAdmin from "@/components/server-islands/IsAdmin.astro";
+import { SignOutButton } from "@clerk/astro/components";
+
+interface Props {
+  activeLink?: "devices" | "request-app" | "admin" | "account" | "support";
+}
+
+const { activeLink = "devices" } = Astro.props;
+---
+
+<!-- Mobile Menu Overlay -->
+<div
+  x-show="mobileMenuOpen"
+  x-cloak
+  x-transition.opacity
+  @click="mobileMenuOpen = false"
+  class="md:hidden fixed inset-0 bg-black bg-opacity-50 z-40"
+>
+</div>
+
+<!-- Sidebar -->
+<aside
+  class="w-64 flex flex-col justify-between h-screen bg-[#f7f6f2] md:relative fixed right-0 top-0 z-50 transition-transform duration-300"
+  :class="{ 'translate-x-full md:translate-x-0': !mobileMenuOpen }"
+>
+  <!-- Top Section: Logo + Navigation -->
+  <div class="flex-1 overflow-y-auto">
+    <!-- Close Button (Mobile Only) - Top Left -->
+    <div class="md:hidden flex items-center justify-start p-4">
+      <button @click="mobileMenuOpen = false" class="p-2 text-gray-600 hover:text-black">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="24"
+          height="24"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Logo (Desktop Only) -->
+    <div class="hidden md:flex p-4 items-center">
+      <WisephoneLogo class="h-8 text-[var(--charcoal)]" />
+      <span class="ml-2 font-semibold text-[10px] text-gray-800">PORTAL</span>
+    </div>
+
+    <nav class="md:mt-6 px-2 space-y-1">
+      <!-- Devices -->
+      <a
+        href="/dashboard"
+        @click="mobileMenuOpen = false"
+        class={`flex items-center px-4 py-3 text-sm rounded-lg ${activeLink === "devices" ? "text-gray-800" : "text-gray-600 hover:bg-gray-50"}`}
+        style={activeLink === "devices" ? "background-color: #DBD5CD;" : ""}
+      >
+        <img src="/assets/portal-icons/devices.svg" alt="" class="w-5 h-5" />
+        <span class="ml-4">Devices</span>
+      </a>
+
+      <!-- Request an app -->
+      <a
+        href="https://getwisephone.com/request-app"
+        target="_blank"
+        rel="noopener noreferrer"
+        @click="mobileMenuOpen = false"
+        class={`flex items-center px-4 py-3 text-sm rounded-lg ${activeLink === "request-app" ? "text-gray-800" : "text-gray-600 hover:bg-gray-50"}`}
+        style={activeLink === "request-app" ? "background-color: #DBD5CD;" : ""}
+      >
+        <img src="/assets/portal-icons/app-request.svg" alt="" class="w-5 h-5" />
+        <span class="ml-4">Request an App</span>
+      </a>
+
+      <!-- Desktop: Show only bottom section -->
+      <!-- Mobile: Show all options in one list -->
+      <div class="md:hidden space-y-1">
+        <div class="flex items-center px-4 py-3 text-sm text-gray-600">
+          <img src="/assets/portal-icons/account-circle.svg" alt="" class="w-5 h-5" />
+          <span class="ml-4">Account</span>
+        </div>
+
+        <a
+          href="mailto:support@wisephone.com"
+          @click="mobileMenuOpen = false"
+          class="flex items-center px-4 py-3 text-sm text-gray-600 hover:bg-gray-50 rounded-lg"
+        >
+          <img src="/assets/portal-icons/support.svg" alt="" class="w-5 h-5" />
+          <span class="ml-4">Support</span>
+        </a>
+
+        <IsAdmin server:defer>
+          <a
+            href="/dashboard/admin"
+            @click="mobileMenuOpen = false"
+            class="flex items-center px-4 py-3 text-sm text-gray-600 hover:bg-gray-50 rounded-lg"
+          >
+            <img src="/assets/portal-icons/admin.svg" alt="" class="w-5 h-5" />
+            <span class="ml-4">Admin</span>
+          </a>
+        </IsAdmin>
+
+        <SignOutButton
+          redirectUrl="/"
+          class="flex items-center w-full px-4 py-3 text-sm text-gray-600 hover:bg-gray-50 text-left rounded-lg"
+          @click="mobileMenuOpen = false"
+        >
+          <img src="/assets/portal-icons/logout.svg" alt="" class="w-5 h-5" />
+          <span class="ml-4">Logout</span>
+        </SignOutButton>
+      </div>
+    </nav>
+  </div>
+
+  <!-- Bottom Section: Admin, Account, Support, Logout (Desktop Only) -->
+  <div class="hidden md:block px-6 pb-6">
+    <IsAdmin server:defer>
+      <a
+        href="/dashboard/admin"
+        @click="mobileMenuOpen = false"
+        class="flex items-center py-2 text-sm text-gray-600 hover:text-black"
+      >
+        <img src="/assets/portal-icons/admin.svg" alt="" class="w-5 h-5" />
+        <span class="ml-4">Admin</span>
+      </a>
+    </IsAdmin>
+
+    <div class="flex items-center py-2 text-sm text-gray-600 pb-4">
+      <img src="/assets/portal-icons/account-circle.svg" alt="" class="w-5 h-5" />
+      <span class="ml-4">Account</span>
+    </div>
+
+    <a
+      href="mailto:support@wisephone.com"
+      @click="mobileMenuOpen = false"
+      class="flex items-center py-2 text-sm text-gray-600 hover:text-black pb-4"
+    >
+      <img src="/assets/portal-icons/support.svg" alt="" class="w-5 h-5" />
+      <span class="ml-4">Support</span>
+    </a>
+
+    <SignOutButton
+      redirectUrl="/"
+      class="flex items-center w-full py-2 pb-4 text-sm text-gray-600 hover:text-black text-left"
+      @click="mobileMenuOpen = false"
+    >
+      <img src="/assets/portal-icons/logout.svg" alt="" class="w-5 h-5" />
+      <span class="ml-4">Logout</span>
+    </SignOutButton>
+  </div>
+</aside>

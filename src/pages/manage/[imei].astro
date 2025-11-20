@@ -1,0 +1,997 @@
+---
+// src/pages/manage/[imei].astro
+import { BypassTechlessSubscription, Wisephone, sql, and, eq, db } from "astro:db";
+import { getUser } from "@/libs/clerk";
+import type { UserResource } from "@clerk/types";
+import type { User } from "@clerk/astro/server";
+import { actions } from "astro:actions";
+import Icon from "astro-iconify";
+import { validateIsSubscribed } from "@/libs/stripe";
+import { SamsungKnoxService } from "@/libs/samsung-knox-service";
+import Layout from "@/layouts/Layout.astro";
+import TechlessSubscriptionButton from "@/components/TechlessSubscriptionButton.astro";
+import DashboardSidebar from "@/components/DashboardSidebar.astro";
+import { FEATURES, FAITH_TOOLS_APPS, getPackageNameFromPlayStoreUrl, isValidIMEI } from "@/libs/utils";
+import { isAdmin } from "@/lib/auth/permissions";
+import type { AppsList } from "@/types/apps";
+
+// Initialize variables
+let imei: string | undefined = Astro.params.imei;
+let wisephone: any = null;
+let features = Object.values(FEATURES);
+let isSubscribed = false;
+let error = "";
+let installedApps: any[] = [];
+let appsList: AppsList = {};
+let sortedAppsList = {};
+let user: UserResource | User | null = null;
+
+// Auth check
+if (!Astro.locals.auth().userId) {
+  return Astro.redirect("/");
+}
+
+user = await Astro.locals.currentUser();
+
+if (!user) {
+  return Astro.redirect("/");
+}
+
+try {
+  if (!imei || !isValidIMEI(imei)) {
+    return Astro.redirect("/dashboard?error=" + encodeURIComponent("A Wisephone II with that IMEI was not found."));
+  }
+
+  const userId = Astro.locals.auth().userId;
+  const userIsAdmin = await isAdmin(user.id);
+
+  if (userIsAdmin) {
+    const wisephones = await db
+      .select()
+      .from(Wisephone)
+      .where(sql`${Wisephone.imei} = ${imei}`)
+      .limit(1);
+
+    if (wisephones.length > 0) {
+      wisephone = wisephones[0];
+    }
+  } else {
+    features = features.filter((feature) => !feature.isAdminOnly);
+
+    const wisephones = await db
+      .select()
+      .from(Wisephone)
+      .where(and(sql`${Wisephone.imei} = ${imei}`, eq(Wisephone.userId, user.id)))
+      .limit(1);
+
+    if (wisephones.length > 0) {
+      wisephone = wisephones[0];
+    }
+  }
+
+  if (!wisephone) {
+    return Astro.redirect("/dashboard?error=" + encodeURIComponent("Device not found"));
+  }
+
+  // Check subscription status
+  const bypassTechlessSubscription = await db
+    .select()
+    .from(BypassTechlessSubscription)
+    .where(eq(BypassTechlessSubscription.imei, Number(imei)))
+    .limit(1);
+
+  isSubscribed = bypassTechlessSubscription.length > 0;
+
+  if (!isSubscribed && wisephone?.phoneNumber) {
+    try {
+      isSubscribed = await validateIsSubscribed({
+        imei: String(wisephone?.imei || ""),
+        phoneNumber: `${wisephone?.phoneNumber?.replace(/[^0-9+]/g, "") || ""}`
+      });
+    } catch (subscriptionError) {
+      console.error("Error checking subscription status:", subscriptionError);
+    }
+  }
+
+  // Get installed apps
+  const formData = new FormData();
+  formData.append("imei", String(wisephone?.imei || ""));
+
+  try {
+    const getInstalledAppsResult = await Astro.callAction(actions.wisephones.getInstalledApps, formData);
+    installedApps = getInstalledAppsResult?.data?.apps || [];
+  } catch (appsError) {
+    console.error("Error getting installed apps:", appsError);
+  }
+
+  // Create apps list with type safety
+  appsList = {};
+
+  // Process Faith Tools apps with similar protection
+  try {
+    FAITH_TOOLS_APPS.forEach((app) => {
+      try {
+        const packageName = getPackageNameFromPlayStoreUrl(app["Play Store URL"]);
+        if (!packageName) return;
+
+        appsList[packageName] = {
+          source: "faith.tools",
+          installed: installedApps.some((app) => app.packageName === packageName),
+          name: app.Name || "Unknown App"
+        };
+      } catch (appError) {
+        console.error("Error processing Faith Tools app:", appError);
+        // Continue with next app instead of crashing
+      }
+    });
+  } catch (faithToolsError) {
+    console.error("Error processing Faith Tools apps:", faithToolsError);
+  }
+
+  // Sort apps by name
+  sortedAppsList = Object.fromEntries(Object.entries(appsList).sort(([, a], [, b]) => a.name.localeCompare(b.name)));
+} catch (error) {
+  console.error("Unexpected error in manage page:", error);
+  return Astro.redirect(
+    "/dashboard?error=" + encodeURIComponent("An unexpected error occurred while loading the device. Please try again.")
+  );
+}
+---
+
+<Layout
+  title={`Device Dashboard → ${user?.firstName || "User"} ${user?.lastName || ""}`}
+  description="Manage your Wisephone device settings, features, and apps."
+>
+  <div
+    class="flex h-screen bg-[#f7f6f2]"
+    x-data="manageDevice"
+    x-init={`
+      mobileMenuOpen = false;
+      installedApps = ${JSON.stringify(installedApps || [])};
+      appsList = ${JSON.stringify(sortedAppsList || {})};
+      availableFeatures = ${JSON.stringify(features || [])};
+      imei = \`${imei || ""}\`;
+      isSubscribed = ${Boolean(isSubscribed)};
+      userName = \`${user?.firstName || ""} ${user?.lastName || ""}\`;
+      userPhone = \`${wisephone?.phoneNumber || "(111) 111-1111"}\`;
+      userEmail = \`${user?.emailAddresses?.[0]?.emailAddress || ""}\`;
+    `}
+  >
+    <!-- Sidebar -->
+    <DashboardSidebar activeLink="devices" />
+
+    <!-- Main Content Area -->
+    <main
+      class="device-dashboard-main-container relative flex-1 overflow-auto md:rounded-xl md:mt-4 md:mb-4 md:mr-4 bg-[#ffffff] w-full pt-16 md:pt-0"
+    >
+      <!-- Mobile Menu Button -->
+      <button
+        @click="mobileMenuOpen = !mobileMenuOpen"
+        class="md:hidden fixed top-4 right-4 z-30 p-2 bg-white rounded-lg shadow-lg"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="24"
+          height="24"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <line x1="3" y1="12" x2="21" y2="12"></line>
+          <line x1="3" y1="6" x2="21" y2="6"></line>
+          <line x1="3" y1="18" x2="21" y2="18"></line>
+        </svg>
+      </button>
+
+      <div class="w-full h-full">
+        <!-- Close Button -->
+        <button
+          @click="window.location.href = '/dashboard'"
+          class="absolute top-4 right-4 md:top-6 md:right-6 w-8 h-8 flex items-center justify-center hover:bg-gray-100 rounded-full z-10"
+        >
+          <Icon name="lucide:x" class="w-5 h-5 text-gray-600" />
+        </button>
+
+        <div class="p-4 md:p-8 max-w-[1000px]">
+          <!-- Header -->
+          <div class="mb-4">
+            <h2 class="text-xl md:text-2xl font-semibold text-gray-900 mb-1">
+              Device Dashboard → <span x-text="userName"></span>
+            </h2>
+            <p class="text-gray-600 text-sm">
+              This dashboard allows you to manage settings for this Wisephone. View usage statistics, update
+              subscription or billing information, and decide which features and apps you'd like on the Wisephone.
+            </p>
+          </div>
+
+          <!-- Tabs -->
+          <div class="flex gap-4 mb-6 border-b-[3px] border-gray-300">
+            <button
+              @click="currentTab = 'device-info'"
+              class="px-6 py-3 text-sm font-medium transition-all relative border-b-[3px] -mb-[3px]"
+              :class="currentTab === 'device-info' ? 'bg-[#DBD5CD] text-gray-900 border-[#C07F53]' : 'bg-transparent text-gray-600 border-transparent hover:text-gray-900'"
+            >
+              Device Info
+            </button>
+            <button
+              @click="currentTab = 'features'"
+              class="px-6 py-3 text-sm font-medium transition-all relative border-b-[3px] -mb-[3px]"
+              :class="currentTab === 'features' ? 'bg-[#DBD5CD] text-gray-900 border-[#C07F53]' : 'bg-transparent text-gray-600 border-transparent hover:text-gray-900'"
+            >
+              Features
+            </button>
+            <button
+              x-show="isSubscribed && (isToolDrawerEnabled || isFaithToolsEnabled)"
+              x-cloak
+              @click="currentTab = 'app-management'"
+              class="px-6 py-3 text-sm font-medium transition-all relative border-b-[3px] -mb-[3px]"
+              :class="currentTab === 'app-management' ? 'bg-[#DBD5CD] text-gray-900 border-[#C07F53]' : 'bg-transparent text-gray-600 border-transparent hover:text-gray-900'"
+            >
+              App Management
+            </button>
+          </div>
+
+          <!-- Device Info Tab -->
+          <div x-show="currentTab === 'device-info'" x-cloak>
+            <!-- User Info -->
+            <div class="mb-6">
+              <div class="flex items-center gap-3 mb-4">
+                <div
+                  class="w-12 h-12 rounded-full bg-teal-600 flex items-center justify-center text-white text-lg font-semibold flex-shrink-0"
+                >
+                  <span x-text="userName.charAt(0)">M</span>
+                </div>
+                <div>
+                  <h3 class="text-base font-semibold text-gray-900" x-text="userName">Marcus Johnson</h3>
+                  <p class="text-sm text-gray-600" x-text="userPhone">(111) 111-1111</p>
+                  <p class="text-xs text-gray-500">IMEI: <span x-text="imei"></span></p>
+                </div>
+              </div>
+
+              <template x-if="isSubscribed">
+                <div class="stats-container">
+                  <!-- Stats Grid -->
+                  <div class="flex gap-2 mb-6 max-w-[26rem]">
+                    <div class="text-center bg-[#f7f6f2] rounded-lg p-3 flex-1">
+                      <p class="text-xs text-gray-600 mb-1">Apps</p>
+                      <p class="text-xl font-semibold text-gray-900" x-text="installedFilteredApps.length">7</p>
+                    </div>
+                    <div class="text-center bg-[#f7f6f2] rounded-lg p-3 flex-1">
+                      <p class="text-xs text-gray-600 mb-1">Monthly Data Used</p>
+                      <p class="text-xl font-semibold text-gray-900">649mb</p>
+                    </div>
+                  </div>
+
+                  <!-- Subscription & Billing -->
+                  <div class="subscription-container flex gap-12 mb-6 pb-6 border-b border-gray-200 max-w-[26rem]">
+                    <div class="flex flex-col">
+                      <p class="text-md font-semibold mb-1">Subscription Level</p>
+                      <p class="text-sm text-gray-600 mb-2">Pro + Unlimited</p>
+                      <button
+                        class="px-3 py-1.5 border border-black rounded-lg text-xs font-medium text-gray-700 hover:bg-gray-50 w-fit mt-auto"
+                      >
+                        Change Level
+                      </button>
+                    </div>
+                    <div class="flex flex-col">
+                      <p class="text-md font-semibold mb-1">Billing and Payment</p>
+                      <p class="text-sm text-gray-500">US$35.99/mo</p>
+                      <p class="text-xs text-gray-600 mb-2">Next payment on Nov 20, 2025</p>
+                      <button
+                        class="px-3 py-1.5 border border-black rounded-lg text-xs font-medium text-gray-700 hover:bg-gray-50 w-fit mt-auto"
+                      >
+                        Edit Billing
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- Device Removal -->
+                  <div class="pt-4">
+                    <h4 class="text-sm font-semibold text-gray-900 mb-2">Device Removal</h4>
+                    <p class="text-sm text-gray-600 mb-2">
+                      Remove this device from this list of managed devices. Perform this action if you want to manage
+                      this device on a different account.
+                    </p>
+                    <p class="text-sm text-gray-600 mb-3">
+                      If you need to re-add this device in the future, select "Add Device" on the Devices page.
+                    </p>
+                    <form
+                      method="POST"
+                      action={actions.wisephones.deleteWisephone}
+                      onsubmit="return confirm('Are you sure you want to remove this Wisephone from your devices? This action cannot be undone.')"
+                    >
+                      <input type="hidden" name="imei" :value="imei" />
+                      <button
+                        type="submit"
+                        class="px-4 py-2 bg-white border border-red-300 rounded-md text-sm font-medium text-red-600 hover:bg-red-50 inline-flex items-center gap-2"
+                      >
+                        <Icon name="lucide:trash-2" class="w-4 h-4" />
+                        Remove Device
+                      </button>
+                    </form>
+                  </div>
+                </div>
+              </template>
+
+              <!-- Activate Subscription (Non-Paying Customers) -->
+              <template x-if="!isSubscribed">
+                <div>
+                  <h3 class="text-base font-semibold text-gray-900 mb-1">Activate Your Wisephone</h3>
+                  <p class="text-sm text-gray-600 mb-4">
+                    To unlock your Wisephone's full potential, a WiseOS Subscription is required. Choose your preferred
+                    connectivity option below.
+                  </p>
+
+                  <div class="grid grid-cols-2 gap-4 mb-3">
+                    <!-- Wisephone Carrier Plan -->
+                    <div class="border border-gray-300 rounded-lg p-4">
+                      <h4 class="text-sm font-semibold text-gray-900 mb-1">Wisephone Carrier Plan</h4>
+                      <p class="text-xs text-gray-600 mb-1">(Includes WiseOS Subscription)</p>
+                      <p class="text-sm text-gray-700 mb-3 leading-snug">
+                        Get all-in-one connectivity with our Wisephone Carrier Plan, which bundles your data, talk, and
+                        text with your WiseOS Subscription for a complete experience.
+                        <a
+                          class="text-blue-600 underline text-xs"
+                          href="https://wisephone.com/pages/plans"
+                          target="_blank">Learn more</a
+                        >
+                      </p>
+                      <a
+                        href="https://plans.techless.com"
+                        target="_blank"
+                        class="inline-flex items-center gap-1 px-4 py-2 bg-amber-700 text-white rounded-md text-sm font-medium hover:bg-amber-800"
+                      >
+                        Activate Carrier Plan
+                      </a>
+                    </div>
+
+                    <!-- Bring Your Own Carrier -->
+                    <div class="border border-gray-300 rounded-lg p-4">
+                      <h4 class="text-sm font-semibold text-gray-900 mb-1">Bring Your Own Carrier</h4>
+                      <p class="text-xs text-gray-600 mb-1">(WiseOS Subscription Required)</p>
+                      <p class="text-sm text-gray-700 mb-3 leading-snug">
+                        Continue using your existing carrier and unlock your Wisephone's features by activating your
+                        WiseOS Subscription.
+                        <a
+                          class="text-blue-600 underline text-xs"
+                          href="https://wisephone.com/pages/plans"
+                          target="_blank">Learn more</a
+                        >
+                      </p>
+                      <TechlessSubscriptionButton
+                        deviceIMEI={wisephone?.imei || ""}
+                        customerEmail={user?.emailAddresses?.[0]?.emailAddress || ""}
+                      />
+                    </div>
+                  </div>
+
+                  <p class="text-xs text-gray-500 italic mb-6">
+                    *This requires a separate account than this Portal to manage your carrier plan. You'll need to
+                    register an account there when asked.
+                  </p>
+
+                  <!-- Device Removal (Non-Paying) -->
+                  <div class="pt-6 border-t border-gray-200">
+                    <h4 class="text-sm font-semibold text-gray-900 mb-2">Device Removal</h4>
+                    <p class="text-sm text-gray-600 mb-2">
+                      Remove this device from this list of managed devices. Perform this action if you want to manage
+                      this device on a different account.
+                    </p>
+                    <p class="text-sm text-gray-600 mb-4">
+                      If you need to re-add this device in the future, select "Add Device" on the Devices page.
+                    </p>
+                    <form
+                      method="POST"
+                      action={actions.wisephones.deleteWisephone}
+                      onsubmit="return confirm('Are you sure you want to remove this Wisephone from your devices? This action cannot be undone.')"
+                    >
+                      <input type="hidden" name="imei" :value="imei" />
+                      <button
+                        type="submit"
+                        class="px-4 py-2 bg-white border border-red-300 rounded-md text-sm font-medium text-red-600 hover:bg-red-50 inline-flex items-center gap-2"
+                      >
+                        <Icon name="lucide:trash-2" class="w-4 h-4" />
+                        Remove Device
+                      </button>
+                    </form>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <!-- Features Tab -->
+          <div x-show="currentTab === 'features'" x-cloak>
+            <p class="text-sm text-gray-600 mb-4">
+              Use this page to manage the features of your Wisephone. Make sure the device is connected to the internet
+              before updating any features.
+            </p>
+
+            <div class="space-y-3">
+              <template x-for="feature in availableFeatures" :key="feature.knoxManageId">
+                <div
+                  class="flex items-center justify-between p-4 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  <div class="flex-1 pr-4">
+                    <div class="flex items-center gap-2 mb-0.5 relative">
+                      <h4 class="text-sm font-semibold text-gray-900" x-text="feature.name"></h4>
+                      <button
+                        x-show="feature.disclosure"
+                        @click.stop="showDisclosureFor = (showDisclosureFor === feature.knoxManageId ? null : feature.knoxManageId)"
+                        class="text-gray-500 hover:text-gray-700 transition-colors"
+                      >
+                        <Icon name="lucide:info" class="w-4 h-4" />
+                      </button>
+                      <span class="text-xs text-gray-500" x-show="feature.isBeta">(beta)</span>
+
+                      <!-- Disclosure Popup -->
+                      <div
+                        x-show="showDisclosureFor === feature.knoxManageId"
+                        x-cloak
+                        @click.outside="showDisclosureFor = null"
+                        class="absolute left-0 top-full mt-2 z-10 bg-white border border-gray-300 rounded-lg shadow-lg p-4 w-80 max-w-md"
+                      >
+                        <div class="flex items-start justify-between gap-2 mb-2">
+                          <p class="text-sm font-medium text-gray-900">Disclosure:</p>
+                          <button
+                            @click.stop="showDisclosureFor = null"
+                            class="text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0"
+                          >
+                            <Icon name="lucide:x" class="w-4 h-4" />
+                          </button>
+                        </div>
+                        <p class="text-sm text-gray-700 leading-relaxed" x-text="feature.disclosure"></p>
+                      </div>
+                    </div>
+                    <p class="text-sm text-gray-600 leading-snug" x-text="feature.description"></p>
+                  </div>
+                  <label class="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                    <input
+                      type="checkbox"
+                      class="sr-only peer"
+                      :checked="isFeatureEnabled(feature.knoxManageId, feature.isInverse || false)"
+                      @click.prevent="toggleFeature(feature)"
+                    />
+                    <div
+                      class="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-5 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-teal-600"
+                    >
+                    </div>
+                  </label>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <!-- App Management Tab -->
+          <div
+            x-show="currentTab === 'app-management'"
+            x-cloak
+            class="flex flex-col h-[calc(100vh-280px)] max-h-[calc(100vh-280px)]"
+          >
+            <!-- App Lists Grid -->
+            <div class="grid grid-cols-2 gap-4 flex-1 min-h-0">
+              <!-- Available Apps -->
+              <div class="flex flex-col min-h-0">
+                <!-- Search Header -->
+                <div class="mb-4 flex-shrink-0">
+                  <div class="relative">
+                    <Icon name="lucide:search" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="text"
+                      x-model="appSearchQuery"
+                      placeholder="Search apps, or categories"
+                      class="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+
+                <h3 class="text-xs font-semibold text-gray-600 mb-3 flex items-center gap-1.5 flex-shrink-0">
+                  <Icon name="lucide:download-cloud" class="w-3.5 h-3.5" />
+                  Available Apps
+                </h3>
+                <div class="space-y-2 flex-1 overflow-y-auto pr-2 min-h-0">
+                  <template x-for="app in availableApps" :key="app.packageName">
+                    <div
+                      class="flex items-center justify-between p-3 border border-gray-300 rounded-lg hover:bg-gray-50"
+                    >
+                      <div class="flex items-center gap-2 flex-1 min-w-0">
+                        <div class="w-8 h-8 bg-gray-200 rounded-md flex items-center justify-center flex-shrink-0">
+                          <Icon name="lucide:package" class="w-4 h-4 text-gray-500" />
+                        </div>
+                        <span class="text-sm text-gray-900 truncate" x-text="app.name"></span>
+                      </div>
+                      <button
+                        @click="installApp(app.packageName)"
+                        class="px-3 py-1.5 bg-white border border-gray-300 rounded-md text-xs font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-1.5 flex-shrink-0 ml-2"
+                      >
+                        <Icon name="lucide:download" class="w-3.5 h-3.5" />
+                        Install
+                      </button>
+                    </div>
+                  </template>
+                </div>
+              </div>
+
+              <!-- Installed Apps -->
+              <div class="bg-[#f5f5f0] p-4 rounded-lg flex flex-col min-h-0">
+                <h3 class="text-xs font-semibold text-gray-600 mb-3 flex items-center gap-1.5 flex-shrink-0">
+                  <Icon name="lucide:check-circle" class="w-3.5 h-3.5" />
+                  Installed Apps (<span x-text="installedFilteredApps.length">0</span>)
+                </h3>
+                <div class="space-y-2 flex-1 overflow-y-auto pr-2 min-h-0">
+                  <template x-for="app in installedFilteredApps" :key="app.packageName">
+                    <div class="flex items-center justify-between p-3 border border-gray-300 rounded-lg bg-white">
+                      <div class="flex items-center gap-2 flex-1 min-w-0">
+                        <div class="w-8 h-8 bg-teal-600 rounded-md flex items-center justify-center flex-shrink-0">
+                          <Icon name="lucide:package" class="w-4 h-4 text-white" />
+                        </div>
+                        <span class="text-sm text-gray-900 truncate" x-text="app.name"></span>
+                      </div>
+                      <div class="flex items-center gap-1.5 flex-shrink-0 ml-2">
+                        <button
+                          class="hidden px-3 py-1.5 bg-white border border-gray-300 rounded-md text-xs font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-1.5"
+                        >
+                          <Icon name="lucide:refresh-cw" class="w-3.5 h-3.5" />
+                          Update
+                        </button>
+                        <button
+                          @click="uninstallApp(app.packageName)"
+                          class="px-3 py-1.5 bg-white border border-gray-300 rounded-md text-xs font-medium text-gray-700 hover:bg-red-50 hover:border-red-300 hover:text-red-600 flex items-center gap-1.5"
+                        >
+                          <Icon name="lucide:trash-2" class="w-3.5 h-3.5" />
+                          Uninstall
+                        </button>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Confirmation Modal -->
+      <div
+        x-show="showConfirmModal"
+        x-cloak
+        @click.self="cancelFeatureToggle()"
+        class="absolute inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4"
+      >
+        <div @click.stop class="bg-white rounded-lg shadow-xl max-w-md w-full p-6 space-y-4">
+          <h3 class="text-lg font-semibold text-gray-900">Are you sure?</h3>
+
+          <p class="text-sm text-gray-700 leading-relaxed" x-text="confirmationMessage"></p>
+
+          <div class="flex justify-end gap-3 pt-2">
+            <button
+              @click="cancelFeatureToggle()"
+              class="px-4 py-2 text-sm font-medium text-white bg-gray-800 rounded hover:bg-gray-700 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              @click="confirmFeatureToggle()"
+              class="px-4 py-2 text-sm font-medium text-gray-900 bg-white border border-gray-300 rounded hover:bg-gray-50 transition-colors"
+            >
+              Ok
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- App Install Confirmation Modal -->
+      <div
+        x-show="showAppInstallModal"
+        x-cloak
+        @click.self="cancelAppInstall()"
+        class="absolute inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4"
+      >
+        <div @click.stop class="bg-white rounded-lg shadow-xl max-w-md w-full p-6 space-y-4">
+          <h3 class="text-lg font-semibold text-gray-900">
+            Are you sure you want to install <span x-text="pendingAppName"></span>?
+          </h3>
+
+          <div class="flex justify-end gap-3 pt-2">
+            <button
+              @click="cancelAppInstall()"
+              class="px-4 py-2 text-sm font-medium text-white bg-gray-800 rounded hover:bg-gray-700 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              @click="confirmAppInstall()"
+              class="px-4 py-2 text-sm font-medium text-gray-900 bg-white border border-gray-300 rounded hover:bg-gray-50 transition-colors"
+            >
+              Install
+            </button>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <script>
+      import Alpine from "alpinejs";
+      import { actions } from "astro:actions";
+      import { KNOX_USER_GROUPS, updateUnreachableAlpineState, getPackageNameFromPlayStoreUrl } from "@/libs/utils";
+      import { AppManagementService } from "@/services/AppManagementService";
+      import { FeatureManagementService } from "@/services/FeatureManagementService";
+      import type { AppEntry } from "@/types/apps";
+
+      const appManagement = new AppManagementService();
+      const featureManagement = new FeatureManagementService();
+
+      Alpine.data("manageDevice", function () {
+        return {
+          currentTab: "device-info",
+          appsList: {} as Record<string, Omit<AppEntry, "packageName">>,
+          installedApps: [] as { packageName: string; appName: string; isGoogleManaged: "Y" | "N" }[],
+          appSearchQuery: "",
+          features: [] as string[],
+          availableFeatures: [] as any[],
+          isSubscribed: false,
+          imei: "",
+          userName: "",
+          userPhone: "",
+          userEmail: "",
+          isToolDrawerLoading: false,
+          isToolDrawerLoaded: false,
+          mobileMenuOpen: false,
+          showConfirmModal: false,
+          pendingFeature: null as any,
+          pendingFeatureEnabled: false,
+          confirmationMessage: "",
+          showDisclosureFor: null as string | null,
+          showAppInstallModal: false,
+          pendingAppToInstall: null as string | null,
+          pendingAppName: "",
+
+          get availableApps() {
+            const apps = Object.entries(this.appsList)
+              .filter(([packageName, app]) => !app.installed)
+              .map(([packageName, app]) => ({ packageName, ...app }));
+
+            if (!this.appSearchQuery) return apps;
+
+            const query = this.appSearchQuery.toLowerCase();
+            return apps.filter((app) => app.name.toLowerCase().includes(query));
+          },
+
+          get installedFilteredApps() {
+            // Show all installed apps from the device (filtered by isGoogleManaged === "Y")
+            // This matches the behavior in device/[imei].astro
+            let apps = this.installedApps
+              .filter((app) => app.isGoogleManaged === "Y")
+              .map((app) => ({
+                packageName: app.packageName || app.appName,
+                name: app.appName || app.packageName || "Unknown App",
+                installed: true,
+                source: "Tool Drawer" as const
+              }));
+
+            // Also include apps from appsList that are marked as installed
+            const appsListInstalled = Object.entries(this.appsList)
+              .filter(([packageName, app]) => app.installed)
+              .map(([packageName, app]) => ({ packageName, ...app }));
+
+            // Merge and deduplicate by packageName
+            const appsMap = new Map();
+            apps.forEach((app) => appsMap.set(app.packageName, app));
+            appsListInstalled.forEach((app) => {
+              if (!appsMap.has(app.packageName)) {
+                appsMap.set(app.packageName, app);
+              }
+            });
+            apps = Array.from(appsMap.values());
+
+            // Sort by name
+            apps.sort((a, b) => a.name.localeCompare(b.name));
+
+            return apps;
+          },
+
+          async getFeatures() {
+            if (!this.imei) {
+              console.error("IMEI is not set, cannot fetch features");
+              return;
+            }
+
+            try {
+              const url = new URL(`/api/samsung-knox.json`, window.location.origin);
+              url.searchParams.set("action", "get-device-groups");
+              url.searchParams.set("imei", this.imei);
+
+              const res = await fetch(url, { method: "GET" });
+
+              if (!res.ok) {
+                throw new Error(`Failed to fetch features: ${res.status} ${res.statusText}`);
+              }
+
+              const features = await res.json();
+              this.features = features;
+            } catch (error) {
+              console.error("Error fetching features:", error);
+              this.showErrorToast("Failed to load device features. Please try again.");
+            }
+          },
+
+          showSuccessToast(message: string) {
+            updateUnreachableAlpineState({
+              sourceDataElement: document.documentElement,
+              key: "toastMessage",
+              value: message
+            });
+          },
+
+          showErrorToast(message: string) {
+            updateUnreachableAlpineState({
+              sourceDataElement: document.documentElement,
+              key: "toastErrorMessage",
+              value: message
+            });
+          },
+
+          async toggleFeature(feature: any) {
+            try {
+              if (!this.isSubscribed) {
+                throw new Error("Active subscription required");
+              }
+
+              const currentEnabled = this.features.includes(feature.knoxManageId);
+              const updatedValue = !currentEnabled;
+
+              // Store the pending feature change
+              this.pendingFeature = feature;
+              this.pendingFeatureEnabled = updatedValue;
+
+              // Set the confirmation message based on whether we're enabling or disabling
+              this.confirmationMessage = currentEnabled ? feature.disableMessage : feature.enableMessage;
+
+              // Show the confirmation modal
+              this.showConfirmModal = true;
+            } catch (error) {
+              console.error("Feature toggle failed:", error);
+              this.showErrorToast(error instanceof Error ? error.message : "Feature update failed");
+            }
+          },
+
+          async confirmFeatureToggle() {
+            try {
+              const feature = this.pendingFeature;
+              const updatedValue = this.pendingFeatureEnabled;
+
+              // Safety check
+              if (!feature) {
+                console.error("No pending feature found");
+                this.showConfirmModal = false;
+                return;
+              }
+
+              // Close modal
+              this.showConfirmModal = false;
+
+              await featureManagement.toggleFeature({
+                imei: this.imei,
+                feature,
+                enabled: updatedValue
+              });
+
+              if (!updatedValue) {
+                this.features = this.features.filter((id) => id !== feature.knoxManageId);
+              } else {
+                this.features.push(feature.knoxManageId);
+              }
+
+              this.showSuccessToast(
+                updatedValue
+                  ? `Your device is being updated. ${feature.name} will be enabled shortly.`
+                  : `Your device is being updated. ${feature.name} will be disabled shortly.`
+              );
+
+              // Reset pending feature
+              this.pendingFeature = null;
+              this.pendingFeatureEnabled = false;
+            } catch (error) {
+              console.error("Feature toggle failed:", error);
+              this.showErrorToast(error instanceof Error ? error.message : "Feature update failed");
+              // Reset pending feature
+              this.pendingFeature = null;
+              this.pendingFeatureEnabled = false;
+            }
+          },
+
+          cancelFeatureToggle() {
+            this.showConfirmModal = false;
+            this.pendingFeature = null;
+            this.pendingFeatureEnabled = false;
+            this.confirmationMessage = "";
+          },
+
+          async installApp(packageName: string) {
+            try {
+              if (!packageName) {
+                throw new Error("Invalid app selected");
+              }
+
+              // Store pending app info
+              this.pendingAppToInstall = packageName;
+              this.pendingAppName = this.appsList[packageName]?.name || packageName;
+
+              // Show confirmation modal
+              this.showAppInstallModal = true;
+            } catch (error) {
+              console.error("Failed to show install confirmation:", error);
+              this.showErrorToast("Failed to show install confirmation");
+            }
+          },
+
+          async confirmAppInstall() {
+            try {
+              const packageName = this.pendingAppToInstall;
+
+              if (!packageName) {
+                console.error("No pending app to install");
+                this.showAppInstallModal = false;
+                return;
+              }
+
+              // Close modal
+              this.showAppInstallModal = false;
+
+              // If app is not in appsList yet, add it
+              if (!this.appsList[packageName]) {
+                this.appsList[packageName] = {
+                  source: "Tool Drawer",
+                  installed: false,
+                  name: packageName
+                };
+              }
+
+              await appManagement.installApp(this.imei, packageName);
+              this.appsList[packageName].installed = true;
+
+              // Add to installedApps array if not already there
+              if (!this.installedApps.some((app) => app.packageName === packageName)) {
+                this.installedApps.push({
+                  packageName,
+                  appName: this.appsList[packageName].name,
+                  isGoogleManaged: "Y"
+                });
+              }
+
+              this.showSuccessToast(`${this.appsList[packageName].name} will be installed shortly`);
+
+              // Clear pending app
+              this.pendingAppToInstall = null;
+              this.pendingAppName = "";
+            } catch (error) {
+              console.error("App installation failed:", error);
+              this.showErrorToast("Failed to install app");
+            }
+          },
+
+          cancelAppInstall() {
+            this.showAppInstallModal = false;
+            this.pendingAppToInstall = null;
+            this.pendingAppName = "";
+          },
+
+          async uninstallApp(packageName: string) {
+            try {
+              await appManagement.uninstallApp(this.imei, packageName);
+              if (this.appsList[packageName]) {
+                this.appsList[packageName].installed = false;
+              }
+              // Update installedApps array
+              this.installedApps = this.installedApps.filter((app) => app.packageName !== packageName);
+              this.showSuccessToast(`App will be uninstalled shortly`);
+            } catch (error) {
+              console.error("App uninstallation failed:", error);
+              this.showErrorToast("Failed to uninstall app");
+            }
+          },
+
+          // Load Tool Drawer apps from API (similar to device/[imei].astro)
+          async loadToolDrawer() {
+            if (this.isToolDrawerLoaded || this.isToolDrawerLoading) {
+              return;
+            }
+
+            try {
+              this.isToolDrawerLoading = true;
+              const response = await fetch("/api/ottogrid.json");
+
+              if (!response.ok) {
+                throw new Error("Failed to load Tool Drawer data");
+              }
+
+              const data = await response.json();
+
+              // Process the data and update the appsList
+              if (data && data.rows && data.rows.length) {
+                const updatedAppsList = { ...this.appsList };
+
+                data.rows
+                  .filter((row: any) => row && row.cells && row.cells["Tool Drawer"] === "Yes")
+                  .forEach((row: any) => {
+                    try {
+                      const packageName = getPackageNameFromPlayStoreUrl(row.cells["Play Store URL"]);
+                      if (!packageName) return;
+
+                      // If the app is already in the list, preserve the installed status
+                      const isInstalled = this.installedApps.some((app) => app.packageName === packageName);
+
+                      updatedAppsList[packageName] = {
+                        source: "Tool Drawer",
+                        installed: isInstalled,
+                        name: row.cells["Tool Name"] || "Unknown App"
+                      };
+                    } catch (error) {
+                      console.error("Error processing app row:", error);
+                    }
+                  });
+
+                this.appsList = updatedAppsList;
+                this.isToolDrawerLoaded = true;
+              }
+            } catch (error) {
+              console.error("Error loading Tool Drawer:", error);
+              this.showErrorToast("Failed to load Tool Drawer apps");
+            } finally {
+              this.isToolDrawerLoading = false;
+            }
+          },
+
+          get isToolDrawerEnabled() {
+            return (
+              this.isSubscribed &&
+              Array.isArray(this.features) &&
+              this.features.includes(KNOX_USER_GROUPS.ADD_ON_TOOL_DRAWER)
+            );
+          },
+          get isFaithToolsEnabled() {
+            return this.isSubscribed && this.features.includes(KNOX_USER_GROUPS.ADD_ON_FAITH_TOOLS);
+          },
+
+          isFeatureEnabled(knoxManageId: string, isInverse = false) {
+            const isEnabled = this.features.includes(knoxManageId);
+            return isInverse ? !isEnabled : isEnabled;
+          },
+
+          async init() {
+            // Watch for IMEI to be set before fetching features (same pattern as device/[imei].astro)
+            this.$watch("imei", async (value) => {
+              try {
+                if (this.imei) {
+                  await this.getFeatures();
+                }
+              } catch (error) {
+                console.error("Failed to load features:", error);
+              }
+            });
+
+            // Watch for features changes to load Tool Drawer when enabled
+            this.$watch("features", async (userGroups: string[]) => {
+              // Load Tool Drawer data client-side when Tool Drawer feature is enabled
+              if (this.isToolDrawerEnabled && !this.isToolDrawerLoaded) {
+                this.loadToolDrawer();
+              }
+            });
+
+            // If IMEI is already set, fetch features immediately
+            if (this.imei) {
+              try {
+                await this.getFeatures();
+              } catch (error) {
+                console.error("Failed to load features:", error);
+              }
+            }
+          }
+        };
+      });
+    </script>
+  </div>
+</Layout>
