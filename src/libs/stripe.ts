@@ -124,15 +124,37 @@ export async function validateIsSubscribed({
   imei: string;
   phoneNumber: string;
 }): Promise<boolean> {
+  console.log(`[Subscription Check] Starting validation for IMEI: ${imei}, Phone: ${phoneNumber}`);
+
   try {
-    if (imei && (await validateSubscription("stripe", { imei }))) {
-      return true;
+    // Check Stripe first
+    if (imei) {
+      console.log(`[Subscription Check] Checking Stripe for IMEI: ${imei}`);
+      const stripeResult = await validateSubscription("stripe", { imei });
+      console.log(`[Subscription Check] Stripe result for IMEI ${imei}: ${stripeResult}`);
+      if (stripeResult) {
+        console.log(`[Subscription Check] SUBSCRIBED via Stripe`);
+        return true;
+      }
     }
 
-    return await validateSubscription("gigs", { imei, phoneNumber });
+    // Check Gigs
+    console.log(`[Subscription Check] Checking Gigs for IMEI: ${imei}, Phone: ${phoneNumber}`);
+    const gigsResult = await validateSubscription("gigs", { imei, phoneNumber });
+    console.log(`[Subscription Check] Gigs result: ${gigsResult}`);
+
+    if (gigsResult) {
+      console.log(`[Subscription Check] SUBSCRIBED via Gigs`);
+    } else {
+      console.log(`[Subscription Check] NOT SUBSCRIBED (no active subscription found in Stripe or Gigs)`);
+    }
+
+    return gigsResult;
   } catch (err: any) {
-    console.error(err);
-    // We will fail on the side of trust that the user is subscribed.
-    return true;
+    console.error(`[Subscription Check] ERROR during validation:`, err);
+    // BUG FIX: Previously returned true on error, which incorrectly marked devices as subscribed
+    // Now we return false on error to be safe - unsubscribed devices shouldn't get premium features
+    console.log(`[Subscription Check] Returning FALSE due to error (previously returned true - this was a bug)`);
+    return false;
   }
 }

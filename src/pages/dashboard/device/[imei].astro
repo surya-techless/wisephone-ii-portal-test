@@ -93,6 +93,7 @@ try {
   wisephoneUsesSecondaryImeiAndShouldBeBlocked = Boolean(knoxDevice?.resultValue?.secondaryImei === imei);
 
   // Check for bypass subscription first
+  console.log(`[Device Page] Checking subscription status for IMEI: ${imei}`);
   const bypassTechlessSubscription = await db
     .select()
     .from(BypassTechlessSubscription)
@@ -100,18 +101,22 @@ try {
     .limit(1);
 
   isSubscribed = bypassTechlessSubscription.length > 0;
+  console.log(`[Device Page] Bypass subscription found: ${isSubscribed}`);
 
   if (!isSubscribed && wisephone?.phoneNumber) {
     try {
+      console.log(`[Device Page] No bypass found, checking Stripe/Gigs for phone: ${wisephone?.phoneNumber}`);
       isSubscribed = await validateIsSubscribed({
         imei: String(wisephone?.imei || ""),
         phoneNumber: `${wisephone?.phoneNumber?.replace(/[^0-9+]/g, "") || ""}`
       });
+      console.log(`[Device Page] Stripe/Gigs subscription result: ${isSubscribed}`);
     } catch (subscriptionError) {
       console.error("Error checking subscription status:", subscriptionError);
       // Continue with isSubscribed = false instead of crashing
     }
   }
+  console.log(`[Device Page] FINAL isSubscribed value passed to client: ${isSubscribed}`);
 
   // Retrieve admin user data with proper error handling
   if (userIsAdmin) {
@@ -970,14 +975,20 @@ const userLink = user?.id
          * Only call this for subscribed devices!
          */
         async assignSubscriptionGroupByDeviceModel() {
+          console.log(`[Group Assignment] assignSubscriptionGroupByDeviceModel() called`);
+          console.log(`[Group Assignment] A16_SUBSCRIBED group ID: ${KNOX_USER_GROUPS.A16_SUBSCRIBED}`);
+          console.log(`[Group Assignment] SUBSCRIBED group ID: ${KNOX_USER_GROUPS.SUBSCRIBED}`);
+
           try {
             // Check if device already has the correct subscription group
             const hasA16Subscribed = this.features.includes(KNOX_USER_GROUPS.A16_SUBSCRIBED);
             const hasSubscribed = this.features.includes(KNOX_USER_GROUPS.SUBSCRIBED);
 
+            console.log(`[Group Assignment] hasA16Subscribed: ${hasA16Subscribed}, hasSubscribed: ${hasSubscribed}`);
+
             // If device already has a subscription group, don't reassign
             if (hasA16Subscribed || hasSubscribed) {
-              console.log("Device already has subscription group, skipping reassignment");
+              console.log("[Group Assignment] Device already has subscription group, skipping reassignment");
               return;
             }
 
@@ -1146,6 +1157,9 @@ const userLink = user?.id
          * based on subscription status and device model
          */
         async ensureBaseGroup(userGroups: string[]) {
+          console.log(`[Group Assignment] ensureBaseGroup called with groups:`, userGroups);
+          console.log(`[Group Assignment] Current isSubscribed value: ${this.isSubscribed}`);
+
           const hasBaseGroup = userGroups.some(
             (group) =>
               group === KNOX_USER_GROUPS.UNPAID ||
@@ -1153,14 +1167,21 @@ const userLink = user?.id
               group === KNOX_USER_GROUPS.SUBSCRIBED ||
               group === KNOX_USER_GROUPS.A16_SUBSCRIBED
           );
+          console.log(`[Group Assignment] Device has base group: ${hasBaseGroup}`);
+
           if (!hasBaseGroup) {
+            console.log(`[Group Assignment] No base group found, assigning based on subscription status...`);
             if (this.isSubscribed) {
               // Only subscribed devices get subscribed groups
+              console.log(`[Group Assignment] isSubscribed=true, calling assignSubscriptionGroupByDeviceModel()`);
               await this.assignSubscriptionGroupByDeviceModel();
             } else {
               // Non-subscribed devices get unpaid groups based on device model
+              console.log(`[Group Assignment] isSubscribed=false, calling assignUnpaidGroupByDeviceModel()`);
               await this.assignUnpaidGroupByDeviceModel();
             }
+          } else {
+            console.log(`[Group Assignment] Device already has a base group, skipping assignment`);
           }
         },
 
@@ -1216,11 +1237,13 @@ const userLink = user?.id
          * Adds a feature to the device using the Knox API
          */
         async addFeatureToDevice(knoxManageId: string) {
+          console.log(`[Knox API] Adding feature/group to device. IMEI: ${this.imei}, GroupID: ${knoxManageId}`);
           const url = new URL(`/api/samsung-knox.json`, window.location.origin);
           url.searchParams.set("action", "apply-feature");
           url.searchParams.set("imei", this.imei);
           url.searchParams.set("knoxManageId", knoxManageId);
-          await fetch(url, { method: "POST" });
+          const response = await fetch(url, { method: "POST" });
+          console.log(`[Knox API] Add feature response status: ${response.status}`);
         },
 
         /**
