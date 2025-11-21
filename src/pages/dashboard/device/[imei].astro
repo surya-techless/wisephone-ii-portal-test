@@ -945,6 +945,33 @@ const userLink = user?.id
           }
         },
 
+        /**
+         * Checks device model and assigns appropriate unpaid group
+         * - A16 devices -> A16_UNPAID group
+         * - A15 and other devices -> UNPAID group (default)
+         */
+        async assignUnpaidGroupByDeviceModel() {
+          try {
+            // Ensure device model is cached
+            await this.cacheDeviceModel();
+
+            if (this.isA16Device) {
+              console.log(`A16 device detected, assigning to A16_UNPAID group`);
+              await this.addFeatureToDevice(KNOX_USER_GROUPS.A16_UNPAID);
+              this.features.push(KNOX_USER_GROUPS.A16_UNPAID);
+            } else {
+              // Default to UNPAID for A15 and all other devices
+              console.log(`Non-A16 device, assigning to UNPAID group`);
+              await this.addFeatureToDevice(KNOX_USER_GROUPS.UNPAID);
+              this.features.push(KNOX_USER_GROUPS.UNPAID);
+            }
+          } catch (error) {
+            console.error("Error assigning unpaid group by device model:", error);
+            // Fallback to default UNPAID group on error
+            await this.addFeatureToDevice(KNOX_USER_GROUPS.UNPAID);
+            this.features.push(KNOX_USER_GROUPS.UNPAID);
+          }
+        },
 
         completeSetup() {
           if (
@@ -1050,12 +1077,13 @@ const userLink = user?.id
          * Gets the list of exclusive groups from the user's current groups
          */
         getExclusiveGroups(userGroups: string[]): string[] {
-          // Unpaid, Subscribed, and A16_Subscribed are exclusive
+          // Unpaid, Subscribed, A16_Unpaid, and A16_Subscribed are exclusive
           return userGroups.filter(
             (group) =>
               group === KNOX_USER_GROUPS.UNPAID ||
               group === KNOX_USER_GROUPS.SUBSCRIBED ||
-              group === KNOX_USER_GROUPS.A16_SUBSCRIBED
+              group === KNOX_USER_GROUPS.A16_SUBSCRIBED ||
+              group === KNOX_USER_GROUPS.A16_UNPAID
           );
         },
 
@@ -1067,22 +1095,24 @@ const userLink = user?.id
         },
 
         /**
-         * Ensures the device has at least one base group (Minimal or Unpaid)
-         * based on subscription status
+         * Ensures the device has at least one base group (Subscribed or Unpaid)
+         * based on subscription status and device model
          */
         async ensureBaseGroup(userGroups: string[]) {
           const hasBaseGroup = userGroups.some(
             (group) =>
               group === KNOX_USER_GROUPS.UNPAID ||
               group === KNOX_USER_GROUPS.SUBSCRIBED ||
-              group === KNOX_USER_GROUPS.A16_SUBSCRIBED
+              group === KNOX_USER_GROUPS.A16_SUBSCRIBED ||
+              group === KNOX_USER_GROUPS.A16_UNPAID
           );
           if (!hasBaseGroup) {
             if (this.isSubscribed) {
               // Assign appropriate subscription group based on device model
               await this.assignSubscriptionGroupByDeviceModel();
             } else {
-              await this.addFeatureToDevice(KNOX_USER_GROUPS.UNPAID);
+              // Assign appropriate unpaid group based on device model
+              await this.assignUnpaidGroupByDeviceModel();
             }
           }
         },
@@ -1104,7 +1134,7 @@ const userLink = user?.id
         getIncompatibleFeatures(userGroups: string[]): string[] {
           const featuresToRemove: string[] = [];
 
-          // Remove Unpaid if present with any subscription group
+          // Remove UNPAID if present with any subscription group
           if (userGroups.includes(KNOX_USER_GROUPS.UNPAID)) {
             if (
               userGroups.includes(KNOX_USER_GROUPS.SUBSCRIBED) ||
@@ -1114,12 +1144,30 @@ const userLink = user?.id
             }
           }
 
+          // Remove A16_UNPAID if present with any subscription group
+          if (userGroups.includes(KNOX_USER_GROUPS.A16_UNPAID)) {
+            if (
+              userGroups.includes(KNOX_USER_GROUPS.SUBSCRIBED) ||
+              userGroups.includes(KNOX_USER_GROUPS.A16_SUBSCRIBED)
+            ) {
+              featuresToRemove.push(KNOX_USER_GROUPS.A16_UNPAID);
+            }
+          }
+
           // Remove SUBSCRIBED if A16_SUBSCRIBED is present (they shouldn't have both)
           if (
             userGroups.includes(KNOX_USER_GROUPS.SUBSCRIBED) &&
             userGroups.includes(KNOX_USER_GROUPS.A16_SUBSCRIBED)
           ) {
             featuresToRemove.push(KNOX_USER_GROUPS.SUBSCRIBED);
+          }
+
+          // Remove UNPAID if A16_UNPAID is present (they shouldn't have both)
+          if (
+            userGroups.includes(KNOX_USER_GROUPS.UNPAID) &&
+            userGroups.includes(KNOX_USER_GROUPS.A16_UNPAID)
+          ) {
+            featuresToRemove.push(KNOX_USER_GROUPS.UNPAID);
           }
 
           return featuresToRemove;

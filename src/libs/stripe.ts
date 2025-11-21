@@ -131,8 +131,9 @@ export async function validateIsSubscribed({
 
     return await validateSubscription("gigs", { imei, phoneNumber });
   } catch (err: any) {
-    console.error(err);
-    // We will fail on the side of trust that the user is subscribed.
-    return true;
+    console.error("Error validating subscription:", err);
+    // Return false on error - device will be assigned to unpaid group
+    // This prevents unsubscribed devices from getting subscribed features due to API errors
+    return false;
   }
 }
