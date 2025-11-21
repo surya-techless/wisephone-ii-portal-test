@@ -93,7 +93,12 @@ try {
   wisephoneUsesSecondaryImeiAndShouldBeBlocked = Boolean(knoxDevice?.resultValue?.secondaryImei === imei);
 
   // Check for bypass subscription first
-  console.log(`[Device Page] Checking subscription status for IMEI: ${imei}`);
+  console.log(`[Device Page] ========== SUBSCRIPTION CHECK START ==========`);
+  console.log(`[Device Page] URL IMEI param: ${imei}`);
+  console.log(`[Device Page] Wisephone from DB:`, JSON.stringify(wisephone, null, 2));
+  console.log(`[Device Page] Wisephone IMEI: ${wisephone?.imei}`);
+  console.log(`[Device Page] Wisephone phoneNumber: ${wisephone?.phoneNumber}`);
+
   const bypassTechlessSubscription = await db
     .select()
     .from(BypassTechlessSubscription)
@@ -101,22 +106,33 @@ try {
     .limit(1);
 
   isSubscribed = bypassTechlessSubscription.length > 0;
-  console.log(`[Device Page] Bypass subscription found: ${isSubscribed}`);
+  console.log(`[Device Page] Bypass subscription records found: ${bypassTechlessSubscription.length}`);
+  console.log(`[Device Page] isSubscribed after bypass check: ${isSubscribed}`);
 
   if (!isSubscribed && wisephone?.phoneNumber) {
+    const cleanedPhone = wisephone?.phoneNumber?.replace(/[^0-9+]/g, "") || "";
+    const imeiToCheck = String(wisephone?.imei || "");
+
+    console.log(`[Device Page] No bypass found, checking Stripe/Gigs...`);
+    console.log(`[Device Page] IMEI to check: "${imeiToCheck}" (length: ${imeiToCheck.length})`);
+    console.log(`[Device Page] Phone to check: "${cleanedPhone}" (original: "${wisephone?.phoneNumber}")`);
+
     try {
-      console.log(`[Device Page] No bypass found, checking Stripe/Gigs for phone: ${wisephone?.phoneNumber}`);
       isSubscribed = await validateIsSubscribed({
-        imei: String(wisephone?.imei || ""),
-        phoneNumber: `${wisephone?.phoneNumber?.replace(/[^0-9+]/g, "") || ""}`
+        imei: imeiToCheck,
+        phoneNumber: cleanedPhone
       });
       console.log(`[Device Page] Stripe/Gigs subscription result: ${isSubscribed}`);
     } catch (subscriptionError) {
-      console.error("Error checking subscription status:", subscriptionError);
+      console.error("[Device Page] Error checking subscription status:", subscriptionError);
       // Continue with isSubscribed = false instead of crashing
     }
+  } else if (!wisephone?.phoneNumber) {
+    console.log(`[Device Page] WARNING: No phone number found for wisephone, cannot check Gigs subscription`);
   }
+
   console.log(`[Device Page] FINAL isSubscribed value passed to client: ${isSubscribed}`);
+  console.log(`[Device Page] ========== SUBSCRIPTION CHECK END ==========`);
 
   // Retrieve admin user data with proper error handling
   if (userIsAdmin) {
