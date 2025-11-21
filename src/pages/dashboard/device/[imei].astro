@@ -1367,26 +1367,16 @@ const userLink = user?.id
           });
 
           this.$watch("features", async (userGroups: string[]) => {
-            // Check if device is subscribed but doesn't have any subscription group
-            if (this.isSubscribed) {
-              const hasSubscribedGroup =
-                userGroups.includes(KNOX_USER_GROUPS.SUBSCRIBED) ||
-                userGroups.includes(KNOX_USER_GROUPS.A16_SUBSCRIBED);
-              if (!hasSubscribedGroup) {
-                // Assign appropriate subscription group based on device model
-                await this.assignSubscriptionGroupByDeviceModel();
-              }
-            } else {
-              // Check if device is NOT subscribed but doesn't have any unpaid group
-              const hasUnpaidGroup =
-                userGroups.includes(KNOX_USER_GROUPS.UNPAID) ||
-                userGroups.includes(KNOX_USER_GROUPS.A16_UNPAID);
-              if (!hasUnpaidGroup) {
-                // Assign appropriate unpaid group based on device model
-                await this.assignUnpaidGroupByDeviceModel();
-              }
+            // Skip group assignment if we're still loading initial data
+            if (this.isLoading) {
+              return;
             }
 
+            // Use ensureBaseGroup to handle base group assignment
+            // This will only assign groups if device has no base groups
+            await this.ensureBaseGroup(userGroups);
+
+            // Handle exclusive group conflicts
             await this.removeExclusiveGroups(userGroups);
 
             // Load Tool Drawer data client-side when Tool Drawer feature is enabled
