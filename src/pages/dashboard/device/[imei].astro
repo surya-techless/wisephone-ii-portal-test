@@ -100,18 +100,26 @@ try {
     .limit(1);
 
   isSubscribed = bypassTechlessSubscription.length > 0;
+  console.log(`[Device Page] Bypass subscription check: ${isSubscribed}`);
 
   if (!isSubscribed && wisephone?.phoneNumber) {
     try {
+      const imeiForCheck = String(wisephone?.imei || "");
+      const phoneForCheck = `${wisephone?.phoneNumber?.replace(/[^0-9+]/g, "") || ""}`;
+      console.log(`[Device Page] Checking subscription - IMEI: ${imeiForCheck}, Phone: ${phoneForCheck}`);
+
       isSubscribed = await validateIsSubscribed({
-        imei: String(wisephone?.imei || ""),
-        phoneNumber: `${wisephone?.phoneNumber?.replace(/[^0-9+]/g, "") || ""}`
+        imei: imeiForCheck,
+        phoneNumber: phoneForCheck
       });
+      console.log(`[Device Page] Subscription check result: ${isSubscribed}`);
     } catch (subscriptionError) {
-      console.error("Error checking subscription status:", subscriptionError);
+      console.error("[Device Page] Error checking subscription status:", subscriptionError);
       // Continue with isSubscribed = false instead of crashing
     }
   }
+
+  console.log(`[Device Page] Final isSubscribed value being passed to client: ${isSubscribed}`);
 
   // Retrieve admin user data with proper error handling
   if (userIsAdmin) {
@@ -554,7 +562,7 @@ const userLink = user?.id
                 x-bind:class="{ 'tab-active !bg-[var(--evergreen)] !text-white': currentView === 'faith-tools' }"
                 @click="currentView = 'faith-tools'"
               >
-                faith.tools
+                Extra Tools
               </a>
               <a
                 role="tab"
@@ -573,7 +581,7 @@ const userLink = user?.id
               x-model="currentView"
             >
               <option value="tool-drawer">Tool Drawer</option>
-              <option value="faith-tools">faith.tools</option>
+              <option value="faith-tools">Extra Tools</option>
               <option value="installed">Installed</option>
             </select>
           </div>

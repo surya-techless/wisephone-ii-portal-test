@@ -77,20 +77,20 @@ export const FEATURES: Record<string, Feature> = {
     disclosure:
       "Please note that third-party apps may display in-app ads, which are not endorsed by Techless and could contain unexpected content. Use of the Tool Drawer apps is at your discretion. If you are battling addiction, we recommend not enabling the Tool Drawer. And, at this time, in-app purchases are not supported."
   },
-  FAITH_TOOLS: {
-    isEnabled: true,
-    knoxManageId: KNOX_USER_GROUPS.ADD_ON_FAITH_TOOLS,
-    lucideIcon: "fish-symbol",
-    name: "Apps curated by faith.tools",
-    isBeta: true,
-    description: "Access faith-based apps curated by faith.tools. Bible, YouVersion, Hallow, Dwell and more.",
-    enableMessage:
-      "Apps curated by faith.tools may display in-app ads and content not affiliated with or curated by Techless. These apps are curated by our partner, faith.tools.",
-    disableMessage:
-      "I acknowledge turning off this feature will remove access to faith-based apps on this device. Any installed faith-based apps will be uninstalled.",
-    disclosure:
-      "Apps curated by faith.tools may display in-app ads and content not affiliated with or curated by Techless. These apps are curated by our partner, faith.tools. And, at this time, in-app purchases are not supported."
-  },
+  // FAITH_TOOLS: {
+  //   isEnabled: false,
+  //   knoxManageId: KNOX_USER_GROUPS.ADD_ON_FAITH_TOOLS,
+  //   lucideIcon: "fish-symbol",
+  //   name: "Apps curated by faith.tools",
+  //   isBeta: true,
+  //   description: "Access faith-based apps curated by faith.tools. Bible, YouVersion, Hallow, Dwell and more.",
+  //   enableMessage:
+  //     "Apps curated by faith.tools may display in-app ads and content not affiliated with or curated by Techless. These apps are curated by our partner, faith.tools.",
+  //   disableMessage:
+  //     "I acknowledge turning off this feature will remove access to faith-based apps on this device. Any installed faith-based apps will be uninstalled.",
+  //   disclosure:
+  //     "Apps curated by faith.tools may display in-app ads and content not affiliated with or curated by Techless. These apps are curated by our partner, faith.tools. And, at this time, in-app purchases are not supported."
+  // },
   GOOGLE_APPS: {
     isEnabled: true,
     knoxManageId: KNOX_USER_GROUPS.ADD_ON_GOOGLE_APPS,

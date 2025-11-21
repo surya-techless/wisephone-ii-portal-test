@@ -24,13 +24,16 @@ export async function validateSubscription(
   params: { imei?: string; phoneNumber?: string }
 ): Promise<boolean> {
   const { imei, phoneNumber } = params;
+  console.log(`[validateSubscription] Provider: ${provider}, IMEI: ${imei}, Phone: ${phoneNumber}`);
 
   if (provider === "stripe" && imei) {
     const customers = await stripe.customers.search({
       query: `metadata['imei']:'${imei}'`
     });
+    console.log(`[validateSubscription] Stripe customers found: ${customers.data.length}`);
 
     if (!customers.data.length) {
+      console.log(`[validateSubscription] No Stripe customers found for IMEI: ${imei}`);
       return false;
     }
 
@@ -41,12 +44,15 @@ export async function validateSubscription(
         customer: customer.id,
         status: "active"
       });
+      console.log(`[validateSubscription] Stripe customer ${customer.id} has ${subscriptions.data.length} active subscriptions`);
 
       if (subscriptions.data.length > 0) {
+        console.log(`[validateSubscription] Stripe: SUBSCRIBED`);
         return true;
       }
     }
 
+    console.log(`[validateSubscription] Stripe: NOT SUBSCRIBED (no active subscriptions found)`);
     return false;
   }
 
@@ -59,6 +65,7 @@ export async function validateSubscription(
       if (!phoneNumber.startsWith("+1")) {
         phoneNumberFormatted = `+1${phoneNumber}`;
       }
+      console.log(`[validateSubscription] Gigs: Searching by phone: ${phoneNumberFormatted}`);
 
       const subscriptionResponse = await fetch(apiUrl, {
         method: "POST",
@@ -71,11 +78,13 @@ export async function validateSubscription(
       });
 
       const subscriptions = (await subscriptionResponse.json()) as SubscriptionList;
-      console.log(subscriptions);
+      console.log(`[validateSubscription] Gigs phone search result:`, subscriptions);
       isSubscribed = subscriptions?.items?.some((sub) => ["active", "pending"].includes(sub.status));
+      console.log(`[validateSubscription] Gigs phone search isSubscribed: ${isSubscribed}`);
     }
 
     if (imei && !isSubscribed) {
+      console.log(`[validateSubscription] Gigs: Searching by IMEI: ${imei}`);
       const devicesApiUrl = new URL(`${API_CONFIG.gigs.baseUrl}/devices/search`);
       const deviceResponse = await fetch(devicesApiUrl, {
         method: "POST",
@@ -89,8 +98,10 @@ export async function validateSubscription(
 
       const devices = (await deviceResponse.json()) as DeviceList;
       const userId = devices.items?.[0]?.user?.id;
+      console.log(`[validateSubscription] Gigs IMEI search - userId: ${userId}`);
 
       if (!userId) {
+        console.log(`[validateSubscription] Gigs: No user found for IMEI`);
         isSubscribed = false;
         return isSubscribed;
       }
@@ -108,12 +119,15 @@ export async function validateSubscription(
       });
 
       const subscriptions = (await subscriptionsResponse.json()) as { items: Subscription[] };
+      console.log(`[validateSubscription] Gigs user subscriptions:`, subscriptions);
       isSubscribed = Boolean(subscriptions?.items?.length > 0 || false);
     }
 
+    console.log(`[validateSubscription] Gigs final result: ${isSubscribed ? 'SUBSCRIBED' : 'NOT SUBSCRIBED'}`);
     return isSubscribed;
   }
 
+  console.log(`[validateSubscription] No matching provider, returning false`);
   return false;
 }
 
@@ -124,14 +138,18 @@ export async function validateIsSubscribed({
   imei: string;
   phoneNumber: string;
 }): Promise<boolean> {
+  console.log(`[validateIsSubscribed] Starting validation - IMEI: ${imei}, Phone: ${phoneNumber}`);
   try {
     if (imei && (await validateSubscription("stripe", { imei }))) {
+      console.log(`[validateIsSubscribed] Result: TRUE (Stripe)`);
       return true;
     }
 
-    return await validateSubscription("gigs", { imei, phoneNumber });
+    const gigsResult = await validateSubscription("gigs", { imei, phoneNumber });
+    console.log(`[validateIsSubscribed] Result: ${gigsResult ? 'TRUE' : 'FALSE'} (Gigs)`);
+    return gigsResult;
   } catch (err: any) {
-    console.error("Error validating subscription:", err);
+    console.error("[validateIsSubscribed] ERROR:", err);
     // Return false on error - device will be assigned to unpaid group
     // This prevents unsubscribed devices from getting subscribed features due to API errors
     return false;
