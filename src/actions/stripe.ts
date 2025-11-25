@@ -1,17 +1,12 @@
 import { defineAction } from "astro:actions";
-import { STRIPE_SECRET_KEY } from "astro:env/server";
+import { STRIPE_SECRET_KEY, STRIPE_SECRET_KEY_2 } from "astro:env/server";
 import { z } from "astro:content";
 import Stripe from "stripe";
 
-const stripeInstance = new Stripe(
-  import.meta.env.PROD
-    ? STRIPE_SECRET_KEY
-    : "sk_test_51H2HO9ATGtdZ0VDD6qhj4b11PI5Rt8kWfTrI9Vms2lZmokvaVU3MXRoHTCbmJKdPoKc3lb06Y0xNlIyankVH6Hgz00nQApc96Y",
-  {
-    apiVersion: "2025-02-24.acacia",
-    typescript: true
-  }
-);
+const stripeInstance = new Stripe(import.meta.env.PROD ? STRIPE_SECRET_KEY : STRIPE_SECRET_KEY_2, {
+  apiVersion: "2025-02-24.acacia",
+  typescript: true
+});
 
 const TECHLESS_SUBSCRIPTION_PRICE_ID = import.meta.env.PROD
   ? "price_1Q0nXWATGtdZ0VDDDU27pLKx"

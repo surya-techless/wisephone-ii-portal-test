@@ -1,16 +1,11 @@
 import Stripe from "stripe";
-import { STRIPE_SECRET_KEY, GIGS_API_KEY } from "astro:env/server";
+import { STRIPE_SECRET_KEY, STRIPE_SECRET_KEY_2, GIGS_API_KEY } from "astro:env/server";
 import { type SubscriptionList, type DeviceList, type Subscription } from "./types";
 
-export const stripe = new Stripe(
-  import.meta.env.PROD
-    ? STRIPE_SECRET_KEY
-    : "sk_test_51H2HO9ATGtdZ0VDD6qhj4b11PI5Rt8kWfTrI9Vms2lZmokvaVU3MXRoHTCbmJKdPoKc3lb06Y0xNlIyankVH6Hgz00nQApc96Y",
-  {
-    apiVersion: "2025-02-24.acacia",
-    typescript: true
-  }
-);
+export const stripe = new Stripe(import.meta.env.PROD ? STRIPE_SECRET_KEY : STRIPE_SECRET_KEY_2, {
+  apiVersion: "2025-02-24.acacia",
+  typescript: true
+});
 
 const API_CONFIG = {
   gigs: {

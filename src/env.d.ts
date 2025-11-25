@@ -49,6 +49,8 @@ interface ImportMetaEnv {
   readonly SENTRY_AUTH_TOKEN: string;
   /** https://docs.stripe.com/api */
   readonly STRIPE_SECRET_KEY: string;
+  /** https://docs.stripe.com/api - Test/Development key */
+  readonly STRIPE_SECRET_KEY_2: string;
   /** https://developers.gigs.com/ */
   readonly GIGS_API_KEY: string;
 }
