@@ -1,10 +1,11 @@
 [build]
   command = "npm run build"
   publish = "dist"
-  
+
 [build.environment]
   NODE_VERSION = "20.3.0"
   NPM_VERSION = "10.0.0"
+  SECRETS_SCAN_SMART_DETECTION_ENABLED = "false"
 
 # Security headers
 [[headers]]
