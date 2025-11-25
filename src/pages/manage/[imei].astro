@@ -11,7 +11,7 @@ import { SamsungKnoxService } from "@/libs/samsung-knox-service";
 import Layout from "@/layouts/Layout.astro";
 import TechlessSubscriptionButton from "@/components/TechlessSubscriptionButton.astro";
 import DashboardSidebar from "@/components/DashboardSidebar.astro";
-import { FEATURES, FAITH_TOOLS_APPS, getPackageNameFromPlayStoreUrl, isValidIMEI } from "@/libs/utils";
+import { FEATURES, FAITH_TOOLS_APPS, getPackageNameFromPlayStoreUrl, isValidIMEI, type Feature } from "@/libs/utils";
 import { isAdmin } from "@/lib/auth/permissions";
 import type { AppsList } from "@/types/apps";
 
@@ -626,7 +626,12 @@ try {
     <script>
       import Alpine from "alpinejs";
       import { actions } from "astro:actions";
-      import { KNOX_USER_GROUPS, updateUnreachableAlpineState, getPackageNameFromPlayStoreUrl } from "@/libs/utils";
+      import {
+        KNOX_USER_GROUPS,
+        updateUnreachableAlpineState,
+        getPackageNameFromPlayStoreUrl,
+        type Feature
+      } from "@/libs/utils";
       import { AppManagementService } from "@/services/AppManagementService";
       import { FeatureManagementService } from "@/services/FeatureManagementService";
       import type { AppEntry } from "@/types/apps";
@@ -641,7 +646,7 @@ try {
           installedApps: [] as { packageName: string; appName: string; isGoogleManaged: "Y" | "N" }[],
           appSearchQuery: "",
           features: [] as string[],
-          availableFeatures: [] as any[],
+          availableFeatures: [] as Feature[],
           isSubscribed: false,
           imei: "",
           userName: "",
@@ -651,7 +656,7 @@ try {
           isToolDrawerLoaded: false,
           mobileMenuOpen: false,
           showConfirmModal: false,
-          pendingFeature: null as any,
+          pendingFeature: null as Feature | null,
           pendingFeatureEnabled: false,
           confirmationMessage: "",
           showDisclosureFor: null as string | null,
@@ -744,7 +749,7 @@ try {
             });
           },
 
-          async toggleFeature(feature: any) {
+          async toggleFeature(feature: Feature) {
             try {
               if (!this.isSubscribed) {
                 throw new Error("Active subscription required");
