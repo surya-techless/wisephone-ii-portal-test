@@ -1,11 +1,14 @@
 import Stripe from "stripe";
-import { STRIPE_SECRET_KEY, STRIPE_SECRET_KEY_2, GIGS_API_KEY } from "astro:env/server";
+import { STRIPE_SECRET_KEY, GIGS_API_KEY } from "astro:env/server";
 import { type SubscriptionList, type DeviceList, type Subscription } from "./types";
 
-export const stripe = new Stripe(import.meta.env.PROD ? STRIPE_SECRET_KEY : STRIPE_SECRET_KEY_2, {
-  apiVersion: "2025-02-24.acacia",
-  typescript: true
-});
+export const stripe = new Stripe(
+  import.meta.env.PROD ? STRIPE_SECRET_KEY : STRIPE_SECRET_KEY,
+  {
+    apiVersion: "2025-02-24.acacia",
+    typescript: true
+  }
+);
 
 const API_CONFIG = {
   gigs: {
@@ -126,8 +129,9 @@ export async function validateIsSubscribed({
 
     return await validateSubscription("gigs", { imei, phoneNumber });
   } catch (err: any) {
-    console.error(err);
-    // We will fail on the side of trust that the user is subscribed.
-    return true;
+    console.error("Error validating subscription:", err);
+    // Return false on error - device will be assigned to unpaid group
+    // This prevents unsubscribed devices from getting subscribed features due to API errors
+    return false;
   }
 }

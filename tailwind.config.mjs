@@ -7,7 +7,20 @@ export default {
         center: true,
         padding: "24px",
         maxWidth: "1000px"
-      }
+      },
+      fontFamily: {
+        haffer: [
+          '"Haffer SemiMono"',
+          "ui-monospace",
+          "SFMono-Regular",
+          "Menlo",
+          "Monaco",
+          "Consolas",
+          '"Liberation Mono"',
+          '"Courier New"',
+          "monospace"
+        ]
+      },
     }
   },
   // Change your theme at https://daisyui.com/docs/themes/.

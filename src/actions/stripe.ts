@@ -1,9 +1,9 @@
 import { defineAction } from "astro:actions";
-import { STRIPE_SECRET_KEY, STRIPE_SECRET_KEY_2 } from "astro:env/server";
+import { STRIPE_SECRET_KEY } from "astro:env/server";
 import { z } from "astro:content";
 import Stripe from "stripe";
 
-const stripeInstance = new Stripe(import.meta.env.PROD ? STRIPE_SECRET_KEY : STRIPE_SECRET_KEY_2, {
+const stripeInstance = new Stripe(STRIPE_SECRET_KEY || STRIPE_SECRET_KEY, {
   apiVersion: "2025-02-24.acacia",
   typescript: true
 });
