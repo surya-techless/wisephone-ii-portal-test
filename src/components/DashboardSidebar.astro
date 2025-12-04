@@ -82,13 +82,17 @@ const { activeLink = "devices" } = Astro.props;
       <!-- Desktop: Show only bottom section -->
       <!-- Mobile: Show all options in one list -->
       <div class="md:hidden space-y-1">
-        <div class="px-4 py-3 relative cursor-pointer" x-data @click="$el.querySelector('button')?.click(); mobileMenuOpen = false">
+        <div
+          class="px-4 py-3 relative cursor-pointer"
+          x-data
+          @click="$el.querySelector('button')?.click(); mobileMenuOpen = false"
+        >
           <div class="flex items-center w-full text-sm text-gray-600">
             <img src="/assets/portal-icons/account-circle.svg" alt="" class="w-5 h-5" />
             <span class="ml-4">Account</span>
           </div>
           <div class="absolute bottom-5 left-0 opacity-0 pointer-events-auto invisible">
-            <UserButton afterSignOutUrl="/" />
+            <UserButton />
           </div>
         </div>
 
@@ -143,7 +147,7 @@ const { activeLink = "devices" } = Astro.props;
         <span class="ml-4">Account</span>
       </div>
       <div class="absolute bottom-5 left-0 opacity-0 pointer-events-auto invisible">
-        <UserButton afterSignOutUrl="/" />
+        <UserButton />
       </div>
     </div>
 

@@ -755,7 +755,7 @@ const actionResult = Astro.getActionResult(actions.wisephones.createWisephone);
         this.hasBlurredImeiVerification = false;
         this.isImeiValid = true;
       },
-      openEditModal(deviceName, devicePhone, imei) {
+      openEditModal(deviceName: string, devicePhone: string, imei: string) {
         // Split the device name into first and last name
         const nameParts = deviceName.trim().split(" ");
         this.editFirstName = nameParts[0] || "";
