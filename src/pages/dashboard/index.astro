@@ -699,6 +699,93 @@ const actionResult = Astro.getActionResult(actions.wisephones.createWisephone);
   </div>
 </div>
 
+  <!-- Support Popup -->
+  <div
+    x-show="showSupportPopup"
+    x-cloak
+    x-transition.opacity
+    class="fixed bottom-32 md:bottom-32 z-50 w-[240px] max-w-[240px]"
+    style="left: 8px;"
+    @click.outside="showSupportPopup = false"
+  >
+    <div class="bg-white rounded-2xl shadow-2xl relative overflow-visible">
+      <!-- Speech bubble tail/pointer -->
+      <div class="absolute -bottom-3 left-5 w-6 h-6 bg-white transform rotate-45 "></div>
+
+      <!-- Header -->
+      <div class="px-4 pt-4 pb-3 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <div class="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              class="text-gray-700"
+            >
+              <circle cx="12" cy="12" r="10"></circle>
+              <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+              <path d="M12 17h.01"></path>
+            </svg>
+          </div>
+          <h3 class="text-base font-bold text-gray-900">Support</h3>
+        </div>
+
+        <!-- Close Button -->
+        <button
+          @click="showSupportPopup = false"
+          class="text-gray-700 hover:text-gray-900"
+          aria-label="Close"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M18 6 6 18"></path>
+            <path d="m6 6 12 12"></path>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Body -->
+      <div class="px-4 pb-4 space-y-0 text-sm text-gray-700">
+        <p class="pb-3">
+          Click here to access our{" "}
+          <a href="https://techless.notion.site/" target="_blank" rel="noopener noreferrer" class="underline text-gray-700 hover:text-gray-900">
+            Help Center.
+          </a>
+        </p>
+
+        <hr class="border-gray-300" />
+
+        <p class="py-3">
+          Call <a href="tel:5126751820" class="text-gray-700 hover:text-gray-900">512 675 1820</a> to get in touch with our support team.
+        </p>
+
+        <hr class="border-gray-300" />
+
+        <p class="pt-3">
+          Click here to access our{" "}
+          <a href="https://techless.zendesk.com/hc/en-us/requests/new" target="_blank" rel="noopener noreferrer" class="underline text-gray-700 hover:text-gray-900">
+            Contact Form.
+          </a>
+        </p>
+      </div>
+    </div>
+  </div>
+
 </main>
 
 </div>
@@ -713,6 +800,7 @@ const actionResult = Astro.getActionResult(actions.wisephones.createWisephone);
       isLoading: false,
       mobileMenuOpen: false,
       showAccountMenu: false,
+      showSupportPopup: false,
       imei1: "",
       imei2: "",
       phoneNumber: "",
