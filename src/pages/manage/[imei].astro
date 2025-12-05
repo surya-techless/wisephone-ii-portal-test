@@ -101,17 +101,6 @@ try {
   try {
     const getInstalledAppsResult = await Astro.callAction(actions.wisephones.getInstalledApps, formData);
     installedApps = getInstalledAppsResult?.data?.apps || [];
-    
-    // Debug: Check if Voice Recorder is in Knox response
-    const voiceRecorder = installedApps.find(app => 
-      app.packageName?.includes("voicenote")
-    );
-    if (voiceRecorder) {
-      console.log("✅ Voice Recorder found in Knox response:", voiceRecorder.packageName, "-", voiceRecorder.appName);
-    } else {
-      console.log("❌ Voice Recorder NOT in Knox response");
-      console.log("📊 Total apps from Knox:", installedApps.length);
-    }
   } catch (appsError) {
     console.error("Error getting installed apps:", appsError);
   }
@@ -273,7 +262,12 @@ try {
                   <div class="flex gap-2 mb-6 max-w-[26rem]">
                     <div class="text-center bg-[#f7f6f2] rounded-lg p-3 flex-1">
                       <p class="text-xs text-gray-600 mb-1">Apps</p>
-                      <p class="text-xl font-semibold text-gray-900" x-text="systemApps.length + installedFilteredApps.length">7</p>
+                      <p
+                        class="text-xl font-semibold text-gray-900"
+                        x-text="systemApps.length + installedFilteredApps.length"
+                      >
+                        7
+                      </p>
                     </div>
                     <div class="text-center bg-[#f7f6f2] rounded-lg p-3 flex-1">
                       <p class="text-xs text-gray-600 mb-1">Monthly Data Used</p>
@@ -558,7 +552,9 @@ try {
                         <span class="text-sm text-gray-900 truncate" x-text="app.name"></span>
                       </div>
                       <div class="flex items-center gap-1.5 flex-shrink-0 ml-2">
-                        <span class="px-3 py-1.5 bg-gray-100 border border-gray-200 rounded-md text-xs font-medium text-gray-600">
+                        <span
+                          class="px-3 py-1.5 bg-gray-100 border border-gray-200 rounded-md text-xs font-medium text-gray-600"
+                        >
                           System App
                         </span>
                       </div>
@@ -737,21 +733,6 @@ try {
           get systemApps() {
             // Get installed system apps based on the device model
             const deviceModel = this.deviceName || ""; // Use device name/model if available
-            
-            // Debug: Log what we're passing to the function
-            console.log(`📊 Passing ${this.installedApps.length} apps to getInstalledSystemApps`);
-            
-            // Check if voicenote is in the installedApps
-            const hasVoiceNote = this.installedApps.some(app => 
-              app.packageName && app.packageName.includes("voicenote")
-            );
-            console.log(`🎤 Voice Recorder in installedApps array: ${hasVoiceNote ? "YES" : "NO"}`);
-            
-            if (hasVoiceNote) {
-              const voiceApp = this.installedApps.find(app => app.packageName?.includes("voicenote"));
-              console.log(`   Found: ${voiceApp.packageName} - "${voiceApp.appName}"`);
-            }
-            
             return getInstalledSystemApps(this.installedApps, deviceModel);
           },
 
@@ -783,7 +764,7 @@ try {
 
             // Filter out system apps (they're shown in a separate section)
             const systemAppPackages = getSystemAppPackageNames();
-            apps = apps.filter(app => !systemAppPackages.includes(app.packageName));
+            apps = apps.filter((app) => !systemAppPackages.includes(app.packageName));
 
             // Sort by name
             apps.sort((a, b) => a.name.localeCompare(b.name));
