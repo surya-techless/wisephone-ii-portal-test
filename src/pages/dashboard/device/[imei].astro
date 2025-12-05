@@ -14,7 +14,7 @@ import TechlessSubscriptionButton from "@/components/TechlessSubscriptionButton.
 import { FEATURES, FAITH_TOOLS_APPS, getPackageNameFromPlayStoreUrl, isValidIMEI } from "@/libs/utils";
 import { isAdmin } from "@/lib/auth/permissions";
 import type { AppsList } from "@/types/apps";
-
+// Deprecated:  Devices are now  handled in the manage/[imei].astro page
 // Initialize variables with default values
 let imei: string | undefined = Astro.params.imei;
 let wisephone: any = null;

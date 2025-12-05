@@ -14,6 +14,7 @@ import DashboardSidebar from "@/components/DashboardSidebar.astro";
 import { FEATURES, FAITH_TOOLS_APPS, getPackageNameFromPlayStoreUrl, isValidIMEI, type Feature } from "@/libs/utils";
 import { isAdmin } from "@/lib/auth/permissions";
 import type { AppsList } from "@/types/apps";
+import { DEFAULT_SYSTEM_APPS, getSystemAppPackageNames } from "@/utils/system-apps";
 
 // Initialize variables
 let imei: string | undefined = Astro.params.imei;
@@ -100,6 +101,17 @@ try {
   try {
     const getInstalledAppsResult = await Astro.callAction(actions.wisephones.getInstalledApps, formData);
     installedApps = getInstalledAppsResult?.data?.apps || [];
+    
+    // Debug: Check if Voice Recorder is in Knox response
+    const voiceRecorder = installedApps.find(app => 
+      app.packageName?.includes("voicenote")
+    );
+    if (voiceRecorder) {
+      console.log("✅ Voice Recorder found in Knox response:", voiceRecorder.packageName, "-", voiceRecorder.appName);
+    } else {
+      console.log("❌ Voice Recorder NOT in Knox response");
+      console.log("📊 Total apps from Knox:", installedApps.length);
+    }
   } catch (appsError) {
     console.error("Error getting installed apps:", appsError);
   }
@@ -261,7 +273,7 @@ try {
                   <div class="flex gap-2 mb-6 max-w-[26rem]">
                     <div class="text-center bg-[#f7f6f2] rounded-lg p-3 flex-1">
                       <p class="text-xs text-gray-600 mb-1">Apps</p>
-                      <p class="text-xl font-semibold text-gray-900" x-text="installedFilteredApps.length">7</p>
+                      <p class="text-xl font-semibold text-gray-900" x-text="systemApps.length + installedFilteredApps.length">7</p>
                     </div>
                     <div class="text-center bg-[#f7f6f2] rounded-lg p-3 flex-1">
                       <p class="text-xs text-gray-600 mb-1">Monthly Data Used</p>
@@ -529,13 +541,38 @@ try {
                 </div>
               </div>
 
-              <!-- Installed Apps -->
+              <!-- Installed Apps (Combined) -->
               <div class="bg-[#f5f5f0] p-4 rounded-lg flex flex-col min-h-0">
                 <h3 class="text-xs font-semibold text-gray-600 mb-3 flex items-center gap-1.5 flex-shrink-0">
                   <Icon name="lucide:check-circle" class="w-3.5 h-3.5" />
-                  Installed Apps (<span x-text="installedFilteredApps.length">0</span>)
+                  Installed Apps (<span x-text="systemApps.length + installedFilteredApps.length">0</span>)
                 </h3>
                 <div class="space-y-2 flex-1 overflow-y-auto pr-2 min-h-0">
+                  <!-- System Applications -->
+                  <template x-for="app in systemApps" :key="app.packageName">
+                    <div class="flex items-center justify-between p-3 border border-gray-300 rounded-lg bg-white">
+                      <div class="flex items-center gap-2 flex-1 min-w-0">
+                        <div class="w-8 h-8 bg-blue-600 rounded-md flex items-center justify-center flex-shrink-0">
+                          <Icon name="lucide:smartphone" class="w-4 h-4 text-white" />
+                        </div>
+                        <span class="text-sm text-gray-900 truncate" x-text="app.name"></span>
+                      </div>
+                      <div class="flex items-center gap-1.5 flex-shrink-0 ml-2">
+                        <span class="px-3 py-1.5 bg-gray-100 border border-gray-200 rounded-md text-xs font-medium text-gray-600">
+                          System App
+                        </span>
+                      </div>
+                    </div>
+                  </template>
+
+                  <!-- Divider -->
+                  <div x-show="systemApps.length > 0 && installedFilteredApps.length > 0" class="relative py-2">
+                    <div class="absolute inset-0 flex items-center">
+                      <div class="w-full border-t border-gray-300"></div>
+                    </div>
+                  </div>
+
+                  <!-- Regular Installed Apps -->
                   <template x-for="app in installedFilteredApps" :key="app.packageName">
                     <div class="flex items-center justify-between p-3 border border-gray-300 rounded-lg bg-white">
                       <div class="flex items-center gap-2 flex-1 min-w-0">
@@ -625,9 +662,6 @@ try {
           </div>
         </div>
       </div>
-
-
-
     </main>
 
     <script>
@@ -642,6 +676,7 @@ try {
       import { AppManagementService } from "@/services/AppManagementService";
       import { FeatureManagementService } from "@/services/FeatureManagementService";
       import type { AppEntry } from "@/types/apps";
+      import { DEFAULT_SYSTEM_APPS, getInstalledSystemApps, getSystemAppPackageNames } from "@/utils/system-apps";
 
       const appManagement = new AppManagementService();
       const featureManagement = new FeatureManagementService();
@@ -650,7 +685,12 @@ try {
         return {
           currentTab: "device-info",
           appsList: {} as Record<string, Omit<AppEntry, "packageName">>,
-          installedApps: [] as { packageName: string; appName: string; isGoogleManaged: "Y" | "N" }[],
+          installedApps: [] as {
+            packageName: string;
+            appName: string;
+            isGoogleManaged: "Y" | "N";
+            systemApp?: string;
+          }[],
           appSearchQuery: "",
           features: [] as string[],
           availableFeatures: [] as Feature[],
@@ -694,9 +734,29 @@ try {
             return apps.filter((app) => app.name.toLowerCase().includes(query));
           },
 
+          get systemApps() {
+            // Get installed system apps based on the device model
+            const deviceModel = this.deviceName || ""; // Use device name/model if available
+            
+            // Debug: Log what we're passing to the function
+            console.log(`📊 Passing ${this.installedApps.length} apps to getInstalledSystemApps`);
+            
+            // Check if voicenote is in the installedApps
+            const hasVoiceNote = this.installedApps.some(app => 
+              app.packageName && app.packageName.includes("voicenote")
+            );
+            console.log(`🎤 Voice Recorder in installedApps array: ${hasVoiceNote ? "YES" : "NO"}`);
+            
+            if (hasVoiceNote) {
+              const voiceApp = this.installedApps.find(app => app.packageName?.includes("voicenote"));
+              console.log(`   Found: ${voiceApp.packageName} - "${voiceApp.appName}"`);
+            }
+            
+            return getInstalledSystemApps(this.installedApps, deviceModel);
+          },
+
           get installedFilteredApps() {
             // Show all installed apps from the device (filtered by isGoogleManaged === "Y")
-            // This matches the behavior in device/[imei].astro
             let apps = this.installedApps
               .filter((app) => app.isGoogleManaged === "Y")
               .map((app) => ({
@@ -720,6 +780,10 @@ try {
               }
             });
             apps = Array.from(appsMap.values());
+
+            // Filter out system apps (they're shown in a separate section)
+            const systemAppPackages = getSystemAppPackageNames();
+            apps = apps.filter(app => !systemAppPackages.includes(app.packageName));
 
             // Sort by name
             apps.sort((a, b) => a.name.localeCompare(b.name));
@@ -1038,6 +1102,7 @@ try {
           },
 
           async init() {
+            console.log("Manage page init() called");
             // Watch for IMEI to be set before fetching features (same pattern as device/[imei].astro)
             this.$watch("imei", async (value) => {
               try {
@@ -1057,6 +1122,12 @@ try {
               }
             });
 
+            // Watch for installedApps changes and log Google-managed apps
+            this.$watch("installedApps", (apps) => {
+              console.log("installedApps changed, new length:", apps?.length || 0);
+              this.logGoogleManagedApps();
+            });
+
             // If IMEI is already set, fetch features immediately
             if (this.imei) {
               try {
@@ -1064,6 +1135,41 @@ try {
               } catch (error) {
                 console.error("Failed to load features:", error);
               }
+            }
+
+            // Log all Google-managed apps excluding system apps
+            this.logGoogleManagedApps();
+          },
+
+          logGoogleManagedApps() {
+            if (this.installedApps && this.installedApps.length > 0) {
+              // Log ALL installed apps
+              const allAppNames = this.installedApps.map((app) => app.appName || app.packageName || "Unknown App");
+
+              console.log("=== ALL INSTALLED APPS ON DEVICE ===");
+              console.log(`Total count: ${this.installedApps.length}`);
+              console.log("App names:", allAppNames);
+
+              // Print each app name on a separate line for better readability
+              allAppNames.forEach((name, index) => {
+                console.log(`${index + 1}. ${name}`);
+              });
+
+              // Also log Google-managed apps (excluding system apps) for reference
+              const googleManagedNonSystemApps = this.installedApps.filter(
+                (app) => app.isGoogleManaged === "Y" && app.systemApp !== "Y"
+              );
+              const googleManagedAppNames = googleManagedNonSystemApps.map(
+                (app) => app.appName || app.packageName || "Unknown App"
+              );
+
+              console.log("\n=== Google-managed apps (excluding system apps) ===");
+              console.log(`Total count: ${googleManagedNonSystemApps.length}`);
+              googleManagedAppNames.forEach((name, index) => {
+                console.log(`${index + 1}. ${name}`);
+              });
+            } else {
+              console.log("No installed apps found to log");
             }
           }
         };
