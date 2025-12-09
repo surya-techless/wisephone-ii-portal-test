@@ -377,7 +377,7 @@ const actionResult = Astro.getActionResult(actions.wisephones.createWisephone);
         </div>
 
         <!-- Device Cards Grid -->
-        <div class="mt-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+        <div class="mt-6 flex flex-wrap gap-6">
           {wisephones.map((wisephone) => {
             const initials = (wisephone.nickname || 'Device')
               .split(' ')
@@ -387,37 +387,21 @@ const actionResult = Astro.getActionResult(actions.wisephones.createWisephone);
               .slice(0, 2);
 
             return (
-              <div class="border border-gray-300 rounded-md p-4 w-full flex flex-col">
-                <div class="flex justify-between items-start gap-2">
-                  <div class="flex items-start space-x-2 sm:space-x-3 min-w-0 flex-1">
-                    <div class="w-8 h-8 sm:w-10 sm:h-10 bg-[#4b918e] rounded-full flex items-center justify-center text-white text-xs sm:text-sm font-semibold flex-shrink-0">
-                      {initials}
-                    </div>
-                    <div class="min-w-0 flex-1">
-                      <p class="font-medium text-sm sm:text-base text-gray-900 truncate">{wisephone.nickname || 'Device'}</p>
-                      <p class="text-gray-500 text-xs sm:text-sm">{wisephone.phoneNumber || 'No phone number'}</p>
-                      <p class="text-gray-400 text-xs">IMEI: {wisephone.imei.toString().padEnd(15, "0")}</p>
-                    </div>
-                  </div>
-                  <a
-                    href={`/manage/${wisephone.imei.toString().padEnd(15, "0")}`}
-                    class="border border-gray-400 text-[11px] sm:text-sm px-2 sm:px-3 py-1 rounded-md hover:bg-gray-100 whitespace-nowrap flex-shrink-0"
-                  >
-                    Manage Device
-                  </a>
+              <div class="border border-gray-300 rounded-md bg-white p-3 w-[400px] flex items-start gap-4">
+                <div class="w-10 h-10 bg-[#4b918e] rounded-full flex items-center justify-center text-white text-sm font-semibold flex-shrink-0">
+                  {initials}
                 </div>
-
-                {/* <div class="device-metrics-container flex justify-between mt-auto pt-4 h-[90px]">
-                  <div class="bg-[#f7f6f2] border border-gray-200 rounded-md p-4 w-32 text-center">
-                    <p class="text-gray-500 text-xs">Avg. Screen Time</p>
-                    <p class="text-lg font-semibold">1hr/Day</p>
-                  </div>
-
-                  <div class="bg-[#f7f6f2] border border-gray-200 rounded-md p-4 w-32 text-center">
-                    <p class="text-gray-500 text-xs">Apps</p>
-                    <p class="text-lg font-semibold">7</p>
-                  </div>
-                </div> */}
+                <div class="flex-1 min-w-0 flex flex-col gap-0.5">
+                  <p class="font-semibold text-base text-gray-900 truncate">{wisephone.nickname || 'Device'}</p>
+                  <p class="text-gray-500 text-sm">{wisephone.phoneNumber || '(111) 111-1111'}</p>
+                  <p class="text-gray-500 text-sm">IMEI: {wisephone.imei.toString().padEnd(15, "0")}</p>
+                </div>
+                <a
+                  href={`/manage/${wisephone.imei.toString().padEnd(15, "0")}`}
+                  class="border border-gray-300 bg-white text-gray-900 text-sm px-2.5 py-1 rounded-md hover:bg-gray-50 whitespace-nowrap flex-shrink-0"
+                >
+                  Manage Device
+                </a>
               </div>
             );
           })}
