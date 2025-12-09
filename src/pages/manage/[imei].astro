@@ -27,6 +27,12 @@ let appsList: AppsList = {};
 let sortedAppsList = {};
 let user: UserResource | User | null = null;
 
+// Check if a device was just deleted successfully - must happen before any device lookup
+const deleteActionResult = Astro.getActionResult(actions.wisephones.deleteWisephone);
+if (deleteActionResult && !deleteActionResult.error) {
+  return Astro.redirect("/dashboard?message=" + encodeURIComponent("Wisephone successfully removed from account."));
+}
+
 // Auth check
 if (!Astro.locals.auth().userId) {
   return Astro.redirect("/");
@@ -250,7 +256,16 @@ try {
                   <span x-text="deviceName.charAt(0) || 'D'">D</span>
                 </div>
                 <div class="flex-1">
-                  <h3 class="text-base font-semibold text-gray-900" x-text="deviceName">Device Name</h3>
+                  <div class="flex items-center gap-2">
+                    <h3 class="text-base font-semibold text-gray-900" x-text="deviceName">Device Name</h3>
+                    <button
+                      class="p-1 hover:bg-gray-100 rounded flex-shrink-0"
+                      @click="openEditModal()"
+                      aria-label="Edit device info"
+                    >
+                      <Icon name="lucide:pencil" class="w-4 h-4 text-gray-500" />
+                    </button>
+                  </div>
                   <p class="text-sm text-gray-600" x-text="devicePhone">(111) 111-1111</p>
                   <p class="text-xs text-gray-500">IMEI: <span x-text="imei"></span></p>
                 </div>
@@ -308,20 +323,13 @@ try {
                     <p class="text-sm text-gray-600 mb-3">
                       If you need to re-add this device in the future, select "Add Device" on the Devices page.
                     </p>
-                    <form
-                      method="POST"
-                      action={actions.wisephones.deleteWisephone}
-                      onsubmit="return confirm('Are you sure you want to remove this Wisephone from your devices? This action cannot be undone.')"
+                    <button
+                      @click="showRemoveModal = true"
+                      class="px-4 py-2 bg-white border border-red-300 rounded-md text-sm font-medium text-red-600 hover:bg-red-50 inline-flex items-center gap-2"
                     >
-                      <input type="hidden" name="imei" :value="imei" />
-                      <button
-                        type="submit"
-                        class="px-4 py-2 bg-white border border-red-300 rounded-md text-sm font-medium text-red-600 hover:bg-red-50 inline-flex items-center gap-2"
-                      >
-                        <Icon name="lucide:trash-2" class="w-4 h-4" />
-                        Remove Device
-                      </button>
-                    </form>
+                      <Icon name="lucide:trash-2" class="w-4 h-4" />
+                      Remove Device
+                    </button>
                   </div>
                 </div>
               </template>
@@ -394,20 +402,13 @@ try {
                     <p class="text-sm text-gray-600 mb-4">
                       If you need to re-add this device in the future, select "Add Device" on the Devices page.
                     </p>
-                    <form
-                      method="POST"
-                      action={actions.wisephones.deleteWisephone}
-                      onsubmit="return confirm('Are you sure you want to remove this Wisephone from your devices? This action cannot be undone.')"
+                    <button
+                      @click="showRemoveModal = true"
+                      class="px-4 py-2 bg-white border border-red-300 rounded-md text-sm font-medium text-red-600 hover:bg-red-50 inline-flex items-center gap-2"
                     >
-                      <input type="hidden" name="imei" :value="imei" />
-                      <button
-                        type="submit"
-                        class="px-4 py-2 bg-white border border-red-300 rounded-md text-sm font-medium text-red-600 hover:bg-red-50 inline-flex items-center gap-2"
-                      >
-                        <Icon name="lucide:trash-2" class="w-4 h-4" />
-                        Remove Device
-                      </button>
-                    </form>
+                      <Icon name="lucide:trash-2" class="w-4 h-4" />
+                      Remove Device
+                    </button>
                   </div>
                 </div>
               </div>
@@ -658,6 +659,159 @@ try {
           </div>
         </div>
       </div>
+
+      <!-- App Uninstall Confirmation Modal -->
+      <div
+        x-show="showAppUninstallModal"
+        x-cloak
+        @click.self="cancelAppUninstall()"
+        class="absolute inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4"
+      >
+        <div @click.stop class="bg-white rounded-lg shadow-xl max-w-md w-full p-6 space-y-4">
+          <h3 class="text-lg font-semibold text-gray-900">
+            Are you sure you want to uninstall <span x-text="pendingAppToUninstallName"></span>?
+          </h3>
+
+          <p class="text-sm text-gray-700 leading-relaxed">
+            All app data will be permanently deleted. This cannot be undone.
+          </p>
+
+          <div class="flex justify-end gap-3 pt-2">
+            <button
+              @click="cancelAppUninstall()"
+              class="px-4 py-2 text-sm font-medium text-white bg-gray-800 rounded hover:bg-gray-700 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              @click="confirmAppUninstall()"
+              class="px-4 py-2 text-sm font-medium text-gray-900 bg-white border border-gray-300 rounded hover:bg-gray-50 transition-colors"
+            >
+              Uninstall
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Edit Device Modal -->
+      <div
+        x-show="showEditModal"
+        x-cloak
+        x-transition.opacity
+        class="absolute inset-0 bg-black/50 flex items-center justify-center z-50"
+        @click.self="closeEditModal()"
+      >
+        <div
+          class='bg-white rounded-lg shadow-xl max-w-md w-full mx-4
+                 font-["Haffer SemiMono"]
+                 [&_input]:!border-0
+                 [&_input]:!border-b
+                 [&_input]:!border-gray-900
+                 [&_input]:!bg-transparent
+                 [&_input]:!rounded-none
+                 [&_input]:!shadow-none
+                 [&_input]:!outline-none
+                 [&_input]:!ring-0
+                 [&_input]:focus:!border-gray-900'
+        >
+          <!-- Header -->
+          <div class="px-6 pt-6 pb-4 font-haffer relative">
+            <h3 class="text-2xl font-semibold text-gray-900 tracking-tight">Edit Device</h3>
+            <button
+              @click="closeEditModal()"
+              class="absolute top-5 right-5 text-gray-700 hover:text-gray-900"
+              aria-label="Close"
+            >
+              <Icon name="lucide:x" class="w-7 h-7" />
+            </button>
+          </div>
+
+          <!-- Body -->
+          <div class="px-6 pb-6 space-y-7">
+            <div>
+              <label class="block text-base text-gray-700">Name</label>
+              <input
+                type="text"
+                x-model="editName"
+                class="w-full mt-3 pl-6 pb-3 pt-1 text-m text-gray-700 tracking-wide"
+              />
+            </div>
+
+            <div>
+              <label class="block text-base text-gray-700">IMEI</label>
+              <input
+                type="text"
+                x-model="editImei"
+                readonly
+                class="w-full mt-3 pl-6 pb-3 pt-1 text-m text-gray-700 tracking-wide"
+              />
+            </div>
+
+            <div>
+              <label class="block text-base text-gray-700">Phone Number</label>
+              <input
+                type="text"
+                x-model="editPhoneNumber"
+                class="w-full mt-3 pl-6 pb-3 pt-1 text-m text-gray-700 tracking-wide"
+              />
+            </div>
+          </div>
+
+          <!-- Footer -->
+          <div class="px-6 pb-6 flex justify-end gap-4">
+            <button
+              @click="closeEditModal()"
+              class="px-8 py-3 text-base font-semibold text-gray-900 bg-white
+                     border-2 border-gray-900 rounded-md hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              @click="saveDeviceDetails()"
+              class="px-8 py-3 text-base font-semibold text-white bg-gray-700
+                     rounded-md hover:bg-gray-800"
+            >
+              Update
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Remove Device Modal -->
+      <div
+        x-show="showRemoveModal"
+        x-cloak
+        @click.self="showRemoveModal = false"
+        class="absolute inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4"
+      >
+        <div @click.stop class="bg-white rounded-lg shadow-xl max-w-md w-full p-6 space-y-4">
+          <h3 class="text-lg font-semibold text-gray-900">Remove Device?</h3>
+
+          <p class="text-sm text-gray-700 leading-relaxed">
+            Are you sure you want to remove this device from your account? You can re-add it later by selecting "Add
+            Device" on the Devices page.
+          </p>
+
+          <form action={actions.wisephones.deleteWisephone} method="POST">
+            <input type="hidden" name="imei" x-bind:value="imei" />
+            <div class="flex justify-end gap-3 pt-2">
+              <button
+                type="button"
+                @click="showRemoveModal = false"
+                class="px-4 py-2 text-sm font-medium text-white bg-gray-800 rounded hover:bg-gray-700 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                class="px-4 py-2 text-sm font-medium text-gray-900 bg-white border border-gray-300 rounded hover:bg-gray-50 transition-colors"
+              >
+                Remove Device
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
     </main>
 
     <script>
@@ -713,11 +867,14 @@ try {
           showAppInstallModal: false,
           pendingAppToInstall: null as string | null,
           pendingAppName: "",
+          showAppUninstallModal: false,
+          pendingAppToUninstall: null as string | null,
+          pendingAppToUninstallName: "",
           showEditModal: false,
-          editFirstName: "",
-          editLastName: "",
+          editName: "",
           editImei: "",
           editPhoneNumber: "",
+          showRemoveModal: false,
 
           get availableApps() {
             const apps = Object.entries(this.appsList)
@@ -820,10 +977,7 @@ try {
           },
 
           openEditModal() {
-            // Split the device name into first and last name
-            const nameParts = this.deviceName.trim().split(" ");
-            this.editFirstName = nameParts[0] || "";
-            this.editLastName = nameParts.slice(1).join(" ") || "";
+            this.editName = this.deviceName;
             this.editImei = this.imei;
             this.editPhoneNumber = this.devicePhone;
             this.showEditModal = true;
@@ -832,27 +986,45 @@ try {
           closeEditModal() {
             this.showEditModal = false;
             // Reset form fields
-            this.editFirstName = "";
-            this.editLastName = "";
+            this.editName = "";
             this.editImei = "";
             this.editPhoneNumber = "";
           },
 
-          saveDeviceDetails() {
-            // Combine first and last name
-            const newDeviceName = `${this.editFirstName.trim()} ${this.editLastName.trim()}`.trim();
+          async saveDeviceDetails() {
+            try {
+              // Create form data for submission
+              const formData = new FormData();
+              formData.append("imei", this.imei);
+              formData.append("nickname", this.editName.trim() || "Device");
+              formData.append("phoneNumber", this.editPhoneNumber);
 
-            // Update the device name and phone
-            this.deviceName = newDeviceName || "Device";
-            this.devicePhone = this.editPhoneNumber;
-            this.originalDeviceName = this.deviceName;
-            this.originalDevicePhone = this.devicePhone;
+              // Submit via fetch to the update action
+              const response = await fetch("/_actions/wisephones.updateWisephone", {
+                method: "POST",
+                body: formData
+              });
 
-            // Close modal
-            this.closeEditModal();
+              if (response.ok) {
+                // Update local state
+                this.deviceName = this.editName.trim() || "Device";
+                this.devicePhone = this.editPhoneNumber;
+                this.originalDeviceName = this.deviceName;
+                this.originalDevicePhone = this.devicePhone;
 
-            // Show success message
-            this.showSuccessToast("Device details updated successfully");
+                // Close modal
+                this.closeEditModal();
+
+                // Show success message
+                this.showSuccessToast("Device details updated successfully");
+              } else {
+                console.error("Failed to update device");
+                this.showErrorToast("Failed to update device. Please try again.");
+              }
+            } catch (error) {
+              console.error("Error updating device:", error);
+              this.showErrorToast("An error occurred while updating the device.");
+            }
           },
 
           async toggleFeature(feature: Feature) {
@@ -1002,6 +1174,41 @@ try {
 
           async uninstallApp(packageName: string) {
             try {
+              if (!packageName) {
+                throw new Error("Invalid app selected");
+              }
+
+              // Get the app name
+              const appName =
+                this.appsList[packageName]?.name ||
+                this.installedApps.find((app) => app.packageName === packageName)?.appName ||
+                packageName;
+
+              // Store pending app info
+              this.pendingAppToUninstall = packageName;
+              this.pendingAppToUninstallName = appName;
+
+              // Show confirmation modal
+              this.showAppUninstallModal = true;
+            } catch (error) {
+              console.error("Failed to show uninstall confirmation:", error);
+              this.showErrorToast("Failed to show uninstall confirmation");
+            }
+          },
+
+          async confirmAppUninstall() {
+            try {
+              const packageName = this.pendingAppToUninstall;
+
+              if (!packageName) {
+                console.error("No pending app to uninstall");
+                this.showAppUninstallModal = false;
+                return;
+              }
+
+              // Close modal
+              this.showAppUninstallModal = false;
+
               await appManagement.uninstallApp(this.imei, packageName);
               if (this.appsList[packageName]) {
                 this.appsList[packageName].installed = false;
@@ -1009,10 +1216,20 @@ try {
               // Update installedApps array
               this.installedApps = this.installedApps.filter((app) => app.packageName !== packageName);
               this.showSuccessToast(`App will be uninstalled shortly`);
+
+              // Clear pending app
+              this.pendingAppToUninstall = null;
+              this.pendingAppToUninstallName = "";
             } catch (error) {
               console.error("App uninstallation failed:", error);
               this.showErrorToast("Failed to uninstall app");
             }
+          },
+
+          cancelAppUninstall() {
+            this.showAppUninstallModal = false;
+            this.pendingAppToUninstall = null;
+            this.pendingAppToUninstallName = "";
           },
 
           // Load Tool Drawer apps from API (similar to device/[imei].astro)

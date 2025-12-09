@@ -12,7 +12,7 @@ interface Props {
   ogImageUrl?: string;
 }
 
-const message = Astro.url.searchParams.get("message") || "";
+const message = Astro.url.searchParams.get("message") || Astro.url.searchParams.get("success") || "";
 const error = Astro.url.searchParams.get("error") || "";
 
 const {

@@ -377,7 +377,7 @@ const actionResult = Astro.getActionResult(actions.wisephones.createWisephone);
         </div>
 
         <!-- Device Cards Grid -->
-        <div class="mt-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div class="mt-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
           {wisephones.map((wisephone) => {
             const initials = (wisephone.nickname || 'Device')
               .split(' ')
@@ -394,17 +394,9 @@ const actionResult = Astro.getActionResult(actions.wisephones.createWisephone);
                       {initials}
                     </div>
                     <div class="min-w-0 flex-1">
-                      <div class="flex items-center gap-1">
-                        <p class="font-medium text-sm sm:text-base text-gray-900 truncate">{wisephone.nickname || 'Device'}</p>
-                        <button
-                          class="p-0.5 hover:bg-gray-100 rounded flex-shrink-0"
-                          @click={`openEditModal('${(wisephone.nickname || 'Device').replace(/'/g, "\\'")}', '${wisephone.phoneNumber || ''}', '${wisephone.imei.toString().padEnd(15, "0")}')`}
-                        >
-                          <Icon name="lucide:pencil" class="w-3 h-3 text-gray-500" />
-                        </button>
-                      </div>
+                      <p class="font-medium text-sm sm:text-base text-gray-900 truncate">{wisephone.nickname || 'Device'}</p>
                       <p class="text-gray-500 text-xs sm:text-sm">{wisephone.phoneNumber || 'No phone number'}</p>
-                      <p class="text-gray-400 text-xs whitespace-nowrap overflow-hidden text-ellipsis">IMEI: {wisephone.imei.toString().padEnd(15, "0")}</p>
+                      <p class="text-gray-400 text-xs">IMEI: {wisephone.imei.toString().padEnd(15, "0")}</p>
                     </div>
                   </div>
                   <a
@@ -606,99 +598,6 @@ const actionResult = Astro.getActionResult(actions.wisephones.createWisephone);
 
   </Fragment>
 
-  <!-- Edit Device Modal -->
-  <div
-  x-show="showEditModal"
-  x-cloak
-  x-transition.opacity
-  class="absolute inset-0 bg-black/50 flex items-center justify-center z-50"
-  @click.self="closeEditModal()"
->
-  <div
-    class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4
-           font-[&quot;Haffer SemiMono&quot;]
-           [&_input]:!border-0
-           [&_input]:!border-b
-           [&_input]:!border-gray-900
-           [&_input]:!bg-transparent
-           [&_input]:!rounded-none
-           [&_input]:!shadow-none
-           [&_input]:!outline-none
-           [&_input]:!ring-0
-           [&_input]:focus:!border-gray-900"
-  >
-    <!-- Header -->
-    <div class="px-6 pt-6 pb-4 font-haffer relative">
-      <h3 class="text-2xl font-semibold text-gray-900 tracking-tight">Edit Device</h3>
-      <button
-        @click="closeEditModal()"
-        class="absolute top-5 right-5 text-gray-700 hover:text-gray-900"
-        aria-label="Close"
-      >
-        <Icon name="lucide:x" class="w-7 h-7" />
-      </button>
-    </div>
-
-    <!-- Body -->
-    <div class="px-6 pb-6 space-y-7">
-      <div>
-        <label class="block text-base text-gray-700">First name</label>
-        <input
-          type="text"
-          x-model="editFirstName"
-          class="w-full mt-3 pl-6 pb-3 pt-1 text-m  text-gray-700 tracking-wide"
-        />
-      </div>
-
-      <div>
-        <label class="block text-base text-gray-700">Last name</label>
-        <input
-          type="text"
-          x-model="editLastName"
-          class="w-full mt-3 pl-6 pb-3 pt-1 text-m  text-gray-700 tracking-wide"
-        />
-      </div>
-
-      <div>
-        <label class="block text-base text-gray-700">IMEI</label>
-        <input
-          type="text"
-          x-model="editImei"
-          readonly
-          class="w-full mt-3 pl-6 pb-3 pt-1 text-m  text-gray-700 tracking-wide"
-        />
-      </div>
-
-      <div>
-        <label class="block text-base text-gray-700">Phone Number</label>
-        <input
-          type="text"
-          x-model="editPhoneNumber"
-          class="w-full mt-3 pl-6 pb-3 pt-1 text-m text-gray-700 tracking-wide"
-        />
-      </div>
-    </div>
-
-    <!-- Footer -->
-    <div class="px-6 pb-6 flex justify-end gap-4">
-      <button
-        @click="closeEditModal()"
-        class="px-8 py-3 text-base font-semibold text-gray-900 bg-white
-               border-2 border-gray-900 rounded-md hover:bg-gray-50"
-      >
-        Cancel
-      </button>
-      <button
-        @click="saveDeviceDetails()"
-        class="px-8 py-3 text-base font-semibold text-white bg-gray-700
-               rounded-md hover:bg-gray-800"
-      >
-        Update
-      </button>
-    </div>
-  </div>
-</div>
-
   <!-- Support Popup -->
   <div
     x-show="showSupportPopup"
@@ -809,12 +708,6 @@ const actionResult = Astro.getActionResult(actions.wisephones.createWisephone);
       hasBlurredImei: false,
       hasBlurredImeiVerification: false,
       isImeiValid: true,
-      showEditModal: false,
-      editFirstName: "",
-      editLastName: "",
-      editImei: "",
-      editPhoneNumber: "",
-      currentEditingImei: "",
       validateImei() {
         this.imeiMatch = this.imei1 === this.imei2;
 
@@ -842,55 +735,6 @@ const actionResult = Astro.getActionResult(actions.wisephones.createWisephone);
         this.hasBlurredImei = false;
         this.hasBlurredImeiVerification = false;
         this.isImeiValid = true;
-      },
-      openEditModal(deviceName: string, devicePhone: string, imei: string) {
-        // Split the device name into first and last name
-        const nameParts = deviceName.trim().split(" ");
-        this.editFirstName = nameParts[0] || "";
-        this.editLastName = nameParts.slice(1).join(" ") || "";
-        this.editImei = imei;
-        this.editPhoneNumber = devicePhone;
-        this.currentEditingImei = imei;
-        this.showEditModal = true;
-      },
-      closeEditModal() {
-        this.showEditModal = false;
-        // Reset form fields
-        this.editFirstName = "";
-        this.editLastName = "";
-        this.editImei = "";
-        this.editPhoneNumber = "";
-        this.currentEditingImei = "";
-      },
-      async saveDeviceDetails() {
-        try {
-          // Combine first and last name
-          const newDeviceName = `${this.editFirstName.trim()} ${this.editLastName.trim()}`.trim();
-
-          // Create form data for submission
-          const formData = new FormData();
-          formData.append("imei", this.currentEditingImei);
-          formData.append("nickname", newDeviceName || "Device");
-          formData.append("phoneNumber", this.editPhoneNumber);
-
-          // Submit via fetch to the update action
-          const response = await fetch("/_actions/wisephones.updateWisephone", {
-            method: "POST",
-            body: formData
-          });
-
-          if (response.ok) {
-            // Close modal and reload page to show updated data
-            this.closeEditModal();
-            window.location.reload();
-          } else {
-            console.error("Failed to update device");
-            alert("Failed to update device. Please try again.");
-          }
-        } catch (error) {
-          console.error("Error updating device:", error);
-          alert("An error occurred while updating the device.");
-        }
       }
     }));
   });
