@@ -28,8 +28,18 @@ const { activeLink = "devices" } = Astro.props;
 
 <!-- Account Modal Backdrop (Mobile) -->
 <div
-  x-data="{ showAccountBackdrop: false }"
-  @account-modal-open.window="showAccountBackdrop = true; setTimeout(() => { if (!document.querySelector('.cl-userButtonPopoverCard:not([hidden])')) showAccountBackdrop = false }, 5000)"
+  x-data="{
+    showAccountBackdrop: false,
+    openBackdrop() {
+      this.showAccountBackdrop = true;
+      setTimeout(() => {
+        if (!document.querySelector('.cl-userButtonPopoverCard:not([hidden])')) {
+          this.showAccountBackdrop = false;
+        }
+      }, 5000);
+    }
+  }"
+  @account-modal-open.window="openBackdrop()"
 >
   <div
     x-show="showAccountBackdrop"
