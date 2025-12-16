@@ -491,9 +491,10 @@ try {
             x-show="currentTab === 'app-management'"
             x-cloak
             class="flex flex-col h-[calc(100vh-280px)] max-h-[calc(100vh-280px)]"
+            x-data="{ installedOpen: true, availableOpen: false }"
           >
-            <!-- App Lists Grid -->
-            <div class="grid grid-cols-2 gap-4 flex-1 min-h-0">
+            <!-- Desktop: App Lists Grid -->
+            <div class="hidden md:grid grid-cols-2 gap-4 flex-1 min-h-0">
               <!-- Available Apps -->
               <div class="flex flex-col min-h-0">
                 <!-- Search Header -->
@@ -515,10 +516,8 @@ try {
                 </h3>
                 <div class="space-y-2 flex-1 overflow-y-auto pr-2 min-h-0">
                   <template x-for="app in availableApps" :key="app.packageName">
-                    <div
-                      class="flex items-center justify-between p-3 border border-gray-300 rounded-lg hover:bg-gray-50"
-                    >
-                      <div class="flex items-center gap-2 flex-1 min-w-0">
+                    <div class="flex items-center gap-4 p-3 border border-gray-300 rounded-lg hover:bg-gray-50">
+                      <div class="flex items-center gap-2 flex-1 min-w-0 overflow-hidden">
                         <div class="w-8 h-8 bg-gray-200 rounded-md flex items-center justify-center flex-shrink-0">
                           <Icon name="lucide:package" class="w-4 h-4 text-gray-500" />
                         </div>
@@ -526,7 +525,7 @@ try {
                       </div>
                       <button
                         @click="installApp(app.packageName)"
-                        class="px-3 py-1.5 bg-white border border-gray-300 rounded-md text-xs font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-1.5 flex-shrink-0 ml-2"
+                        class="px-3 py-1.5 bg-white border border-gray-300 rounded-md text-xs font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-1.5 flex-shrink-0 whitespace-nowrap"
                       >
                         <Icon name="lucide:download" class="w-3.5 h-3.5" />
                         Install
@@ -545,16 +544,16 @@ try {
                 <div class="space-y-2 flex-1 overflow-y-auto pr-2 min-h-0">
                   <!-- System Applications -->
                   <template x-for="app in systemApps" :key="app.packageName">
-                    <div class="flex items-center justify-between p-3 border border-gray-300 rounded-lg bg-white">
-                      <div class="flex items-center gap-2 flex-1 min-w-0">
+                    <div class="flex items-center gap-4 p-3 border border-gray-300 rounded-lg bg-white">
+                      <div class="flex items-center gap-2 flex-1 min-w-0 overflow-hidden">
                         <div class="w-8 h-8 bg-blue-600 rounded-md flex items-center justify-center flex-shrink-0">
                           <Icon name="lucide:smartphone" class="w-4 h-4 text-white" />
                         </div>
                         <span class="text-sm text-gray-900 truncate" x-text="app.name"></span>
                       </div>
-                      <div class="flex items-center gap-1.5 flex-shrink-0 ml-2">
+                      <div class="flex-shrink-0">
                         <span
-                          class="px-3 py-1.5 bg-gray-100 border border-gray-200 rounded-md text-xs font-medium text-gray-600"
+                          class="px-3 py-1.5 bg-gray-100 border border-gray-200 rounded-md text-xs font-medium text-gray-600 whitespace-nowrap"
                         >
                           System App
                         </span>
@@ -571,23 +570,23 @@ try {
 
                   <!-- Regular Installed Apps -->
                   <template x-for="app in installedFilteredApps" :key="app.packageName">
-                    <div class="flex items-center justify-between p-3 border border-gray-300 rounded-lg bg-white">
-                      <div class="flex items-center gap-2 flex-1 min-w-0">
+                    <div class="flex items-center gap-4 p-3 border border-gray-300 rounded-lg bg-white">
+                      <div class="flex items-center gap-2 flex-1 min-w-0 overflow-hidden">
                         <div class="w-8 h-8 bg-teal-600 rounded-md flex items-center justify-center flex-shrink-0">
                           <Icon name="lucide:package" class="w-4 h-4 text-white" />
                         </div>
                         <span class="text-sm text-gray-900 truncate" x-text="app.name"></span>
                       </div>
-                      <div class="flex items-center gap-1.5 flex-shrink-0 ml-2">
+                      <div class="flex items-center gap-1.5 flex-shrink-0">
                         <button
-                          class="hidden px-3 py-1.5 bg-white border border-gray-300 rounded-md text-xs font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-1.5"
+                          class="hidden px-3 py-1.5 bg-white border border-gray-300 rounded-md text-xs font-medium text-gray-700 hover:bg-gray-50 items-center gap-1.5 whitespace-nowrap"
                         >
                           <Icon name="lucide:refresh-cw" class="w-3.5 h-3.5" />
                           Update
                         </button>
                         <button
                           @click="uninstallApp(app.packageName)"
-                          class="px-3 py-1.5 bg-white border border-gray-300 rounded-md text-xs font-medium text-gray-700 hover:bg-red-50 hover:border-red-300 hover:text-red-600 flex items-center gap-1.5"
+                          class="px-3 py-1.5 bg-white border border-gray-300 rounded-md text-xs font-medium text-gray-700 hover:bg-red-50 hover:border-red-300 hover:text-red-600 flex items-center gap-1.5 whitespace-nowrap"
                         >
                           <Icon name="lucide:trash-2" class="w-3.5 h-3.5" />
                           Uninstall
@@ -595,6 +594,131 @@ try {
                       </div>
                     </div>
                   </template>
+                </div>
+              </div>
+            </div>
+
+            <!-- Mobile: Accordion Layout -->
+            <div class="md:hidden flex flex-col gap-4 flex-1 overflow-hidden">
+              <!-- Search Header -->
+              <div class="flex-shrink-0">
+                <div class="relative">
+                  <Icon name="lucide:search" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="text"
+                    x-model="appSearchQuery"
+                    placeholder="Search apps, or categories"
+                    class="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                  />
+                </div>
+              </div>
+
+              <!-- Installed Apps Accordion -->
+              <div class="bg-[#f5f5f0] rounded-lg overflow-hidden flex-shrink-0">
+                <button
+                  @click="installedOpen = !installedOpen"
+                  class="w-full flex items-center justify-between p-4 text-left"
+                >
+                  <h3 class="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                    <Icon name="lucide:check-circle" class="w-4 h-4" />
+                    Installed Apps (<span x-text="systemApps.length + installedFilteredApps.length">0</span>)
+                  </h3>
+                  <svg
+                    class="w-5 h-5 transition-transform text-gray-600"
+                    :class="{ 'rotate-180': installedOpen }"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                  </svg>
+                </button>
+                <div x-show="installedOpen" x-collapse class="px-4 pb-4">
+                  <div class="space-y-2 max-h-[300px] overflow-y-auto">
+                    <!-- System Applications -->
+                    <template x-for="app in systemApps" :key="app.packageName">
+                      <div class="flex items-center justify-between p-3 border border-gray-300 rounded-lg bg-white">
+                        <div class="flex items-center gap-2 flex-1 min-w-0">
+                          <div class="w-8 h-8 bg-blue-600 rounded-md flex items-center justify-center flex-shrink-0">
+                            <Icon name="lucide:smartphone" class="w-4 h-4 text-white" />
+                          </div>
+                          <div class="flex flex-col min-w-0">
+                            <span class="text-sm text-gray-900 truncate" x-text="app.name"></span>
+                            <span class="text-xs text-gray-500">System App</span>
+                          </div>
+                        </div>
+                      </div>
+                    </template>
+
+                    <!-- Divider -->
+                    <div x-show="systemApps.length > 0 && installedFilteredApps.length > 0" class="relative py-1">
+                      <div class="absolute inset-0 flex items-center">
+                        <div class="w-full border-t border-gray-300"></div>
+                      </div>
+                    </div>
+
+                    <!-- Regular Installed Apps -->
+                    <template x-for="app in installedFilteredApps" :key="app.packageName">
+                      <div class="flex items-center justify-between p-3 border border-gray-300 rounded-lg bg-white">
+                        <div class="flex items-center gap-2 flex-1 min-w-0">
+                          <div class="w-8 h-8 bg-teal-600 rounded-md flex items-center justify-center flex-shrink-0">
+                            <Icon name="lucide:package" class="w-4 h-4 text-white" />
+                          </div>
+                          <span class="text-sm text-gray-900 truncate" x-text="app.name"></span>
+                        </div>
+                        <button
+                          @click="uninstallApp(app.packageName)"
+                          class="px-3 py-1.5 bg-white border border-gray-300 rounded-md text-xs font-medium text-gray-700 hover:bg-red-50 hover:border-red-300 hover:text-red-600 flex items-center gap-1.5 flex-shrink-0 ml-2"
+                        >
+                          <Icon name="lucide:trash-2" class="w-3.5 h-3.5" />
+                          Uninstall
+                        </button>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Available Apps Accordion -->
+              <div class="border border-gray-300 rounded-lg overflow-hidden flex-shrink-0">
+                <button
+                  @click="availableOpen = !availableOpen"
+                  class="w-full flex items-center justify-between p-4 text-left bg-white"
+                >
+                  <h3 class="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                    <Icon name="lucide:download-cloud" class="w-4 h-4" />
+                    Available Apps
+                  </h3>
+                  <svg
+                    class="w-5 h-5 transition-transform text-gray-600"
+                    :class="{ 'rotate-180': availableOpen }"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                  </svg>
+                </button>
+                <div x-show="availableOpen" x-collapse class="px-4 pb-4">
+                  <div class="space-y-2 max-h-[300px] overflow-y-auto">
+                    <template x-for="app in availableApps" :key="app.packageName">
+                      <div class="flex items-center justify-between p-3 border border-gray-300 rounded-lg hover:bg-gray-50">
+                        <div class="flex items-center gap-2 flex-1 min-w-0">
+                          <div class="w-8 h-8 bg-gray-200 rounded-md flex items-center justify-center flex-shrink-0">
+                            <Icon name="lucide:package" class="w-4 h-4 text-gray-500" />
+                          </div>
+                          <span class="text-sm text-gray-900 truncate" x-text="app.name"></span>
+                        </div>
+                        <button
+                          @click="installApp(app.packageName)"
+                          class="px-3 py-1.5 bg-white border border-gray-300 rounded-md text-xs font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-1.5 flex-shrink-0 ml-2"
+                        >
+                          <Icon name="lucide:download" class="w-3.5 h-3.5" />
+                          Install
+                        </button>
+                      </div>
+                    </template>
+                  </div>
                 </div>
               </div>
             </div>

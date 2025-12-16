@@ -11,6 +11,36 @@ interface Props {
 const { activeLink = "devices" } = Astro.props;
 ---
 
+<style is:global>
+  /* Mobile-specific styles for Clerk UserButton modal */
+  @media (max-width: 768px) {
+    /* Center the UserButton popover card on mobile */
+    .cl-userButtonPopoverCard {
+      position: fixed !important;
+      top: 50% !important;
+      left: 50% !important;
+      transform: translate(-50%, -50%) !important;
+      z-index: 10000 !important;
+      max-width: 90vw !important;
+    }
+  }
+</style>
+
+<!-- Account Modal Backdrop (Mobile) -->
+<div
+  x-data="{ showAccountBackdrop: false }"
+  @account-modal-open.window="showAccountBackdrop = true; setTimeout(() => { if (!document.querySelector('.cl-userButtonPopoverCard:not([hidden])')) showAccountBackdrop = false }, 5000)"
+>
+  <div
+    x-show="showAccountBackdrop"
+    x-cloak
+    x-transition.opacity
+    @click="document.body.click(); showAccountBackdrop = false"
+    class="md:hidden fixed inset-0 bg-black bg-opacity-50 z-[9999]"
+  >
+  </div>
+</div>
+
 <!-- Mobile Menu Overlay -->
 <div
   x-show="mobileMenuOpen"
@@ -85,7 +115,7 @@ const { activeLink = "devices" } = Astro.props;
         <div
           class="px-4 py-3 relative cursor-pointer"
           x-data
-          @click="$el.querySelector('button')?.click(); mobileMenuOpen = false"
+          @click="$el.querySelector('button')?.click(); mobileMenuOpen = false; $dispatch('account-modal-open')"
         >
           <div class="flex items-center w-full text-sm text-gray-600">
             <img src="/assets/portal-icons/account-circle.svg" alt="" class="w-5 h-5" />
