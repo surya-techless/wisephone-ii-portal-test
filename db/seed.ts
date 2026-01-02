@@ -3,20 +3,35 @@ import { db, Wisephone, BypassTechlessSubscription, UserPermission, App } from "
 const CAM_CLERK_ID = "user_2sLc5BX4F7qRUklqQ2UTUJXSipf";
 // https://astro.build/db/seed
 export default async function seed() {
-  await db.insert(Wisephone).values([
+  // Devices to seed
+  const devices = [
     {
-      imei: 350256485931533,
-      nickname: "Cam Pak",
-      phoneNumber: "405-206-0654",
-      userId: CAM_CLERK_ID
+      imei: 350256486849403,
+      nickname: "Surya's Test Device",
+      phoneNumber: "000-000-0000",
+      userId: "test_user"
     },
     {
-      imei: 350256480766181,
-      nickname: "Kyle's Phone",
-      phoneNumber: "123-123-1234",
-      userId: "user_u5ern4me"
+      imei: 350256489950778,
+      nickname: "surya 0778",
+      phoneNumber: "480-287-1184",
+      userId: "user_3444UPZWP8SAuRoSBUhmXvKmfTK"
     }
-  ]);
+  ];
+
+  // Insert all Wisephones (ignore if already exists)
+  // Note: DeviceScreenTime will be initialized automatically by createWisephone action
+  // when devices are added via the portal UI
+  for (const device of devices) {
+    try {
+      await db.insert(Wisephone).values(device);
+    } catch (error: any) {
+      // Ignore if device already exists
+      if (error?.code !== "SQLITE_CONSTRAINT_PRIMARYKEY" && error?.code !== "SQLITE_CONSTRAINT") {
+        throw error;
+      }
+    }
+  }
 
   await db.insert(BypassTechlessSubscription).values([
     {

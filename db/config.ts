@@ -44,12 +44,51 @@ const OttogridCache = defineTable({
   }
 });
 
+// Screen time snapshot per device per week (synced from WiseOS)
+const DeviceScreenTime = defineTable({
+  columns: {
+    id: column.number({ primaryKey: true, autoIncrement: true }),
+    imei: column.text(),                                    // Device IMEI
+    weekStartDate: column.date(),                           // Start of the week
+    weekEndDate: column.date(),                             // End of the week
+    totalScreenTimeMs: column.number(),                     // Total screen time in milliseconds
+    dailyAverageMs: column.number(),                        // Daily average in ms
+    syncedAt: column.date({ default: new Date() }),         // When this data was synced
+    deviceName: column.text({ optional: true }),
+    deviceManufacturer: column.text({ optional: true })
+  },
+  indexes: [
+    // Temporarily disabled to allow cleanup of duplicates
+    // { on: ["imei", "weekStartDate"], unique: true }         // One record per device per week
+  ]
+});
+
+// Per-app usage within a week (child of DeviceScreenTime)
+const DeviceAppUsage = defineTable({
+  columns: {
+    id: column.number({ primaryKey: true, autoIncrement: true }),
+    screenTimeId: column.number(),                          // References DeviceScreenTime.id
+    imei: column.text(),                                    // For easier querying
+    packageName: column.text(),
+    appName: column.text(),
+    totalTimeMs: column.number(),                           // Total usage in ms
+    dailyAverageMs: column.number(),
+    weekStartDate: column.date()                            // For easier querying
+  },
+  indexes: [
+    { on: ["screenTimeId"] },
+    { on: ["imei", "weekStartDate"] }
+  ]
+});
+
 export default defineDb({
   tables: {
     App,
     BypassTechlessSubscription,
     Wisephone,
     UserPermission,
-    OttogridCache
+    OttogridCache,
+    DeviceScreenTime,
+    DeviceAppUsage
   }
 });

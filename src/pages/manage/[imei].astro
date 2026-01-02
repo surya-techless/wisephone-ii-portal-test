@@ -702,7 +702,9 @@ try {
                 <div x-show="availableOpen" x-collapse class="px-4 pb-4">
                   <div class="space-y-2 max-h-[300px] overflow-y-auto">
                     <template x-for="app in availableApps" :key="app.packageName">
-                      <div class="flex items-center justify-between p-3 border border-gray-300 rounded-lg hover:bg-gray-50">
+                      <div
+                        class="flex items-center justify-between p-3 border border-gray-300 rounded-lg hover:bg-gray-50"
+                      >
                         <div class="flex items-center gap-2 flex-1 min-w-0">
                           <div class="w-8 h-8 bg-gray-200 rounded-md flex items-center justify-center flex-shrink-0">
                             <Icon name="lucide:package" class="w-4 h-4 text-gray-500" />

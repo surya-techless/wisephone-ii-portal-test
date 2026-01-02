@@ -14,199 +14,269 @@ const { activeLink = "devices" } = Astro.props;
 <style is:global>
   /* Mobile-specific styles for Clerk UserButton modal */
   @media (max-width: 768px) {
-    /* Center the UserButton popover card on mobile */
     .cl-userButtonPopoverCard {
       position: fixed !important;
       top: 50% !important;
       left: 50% !important;
-      transform: translate(-50%, -50%) !important;
-      z-index: 10000 !important;
+      transform: translate(-50%, -50) !important;
+      z-index: 70 !important;
       max-width: 90vw !important;
     }
   }
 </style>
 
-<!-- Account Modal Backdrop (Mobile) -->
-<div
-  x-data="{
-    showAccountBackdrop: false,
-    openBackdrop() {
-      this.showAccountBackdrop = true;
-      setTimeout(() => {
-        if (!document.querySelector('.cl-userButtonPopoverCard:not([hidden])')) {
-          this.showAccountBackdrop = false;
-        }
-      }, 5000);
-    }
-  }"
-  @account-modal-open.window="openBackdrop()"
->
-  <div
-    x-show="showAccountBackdrop"
-    x-cloak
-    x-transition.opacity
-    @click="document.body.click(); showAccountBackdrop = false"
-    class="md:hidden fixed inset-0 bg-black bg-opacity-50 z-[9999]"
-  >
-  </div>
-</div>
-
 <!-- Mobile Menu Overlay -->
 <div
-  x-show="mobileMenuOpen"
+  x-show="$root.mobileMenuOpen || mobileMenuOpen"
   x-cloak
   x-transition.opacity
-  @click="mobileMenuOpen = false"
+  @click="$root.mobileMenuOpen = false; mobileMenuOpen = false"
   class="md:hidden fixed inset-0 bg-black bg-opacity-50 z-40"
 >
 </div>
 
-<!-- Sidebar -->
-<aside
-  class="w-64 flex flex-col justify-between h-screen bg-[#f7f6f2] md:relative fixed right-0 top-0 z-50 transition-transform duration-300"
-  :class="{ 'translate-x-full md:translate-x-0': !mobileMenuOpen }"
->
-  <!-- Top Section: Logo + Navigation -->
-  <div class="flex-1 overflow-y-auto">
-    <!-- Close Button (Mobile Only) - Top Left -->
-    <div class="md:hidden flex items-center justify-start p-4">
-      <button @click="mobileMenuOpen = false" class="p-2 text-gray-600 hover:text-black">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
+<!-- Sidebar with Support Popup -->
+<div x-data="{ showSupportPopup: false }" class="md:relative h-full relative">
+  <!-- Sidebar -->
+  <aside
+    class="w-64 flex flex-col justify-between h-screen bg-[#f7f6f2] md:relative fixed right-0 top-0 z-50 transition-transform duration-300"
+    :class="{ 'translate-x-full md:translate-x-0': !($root.mobileMenuOpen || mobileMenuOpen) }"
+  >
+    <!-- Top Section: Logo + Navigation -->
+    <div class="flex-1 overflow-y-auto">
+      <!-- Close Button (Mobile Only) - Top Left -->
+      <div class="md:hidden flex items-center justify-start p-4">
+        <button
+          @click="$root.mobileMenuOpen = false; mobileMenuOpen = false"
+          class="p-2 text-gray-600 hover:text-black"
         >
-          <line x1="18" y1="6" x2="6" y2="18"></line>
-          <line x1="6" y1="6" x2="18" y2="18"></line>
-        </svg>
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Logo (Desktop Only) -->
+      <div class="hidden md:flex p-4 items-center">
+        <WisephoneLogo class="h-8 text-[var(--charcoal)]" />
+        <span class="ml-2 font-semibold text-[10px] text-gray-800">PORTAL</span>
+      </div>
+
+      <nav class="md:mt-6 px-2 space-y-1">
+        <!-- Devices -->
+        <a
+          href="/dashboard"
+          @click="mobileMenuOpen = false"
+          class={`flex items-center px-4 py-3 text-sm rounded-lg ${activeLink === "devices" ? "text-gray-800" : "text-gray-600 hover:bg-gray-50"}`}
+          style={activeLink === "devices" ? "background-color: #DBD5CD;" : ""}
+        >
+          <img src="/assets/portal-icons/devices.svg" alt="" class="w-5 h-5" />
+          <span class="ml-4">Devices</span>
+        </a>
+
+        <!-- Request an app -->
+        <a
+          href="https://getwisephone.com/request-app"
+          target="_blank"
+          rel="noopener noreferrer"
+          @click="mobileMenuOpen = false"
+          class={`flex items-center px-4 py-3 text-sm rounded-lg ${activeLink === "request-app" ? "text-gray-800" : "text-gray-600 hover:bg-gray-50"}`}
+          style={activeLink === "request-app" ? "background-color: #DBD5CD;" : ""}
+        >
+          <img src="/assets/portal-icons/app-request.svg" alt="" class="w-5 h-5" />
+          <span class="ml-4">Request an App</span>
+        </a>
+
+        <!-- Desktop: Show only bottom section -->
+        <!-- Mobile: Show all options in one list -->
+        <div class="md:hidden space-y-1">
+          <div
+            class="px-4 py-3 relative cursor-pointer"
+            x-data
+            @click="$el.querySelector('button')?.click(); mobileMenuOpen = false"
+          >
+            <div class="flex items-center w-full text-sm text-gray-600">
+              <img src="/assets/portal-icons/account-circle.svg" alt="" class="w-5 h-5" />
+              <span class="ml-4">Account</span>
+            </div>
+            <div class="absolute bottom-5 left-0 opacity-0 pointer-events-auto invisible">
+              <UserButton />
+            </div>
+          </div>
+
+          <button
+            type="button"
+            @click="console.log('🔵 Mobile Support clicked, showSupportPopup:', showSupportPopup); showSupportPopup = true; console.log('After click, showSupportPopup:', showSupportPopup)"
+            class="flex items-center w-full px-4 py-3 text-sm text-gray-600 hover:bg-gray-50 rounded-lg text-left"
+          >
+            <img src="/assets/portal-icons/support.svg" alt="" class="w-5 h-5" />
+            <span class="ml-4">Support</span>
+          </button>
+
+          <IsAdmin server:defer>
+            <a
+              href="/dashboard/admin"
+              @click="mobileMenuOpen = false"
+              class="flex items-center px-4 py-3 text-sm text-gray-600 hover:bg-gray-50 rounded-lg"
+            >
+              <img src="/assets/portal-icons/admin.svg" alt="" class="w-5 h-5" />
+              <span class="ml-4">Admin</span>
+            </a>
+          </IsAdmin>
+
+          <SignOutButton
+            redirectUrl="/"
+            class="flex items-center w-full px-4 py-3 text-sm text-gray-600 hover:bg-gray-50 text-left rounded-lg"
+            @click="mobileMenuOpen = false"
+          >
+            <img src="/assets/portal-icons/logout.svg" alt="" class="w-5 h-5" />
+            <span class="ml-4">Logout</span>
+          </SignOutButton>
+        </div>
+      </nav>
+    </div>
+
+    <!-- Bottom Section: Admin, Account, Support, Logout (Desktop Only) -->
+    <div class="hidden md:block px-6 pb-6">
+      <IsAdmin server:defer>
+        <a
+          href="/dashboard/admin"
+          @click="mobileMenuOpen = false"
+          class="flex items-center py-2 text-sm text-gray-600 hover:text-black"
+        >
+          <img src="/assets/portal-icons/admin.svg" alt="" class="w-5 h-5" />
+          <span class="ml-4">Admin</span>
+        </a>
+      </IsAdmin>
+
+      <div class="py-2 pb-4 relative cursor-pointer" x-data @click="$el.querySelector('button')?.click()">
+        <div class="flex items-center w-full py-2 text-sm text-gray-600">
+          <img src="/assets/portal-icons/account-circle.svg" alt="" class="w-5 h-5" />
+          <span class="ml-4">Account</span>
+        </div>
+        <div class="absolute bottom-5 left-0 opacity-0 pointer-events-auto invisible">
+          <UserButton />
+        </div>
+      </div>
+
+      <button
+        type="button"
+        @click="showSupportPopup = true"
+        class="flex items-center w-full py-2 text-sm text-gray-600 hover:text-black pb-4 text-left relative"
+        x-ref="supportButton"
+      >
+        <img src="/assets/portal-icons/support.svg" alt="" class="w-5 h-5" />
+        <span class="ml-4">Support</span>
       </button>
-    </div>
 
-    <!-- Logo (Desktop Only) -->
-    <div class="hidden md:flex p-4 items-center">
-      <WisephoneLogo class="h-8 text-[var(--charcoal)]" />
-      <span class="ml-2 font-semibold text-[10px] text-gray-800">PORTAL</span>
-    </div>
-
-    <nav class="md:mt-6 px-2 space-y-1">
-      <!-- Devices -->
-      <a
-        href="/dashboard"
+      <SignOutButton
+        redirectUrl="/"
+        class="flex items-center w-full py-2 pb-4 text-sm text-gray-600 hover:text-black text-left"
         @click="mobileMenuOpen = false"
-        class={`flex items-center px-4 py-3 text-sm rounded-lg ${activeLink === "devices" ? "text-gray-800" : "text-gray-600 hover:bg-gray-50"}`}
-        style={activeLink === "devices" ? "background-color: #DBD5CD;" : ""}
       >
-        <img src="/assets/portal-icons/devices.svg" alt="" class="w-5 h-5" />
-        <span class="ml-4">Devices</span>
-      </a>
+        <img src="/assets/portal-icons/logout.svg" alt="" class="w-5 h-5" />
+        <span class="ml-4">Logout</span>
+      </SignOutButton>
+    </div>
+  </aside>
 
-      <!-- Request an app -->
-      <a
-        href="https://getwisephone.com/request-app"
-        target="_blank"
-        rel="noopener noreferrer"
-        @click="mobileMenuOpen = false"
-        class={`flex items-center px-4 py-3 text-sm rounded-lg ${activeLink === "request-app" ? "text-gray-800" : "text-gray-600 hover:bg-gray-50"}`}
-        style={activeLink === "request-app" ? "background-color: #DBD5CD;" : ""}
-      >
-        <img src="/assets/portal-icons/app-request.svg" alt="" class="w-5 h-5" />
-        <span class="ml-4">Request an App</span>
-      </a>
+  <!-- Support Popup - Positioned above Support button, aligned with sidebar -->
+  <!--
+    Desktop: md:fixed md:bottom-[136px] md:left-2 md:w-56
+    Mobile: fixed positioning over the sidebar menu, aligned with Support button
+  -->
+  <div
+    x-show="showSupportPopup"
+    x-cloak
+    x-transition.opacity
+    x-init="console.log('🟡 Mobile popup initialized, showSupportPopup:', showSupportPopup)"
+    x-effect="console.log('🟡 Mobile popup effect, showSupportPopup:', showSupportPopup); console.log('Element computed styles:', window.getComputedStyle($el).display, window.getComputedStyle($el).visibility)"
+    class="md:fixed md:bottom-[136px] md:left-2 md:w-56 fixed bottom-[200px] right-0 z-[60] w-64"
+    @click.outside="showSupportPopup = false"
+  >
+    <div class="bg-white rounded-3xl shadow-2xl relative">
+      <!-- Speech bubble tail: top-left on mobile, bottom-left on desktop (towards sidebar support button) -->
+      <div class="absolute -top-3 md:top-auto md:-bottom-3 left-8 w-6 h-6 bg-white transform rotate-45 shadow-lg"></div>
 
-      <!-- Desktop: Show only bottom section -->
-      <!-- Mobile: Show all options in one list -->
-      <div class="md:hidden space-y-1">
-        <div
-          class="px-4 py-3 relative cursor-pointer"
-          x-data
-          @click="$el.querySelector('button')?.click(); mobileMenuOpen = false; $dispatch('account-modal-open')"
-        >
-          <div class="flex items-center w-full text-sm text-gray-600">
-            <img src="/assets/portal-icons/account-circle.svg" alt="" class="w-5 h-5" />
-            <span class="ml-4">Account</span>
-          </div>
-          <div class="absolute bottom-5 left-0 opacity-0 pointer-events-auto invisible">
-            <UserButton />
-          </div>
+      <!-- Header with icon and close button -->
+      <div class="flex items-center justify-between p-6 pb-4">
+        <div class="flex items-center gap-3">
+          <!-- Support icon (reused from support button) -->
+          <img src="/assets/portal-icons/support.svg" alt="" class="w-5 h-5" />
+          <h2 class="text-md font-semibold text-gray-900">Support</h2>
         </div>
 
+        <!-- Close button -->
         <button
-          type="button"
-          @click="showSupportPopup = true; mobileMenuOpen = false"
-          class="flex items-center w-full px-4 py-3 text-sm text-gray-600 hover:bg-gray-50 rounded-lg text-left"
+          @click="showSupportPopup = false"
+          class="text-gray-900 hover:text-gray-700 transition-colors"
+          aria-label="Close"
         >
-          <img src="/assets/portal-icons/support.svg" alt="" class="w-5 h-5" />
-          <span class="ml-4">Support</span>
-        </button>
-
-        <IsAdmin server:defer>
-          <a
-            href="/dashboard/admin"
-            @click="mobileMenuOpen = false"
-            class="flex items-center px-4 py-3 text-sm text-gray-600 hover:bg-gray-50 rounded-lg"
+          <svg
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
           >
-            <img src="/assets/portal-icons/admin.svg" alt="" class="w-5 h-5" />
-            <span class="ml-4">Admin</span>
-          </a>
-        </IsAdmin>
-
-        <SignOutButton
-          redirectUrl="/"
-          class="flex items-center w-full px-4 py-3 text-sm text-gray-600 hover:bg-gray-50 text-left rounded-lg"
-          @click="mobileMenuOpen = false"
-        >
-          <img src="/assets/portal-icons/logout.svg" alt="" class="w-5 h-5" />
-          <span class="ml-4">Logout</span>
-        </SignOutButton>
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
       </div>
-    </nav>
-  </div>
 
-  <!-- Bottom Section: Admin, Account, Support, Logout (Desktop Only) -->
-  <div class="hidden md:block px-6 pb-6">
-    <IsAdmin server:defer>
-      <a
-        href="/dashboard/admin"
-        @click="mobileMenuOpen = false"
-        class="flex items-center py-2 text-sm text-gray-600 hover:text-black"
-      >
-        <img src="/assets/portal-icons/admin.svg" alt="" class="w-5 h-5" />
-        <span class="ml-4">Admin</span>
-      </a>
-    </IsAdmin>
+      <!-- Content -->
+      <div class="px-6 pb-6 space-y-4 text-gray-700 text-base">
+        <!-- Help Center -->
+        <p class="leading-relaxed">
+          Click here to access our
+          <a
+            href="https://techless.notion.site/"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="underline hover:text-gray-900 transition-colors"
+          >
+            Help Center
+          </a>.
+        </p>
 
-    <div class="py-2 pb-4 relative cursor-pointer" x-data @click="$el.querySelector('button')?.click()">
-      <div class="flex items-center w-full py-2 text-sm text-gray-600">
-        <img src="/assets/portal-icons/account-circle.svg" alt="" class="w-5 h-5" />
-        <span class="ml-4">Account</span>
-      </div>
-      <div class="absolute bottom-5 left-0 opacity-0 pointer-events-auto invisible">
-        <UserButton />
+        <hr class="border-gray-300" />
+
+        <!-- Phone -->
+        <p class="leading-relaxed">
+          Call <a href="tel:5126751820" class="font-medium underline hover:text-gray-900">512 675 1820</a> to get in touch
+          with our support team.
+        </p>
+
+        <hr class="border-gray-300" />
+
+        <!-- Contact Form -->
+        <p class="leading-relaxed">
+          Click here to access our
+          <a
+            href="https://techless.zendesk.com/hc/en-us/requests/new"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="underline hover:text-gray-900 transition-colors"
+          >
+            Contact Form
+          </a>.
+        </p>
       </div>
     </div>
-
-    <button
-      type="button"
-      @click="showSupportPopup = true"
-      class="flex items-center w-full py-2 text-sm text-gray-600 hover:text-black pb-4 text-left"
-    >
-      <img src="/assets/portal-icons/support.svg" alt="" class="w-5 h-5" />
-      <span class="ml-4">Support</span>
-    </button>
-
-    <SignOutButton
-      redirectUrl="/"
-      class="flex items-center w-full py-2 pb-4 text-sm text-gray-600 hover:text-black text-left"
-      @click="mobileMenuOpen = false"
-    >
-      <img src="/assets/portal-icons/logout.svg" alt="" class="w-5 h-5" />
-      <span class="ml-4">Logout</span>
-    </SignOutButton>
   </div>
-</aside>
+</div>
