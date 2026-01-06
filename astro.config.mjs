@@ -29,6 +29,27 @@ export default defineConfig({
   ],
   output: "server",
   adapter: netlify(),
+  vite: {
+    server: {
+      // Enable HTTPS for local development
+      // For production, Netlify automatically provides HTTPS
+      https:
+        process.env.HTTPS === "true"
+          ? {
+              // Use self-signed certificate (browser will show warning, but works for API calls)
+              // For trusted certificates, use mkcert: https://github.com/FiloSottile/mkcert
+              // After installing mkcert, run: mkcert -install && mkcert localhost 127.0.0.1 ::1
+              // Then set: SSL_KEY_PATH=./localhost+2-key.pem SSL_CERT_PATH=./localhost+2.pem
+              key: process.env.SSL_KEY_PATH || "./localhost-key.pem",
+              cert: process.env.SSL_CERT_PATH || "./localhost.pem"
+            }
+          : false,
+      port: process.env.PORT ? parseInt(process.env.PORT) : 4321,
+      host: process.env.HOST || true,
+      // Allow Cloudflare tunnel hosts and any trycloudflare.com subdomain
+      allowedHosts: [".trycloudflare.com", "localhost", "127.0.0.1"]
+    }
+  },
   env: {
     schema: {
       GIGS_API_KEY: envField.string({ context: "server", access: "secret" }),

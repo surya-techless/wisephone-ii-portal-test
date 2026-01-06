@@ -81,6 +81,44 @@ const DeviceAppUsage = defineTable({
   ]
 });
 
+// Daily screen time breakdown (new format from WiseOS)
+const DeviceDailyScreenTime = defineTable({
+  columns: {
+    id: column.number({ primaryKey: true, autoIncrement: true }),
+    screenTimeId: column.number(),                          // References DeviceScreenTime.id
+    imei: column.text(),                                    // For easier querying
+    date: column.date(),                                    // The specific day
+    totalScreenTimeMs: column.number(),                     // Screen time for this day in ms
+    weekStartDate: column.date()                            // For easier querying
+  },
+  indexes: [
+    { on: ["screenTimeId"] },
+    { on: ["imei", "date"] },
+    { on: ["imei", "weekStartDate"] }
+  ]
+});
+
+// Per-app usage per day (new format from WiseOS)
+const DeviceDailyAppUsage = defineTable({
+  columns: {
+    id: column.number({ primaryKey: true, autoIncrement: true }),
+    dailyScreenTimeId: column.number(),                    // References DeviceDailyScreenTime.id
+    screenTimeId: column.number(),                          // References DeviceScreenTime.id (for easier querying)
+    imei: column.text(),                                    // For easier querying
+    date: column.date(),                                    // The specific day
+    packageName: column.text(),
+    appName: column.text(),
+    totalTimeMs: column.number(),                           // Usage for this day in ms
+    weekStartDate: column.date()                            // For easier querying
+  },
+  indexes: [
+    { on: ["dailyScreenTimeId"] },
+    { on: ["screenTimeId"] },
+    { on: ["imei", "date"] },
+    { on: ["imei", "weekStartDate"] }
+  ]
+});
+
 export default defineDb({
   tables: {
     App,
@@ -89,6 +127,8 @@ export default defineDb({
     UserPermission,
     OttogridCache,
     DeviceScreenTime,
-    DeviceAppUsage
+    DeviceAppUsage,
+    DeviceDailyScreenTime,
+    DeviceDailyAppUsage
   }
 });

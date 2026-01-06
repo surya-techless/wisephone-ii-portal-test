@@ -6,6 +6,8 @@
     "dev": "astro dev",
     "dev:remote": "astro dev --remote",
     "dev:host": "astro dev --host",
+    "dev:https": "HTTPS=true astro dev",
+    "dev:tunnel": "cloudflared tunnel --url http://localhost:4321",
     "update-packages": "npx npm-check-updates -u",
     "start": "astro dev",
     "build": "astro check && astro build --remote",

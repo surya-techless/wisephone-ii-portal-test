@@ -28,3 +28,10 @@ pnpm-debug.log*
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+
+# SSL certificates (local dev only)
+*.pem
+*.key
+*.crt
+localhost*
+*.local

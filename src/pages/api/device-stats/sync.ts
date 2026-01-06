@@ -1,5 +1,15 @@
 import type { APIRoute } from "astro";
-import { db, DeviceScreenTime, DeviceAppUsage, Wisephone, eq, and, sql } from "astro:db";
+import {
+  db,
+  DeviceScreenTime,
+  DeviceAppUsage,
+  DeviceDailyScreenTime,
+  DeviceDailyAppUsage,
+  Wisephone,
+  eq,
+  and,
+  sql
+} from "astro:db";
 import { captureException } from "@sentry/astro";
 
 /**
@@ -18,6 +28,23 @@ import { captureException } from "@sentry/astro";
  *   }]
  * }
  */
+
+// CORS headers for device sync requests
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+  "Access-Control-Max-Age": "86400"
+};
+
+// Handle CORS preflight requests
+export const OPTIONS: APIRoute = async () => {
+  return new Response(null, {
+    status: 204,
+    headers: corsHeaders
+  });
+};
+
 export const POST: APIRoute = async ({ request }) => {
   try {
     // ============================================
@@ -114,6 +141,35 @@ export const POST: APIRoute = async ({ request }) => {
       }
 
       console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
+
+      // Check if all screen time tables exist, create if any are missing
+      let tablesExist = true;
+      const tablesToCheck = [
+        { name: "DeviceScreenTime", table: DeviceScreenTime },
+        { name: "DeviceAppUsage", table: DeviceAppUsage },
+        { name: "DeviceDailyScreenTime", table: DeviceDailyScreenTime },
+        { name: "DeviceDailyAppUsage", table: DeviceDailyAppUsage }
+      ];
+
+      for (const { name, table } of tablesToCheck) {
+        try {
+          await db.select().from(table).limit(1);
+          console.log(`✅ ${name} table exists`);
+        } catch (tableError: any) {
+          if (tableError?.code === "SQLITE_UNKNOWN" || tableError?.message?.includes("no such table")) {
+            console.log(`⚠️ ${name} table missing`);
+            tablesExist = false;
+          } else {
+            throw tableError;
+          }
+        }
+      }
+
+      if (!tablesExist) {
+        console.log("⚠️ Some screen time tables are missing, creating all tables...");
+        await createScreenTimeTables();
+        console.log("✅ All screen time tables created successfully");
+      }
     } catch (dbError) {
       console.error("❌ Database connection failed:", dbError);
       return new Response(
@@ -123,7 +179,10 @@ export const POST: APIRoute = async ({ request }) => {
         }),
         {
           status: 500,
-          headers: { "Content-Type": "application/json" }
+          headers: {
+            "Content-Type": "application/json",
+            ...corsHeaders
+          }
         }
       );
     }
@@ -136,33 +195,50 @@ export const POST: APIRoute = async ({ request }) => {
       console.error("DEVICE_SYNC_API_KEY not configured");
       return new Response(JSON.stringify({ error: "Server misconfigured" }), {
         status: 500,
-        headers: { "Content-Type": "application/json" }
+        headers: {
+          "Content-Type": "application/json",
+          ...corsHeaders
+        }
       });
     }
 
     if (!authHeader || authHeader !== `Bearer ${expectedKey}`) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
-        headers: { "Content-Type": "application/json" }
+        headers: {
+          "Content-Type": "application/json",
+          ...corsHeaders
+        }
       });
     }
 
     const body = await request.json();
-    console.log("Incoming POST data:", JSON.stringify(body, null, 2));
-    const { device, weeks } = body;
+    console.log("========================================");
+    console.log("📥 NEW SCREEN TIME DATA RECEIVED");
+    console.log("========================================");
+    console.log("Full payload:", JSON.stringify(body, null, 2));
+    console.log("========================================");
+
+    const { device, weeks, collectedAt } = body;
 
     // Validate required fields
     if (!device?.imei) {
       return new Response(JSON.stringify({ error: "Missing device IMEI" }), {
         status: 400,
-        headers: { "Content-Type": "application/json" }
+        headers: {
+          "Content-Type": "application/json",
+          ...corsHeaders
+        }
       });
     }
 
     if (!weeks || !Array.isArray(weeks)) {
       return new Response(JSON.stringify({ error: "Missing weeks data" }), {
         status: 400,
-        headers: { "Content-Type": "application/json" }
+        headers: {
+          "Content-Type": "application/json",
+          ...corsHeaders
+        }
       });
     }
 
@@ -173,7 +249,10 @@ export const POST: APIRoute = async ({ request }) => {
     if (isNaN(imeiNumber)) {
       return new Response(JSON.stringify({ error: "Invalid IMEI format" }), {
         status: 400,
-        headers: { "Content-Type": "application/json" }
+        headers: {
+          "Content-Type": "application/json",
+          ...corsHeaders
+        }
       });
     }
 
@@ -185,12 +264,17 @@ export const POST: APIRoute = async ({ request }) => {
     if (!wisephone) {
       return new Response(JSON.stringify({ error: "Unknown device" }), {
         status: 404,
-        headers: { "Content-Type": "application/json" }
+        headers: {
+          "Content-Type": "application/json",
+          ...corsHeaders
+        }
       });
     }
 
     let syncedWeeks = 0;
     let syncedApps = 0;
+    let syncedDays = 0;
+    let syncedDailyApps = 0;
 
     console.log(`📊 Processing ${weeks.length} weeks of data...`);
 
@@ -198,20 +282,30 @@ export const POST: APIRoute = async ({ request }) => {
     for (let i = 0; i < weeks.length; i++) {
       const week = weeks[i];
       console.log(`\n📅 Processing week ${i + 1}/${weeks.length}: ${week.weekLabel || "Unknown"}`);
-      console.log(`   Start date string: "${week.startDateFormatted}"`);
-      console.log(`   End date string: "${week.endDateFormatted}"`);
 
-      // Parse dates from formatted strings (e.g., "Dec 9" -> actual Date)
-      const weekStart = parseWeekDate(week.startDateFormatted);
-      const weekEnd = parseWeekDate(week.endDateFormatted);
+      // Parse dates - new format uses "YYYY-MM-DD" strings, old format uses formatted strings
+      let weekStart: Date | null = null;
+      let weekEnd: Date | null = null;
+
+      if (week.startDate && week.endDate) {
+        // New format: "YYYY-MM-DD" strings
+        console.log(`   📅 New format detected: startDate="${week.startDate}", endDate="${week.endDate}"`);
+        weekStart = new Date(week.startDate + "T00:00:00.000Z");
+        weekEnd = new Date(week.endDate + "T23:59:59.999Z");
+      } else if (week.startDateFormatted && week.endDateFormatted) {
+        // Old format: formatted strings like "Dec 9"
+        console.log(
+          `   📅 Old format detected: startDateFormatted="${week.startDateFormatted}", endDateFormatted="${week.endDateFormatted}"`
+        );
+        weekStart = parseWeekDate(week.startDateFormatted);
+        weekEnd = parseWeekDate(week.endDateFormatted);
+      }
 
       console.log(`   Parsed start date: ${weekStart ? weekStart.toISOString() : "NULL"}`);
       console.log(`   Parsed end date: ${weekEnd ? weekEnd.toISOString() : "NULL"}`);
 
       if (!weekStart || !weekEnd) {
-        console.warn(
-          `⚠️  Skipping week ${i + 1} with invalid dates: ${week.startDateFormatted} - ${week.endDateFormatted}`
-        );
+        console.warn(`⚠️  Skipping week ${i + 1} with invalid dates`);
         continue;
       }
 
@@ -235,10 +329,10 @@ export const POST: APIRoute = async ({ request }) => {
         await db
           .update(DeviceScreenTime)
           .set({
-            totalScreenTimeMs: week.totalScreenTime || 0,
-            dailyAverageMs: week.dailyAverage || 0,
+            totalScreenTimeMs: week.totalScreenTime || week.totalScreenTimeMs || 0,
+            dailyAverageMs: week.dailyAverage || week.dailyAverageMs || 0,
             syncedAt: new Date(),
-            deviceName: device.deviceName,
+            deviceName: device.deviceName || device.deviceId,
             deviceManufacturer: device.manufacturer,
             weekEndDate: weekEnd
           })
@@ -257,39 +351,151 @@ export const POST: APIRoute = async ({ request }) => {
           imei: imeiString,
           weekStartDate: weekStart,
           weekEndDate: weekEnd,
-          totalScreenTimeMs: week.totalScreenTime || 0,
-          dailyAverageMs: week.dailyAverage || 0,
+          totalScreenTimeMs: week.totalScreenTime || week.totalScreenTimeMs || 0,
+          dailyAverageMs: week.dailyAverage || week.dailyAverageMs || 0,
           syncedAt: new Date(),
-          deviceName: device.deviceName,
+          deviceName: device.deviceName || device.deviceId,
           deviceManufacturer: device.manufacturer
         };
         console.log(`   📝 Insert data:`, JSON.stringify(insertData, null, 2));
 
         // Insert new screen time record
-        const result = await db.insert(DeviceScreenTime).values(insertData);
+        try {
+          const result = await db.insert(DeviceScreenTime).values(insertData);
+          screenTimeId = Number(result.lastInsertRowid);
+          console.log(`   ✅ Inserted DeviceScreenTime record (ID: ${screenTimeId})`);
 
-        screenTimeId = Number(result.lastInsertRowid);
-        console.log(`   ✅ Inserted DeviceScreenTime record (ID: ${screenTimeId})`);
+          // Verify the insert by querying it back
+          const verifyRecord = await db
+            .select()
+            .from(DeviceScreenTime)
+            .where(eq(DeviceScreenTime.id, screenTimeId))
+            .get();
+          console.log(`   🔍 Verification: ${verifyRecord ? "Record found in DB" : "❌ Record NOT found in DB!"}`);
+          if (verifyRecord) {
+            console.log(`   📊 Verified record:`, JSON.stringify(verifyRecord, null, 2));
+          }
+        } catch (insertError: any) {
+          console.error(`   ❌ Error inserting DeviceScreenTime:`, insertError);
+          console.error(`   ❌ Error code:`, insertError?.code);
+          console.error(`   ❌ Error message:`, insertError?.message);
+          throw insertError;
+        }
       }
 
-      // Insert app usage data for this week
+      // Delete old daily records for this week (will re-insert fresh data)
+      console.log(`   🗑️  Deleting old daily records for screenTimeId: ${screenTimeId}...`);
+      const existingDailyRecords = await db
+        .select()
+        .from(DeviceDailyScreenTime)
+        .where(eq(DeviceDailyScreenTime.screenTimeId, screenTimeId));
+
+      if (existingDailyRecords.length > 0) {
+        // Delete daily app usage records first (foreign key constraint)
+        for (const dailyRecord of existingDailyRecords) {
+          await db.delete(DeviceDailyAppUsage).where(eq(DeviceDailyAppUsage.dailyScreenTimeId, dailyRecord.id));
+        }
+        // Then delete daily screen time records
+        await db.delete(DeviceDailyScreenTime).where(eq(DeviceDailyScreenTime.screenTimeId, screenTimeId));
+        console.log(`   ✅ Deleted ${existingDailyRecords.length} old daily records`);
+      }
+
+      // Insert daily breakdown data (new format)
+      if (week.days && Array.isArray(week.days) && week.days.length > 0) {
+        console.log(`   📅 Inserting ${week.days.length} daily screen time records...`);
+        let weekSyncedDays = 0;
+        let weekSyncedDailyApps = 0;
+
+        for (const day of week.days) {
+          const dayDate = new Date(day.date + "T00:00:00.000Z");
+          const dayScreenTimeMs = day.totalScreenTime || 0;
+
+          // Insert daily screen time record
+          let dailyScreenTimeId: number;
+          try {
+            const dailyResult = await db.insert(DeviceDailyScreenTime).values({
+              screenTimeId,
+              imei: imeiString,
+              date: dayDate,
+              totalScreenTimeMs: dayScreenTimeMs,
+              weekStartDate: weekStart
+            });
+
+            dailyScreenTimeId = Number(dailyResult.lastInsertRowid);
+            weekSyncedDays++;
+            console.log(`   📅 Inserted daily record ID: ${dailyScreenTimeId} for date: ${dayDate.toISOString()}`);
+          } catch (dailyError: any) {
+            console.error(`   ❌ Error inserting DeviceDailyScreenTime for date ${dayDate}:`, dailyError);
+            throw dailyError;
+          }
+
+          // Insert daily app usage
+          if (day.apps && Array.isArray(day.apps) && day.apps.length > 0) {
+            const dailyAppRecords = day.apps.map((app: any) => ({
+              dailyScreenTimeId,
+              screenTimeId,
+              imei: imeiString,
+              date: dayDate,
+              packageName: app.packageName,
+              appName: app.appName,
+              totalTimeMs: app.totalTime || 0,
+              weekStartDate: weekStart
+            }));
+
+            try {
+              await db.insert(DeviceDailyAppUsage).values(dailyAppRecords);
+              weekSyncedDailyApps += dailyAppRecords.length;
+              console.log(
+                `   📱 Inserted ${dailyAppRecords.length} daily app records for date: ${dayDate.toISOString()}`
+              );
+            } catch (dailyAppError: any) {
+              console.error(`   ❌ Error inserting DeviceDailyAppUsage for date ${dayDate}:`, dailyAppError);
+              throw dailyAppError;
+            }
+          }
+        }
+
+        syncedDays += weekSyncedDays;
+        syncedDailyApps += weekSyncedDailyApps;
+        console.log(
+          `   ✅ Inserted ${weekSyncedDays} daily records and ${weekSyncedDailyApps} daily app usage records`
+        );
+      }
+
+      // Insert weekly app usage data (for backward compatibility and weekly aggregates)
       if (week.apps && Array.isArray(week.apps) && week.apps.length > 0) {
-        console.log(`   📱 Inserting ${week.apps.length} app usage records...`);
+        console.log(`   📱 Inserting ${week.apps.length} weekly app usage records...`);
         const appRecords = week.apps.map((app: any) => ({
           screenTimeId,
           imei: imeiString,
           packageName: app.packageName,
           appName: app.appName,
-          totalTimeMs: app.totalTime || 0,
-          dailyAverageMs: app.dailyAverage || 0,
+          totalTimeMs: app.totalTime || app.totalTimeMs || 0,
+          dailyAverageMs: app.dailyAverage || app.dailyAverageMs || 0,
           weekStartDate: weekStart
         }));
 
         console.log(`   📝 App records sample (first 2):`, JSON.stringify(appRecords.slice(0, 2), null, 2));
 
-        await db.insert(DeviceAppUsage).values(appRecords);
-        syncedApps += appRecords.length;
-        console.log(`   ✅ Inserted ${appRecords.length} DeviceAppUsage records`);
+        try {
+          await db.insert(DeviceAppUsage).values(appRecords);
+          syncedApps += appRecords.length;
+          console.log(`   ✅ Inserted ${appRecords.length} DeviceAppUsage records`);
+
+          // Verify the inserts
+          const verifyApps = await db
+            .select()
+            .from(DeviceAppUsage)
+            .where(eq(DeviceAppUsage.screenTimeId, screenTimeId));
+          console.log(
+            `   🔍 Verification: Found ${verifyApps.length} app records in DB for screenTimeId ${screenTimeId}`
+          );
+        } catch (appError: any) {
+          console.error(`   ❌ Error inserting DeviceAppUsage:`, appError);
+          console.error(`   ❌ Error code:`, appError?.code);
+          console.error(`   ❌ Error message:`, appError?.message);
+          throw appError;
+        }
       } else {
         console.log(`   ⚠️  No apps data for this week`);
       }
@@ -298,18 +504,45 @@ export const POST: APIRoute = async ({ request }) => {
       console.log(`   ✅ Completed week ${i + 1}/${weeks.length}`);
     }
 
-    console.log(`\n📊 Sync Summary: ${syncedWeeks} weeks, ${syncedApps} apps`);
+    console.log(
+      `\n📊 Sync Summary: ${syncedWeeks} weeks, ${syncedApps} weekly apps, ${syncedDays} days, ${syncedDailyApps} daily apps`
+    );
+
+    // Final verification: Query all records for this IMEI
+    const imeiString = String(device.imei);
+    console.log(`\n🔍 Final Verification: Querying all DeviceScreenTime records for IMEI: ${imeiString}`);
+    try {
+      const allRecords = await db
+        .select()
+        .from(DeviceScreenTime)
+        .where(eq(DeviceScreenTime.imei, imeiString))
+        .orderBy(sql`${DeviceScreenTime.weekStartDate} DESC`)
+        .limit(10);
+      console.log(`   📊 Found ${allRecords.length} total DeviceScreenTime records for this IMEI`);
+      if (allRecords.length > 0) {
+        console.log(`   📋 Latest record:`, JSON.stringify(allRecords[0], null, 2));
+      } else {
+        console.warn(`   ⚠️  WARNING: No records found in database for IMEI ${imeiString} after sync!`);
+      }
+    } catch (verifyError: any) {
+      console.error(`   ❌ Error verifying records:`, verifyError);
+    }
 
     return new Response(
       JSON.stringify({
         success: true,
         syncedWeeks,
         syncedApps,
+        syncedDays,
+        syncedDailyApps,
         timestamp: new Date().toISOString()
       }),
       {
         status: 200,
-        headers: { "Content-Type": "application/json" }
+        headers: {
+          "Content-Type": "application/json",
+          ...corsHeaders
+        }
       }
     );
   } catch (error) {
@@ -322,11 +555,99 @@ export const POST: APIRoute = async ({ request }) => {
       }),
       {
         status: 500,
-        headers: { "Content-Type": "application/json" }
+        headers: {
+          "Content-Type": "application/json",
+          ...corsHeaders
+        }
       }
     );
   }
 };
+
+/**
+ * Create screen time tables if they don't exist
+ * This handles the case where tables are missing in remote/production DB
+ */
+async function createScreenTimeTables() {
+  console.log("🔨 Creating DeviceScreenTime table...");
+  await db.run(sql`
+    CREATE TABLE IF NOT EXISTS DeviceScreenTime (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      imei TEXT NOT NULL,
+      weekStartDate TEXT NOT NULL,
+      weekEndDate TEXT NOT NULL,
+      totalScreenTimeMs INTEGER NOT NULL,
+      dailyAverageMs INTEGER NOT NULL,
+      syncedAt TEXT NOT NULL DEFAULT (datetime('now')),
+      deviceName TEXT,
+      deviceManufacturer TEXT
+    )
+  `);
+
+  console.log("🔨 Creating DeviceAppUsage table...");
+  await db.run(sql`
+    CREATE TABLE IF NOT EXISTS DeviceAppUsage (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      screenTimeId INTEGER NOT NULL,
+      imei TEXT NOT NULL,
+      packageName TEXT NOT NULL,
+      appName TEXT NOT NULL,
+      totalTimeMs INTEGER NOT NULL,
+      dailyAverageMs INTEGER NOT NULL,
+      weekStartDate TEXT NOT NULL
+    )
+  `);
+
+  console.log("🔨 Creating DeviceDailyScreenTime table...");
+  await db.run(sql`
+    CREATE TABLE IF NOT EXISTS DeviceDailyScreenTime (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      screenTimeId INTEGER NOT NULL,
+      imei TEXT NOT NULL,
+      date TEXT NOT NULL,
+      totalScreenTimeMs INTEGER NOT NULL,
+      weekStartDate TEXT NOT NULL
+    )
+  `);
+
+  console.log("🔨 Creating DeviceDailyAppUsage table...");
+  await db.run(sql`
+    CREATE TABLE IF NOT EXISTS DeviceDailyAppUsage (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      dailyScreenTimeId INTEGER NOT NULL,
+      screenTimeId INTEGER NOT NULL,
+      imei TEXT NOT NULL,
+      date TEXT NOT NULL,
+      packageName TEXT NOT NULL,
+      appName TEXT NOT NULL,
+      totalTimeMs INTEGER NOT NULL,
+      weekStartDate TEXT NOT NULL
+    )
+  `);
+
+  console.log("🔨 Creating indexes...");
+  await db.run(sql`CREATE INDEX IF NOT EXISTS idx_device_app_usage_screen_time_id ON DeviceAppUsage(screenTimeId)`);
+  await db.run(sql`CREATE INDEX IF NOT EXISTS idx_device_app_usage_imei_week ON DeviceAppUsage(imei, weekStartDate)`);
+  await db.run(sql`CREATE INDEX IF NOT EXISTS idx_device_daily_screen_time_id ON DeviceDailyScreenTime(screenTimeId)`);
+  await db.run(
+    sql`CREATE INDEX IF NOT EXISTS idx_device_daily_screen_time_imei_date ON DeviceDailyScreenTime(imei, date)`
+  );
+  await db.run(
+    sql`CREATE INDEX IF NOT EXISTS idx_device_daily_screen_time_imei_week ON DeviceDailyScreenTime(imei, weekStartDate)`
+  );
+  await db.run(
+    sql`CREATE INDEX IF NOT EXISTS idx_device_daily_app_usage_daily_id ON DeviceDailyAppUsage(dailyScreenTimeId)`
+  );
+  await db.run(
+    sql`CREATE INDEX IF NOT EXISTS idx_device_daily_app_usage_screen_time_id ON DeviceDailyAppUsage(screenTimeId)`
+  );
+  await db.run(sql`CREATE INDEX IF NOT EXISTS idx_device_daily_app_usage_imei_date ON DeviceDailyAppUsage(imei, date)`);
+  await db.run(
+    sql`CREATE INDEX IF NOT EXISTS idx_device_daily_app_usage_imei_week ON DeviceDailyAppUsage(imei, weekStartDate)`
+  );
+
+  console.log("✅ All screen time tables and indexes created");
+}
 
 /**
  * Parse a short date format (e.g., "Dec 9") into a full Date object.
