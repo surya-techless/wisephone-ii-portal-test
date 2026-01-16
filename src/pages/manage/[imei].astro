@@ -24,10 +24,12 @@ import Layout from "@/layouts/Layout.astro";
 import TechlessSubscriptionButton from "@/components/TechlessSubscriptionButton.astro";
 import DashboardSidebar from "@/components/DashboardSidebar.astro";
 import ScreenTimeStats from "@/components/ScreenTimeStats.astro";
-import { FEATURES, FAITH_TOOLS_APPS, getPackageNameFromPlayStoreUrl, isValidIMEI, type Feature } from "@/libs/utils";
+import { FEATURES, getPackageNameFromPlayStoreUrl, isValidIMEI, type Feature } from "@/libs/utils";
 import { isAdmin } from "@/lib/auth/permissions";
 import type { AppsList } from "@/types/apps";
 import { DEFAULT_SYSTEM_APPS, getSystemAppPackageNames } from "@/utils/system-apps";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 // Helper function to create screen time tables if they don't exist
 async function createScreenTimeTables() {
@@ -78,6 +80,18 @@ let appsList: AppsList = {};
 let sortedAppsList = {};
 let user: UserResource | User | null = null;
 let screenTimeData: any[] = [];
+
+// Load apps.json file
+let appsJsonData: any = { rows: [] };
+try {
+  const appsJsonPath = join(process.cwd(), "apps.json");
+  const appsJsonContent = readFileSync(appsJsonPath, "utf-8");
+  appsJsonData = JSON.parse(appsJsonContent);
+  console.log(`✅ Loaded ${appsJsonData.rows?.length || 0} apps from apps.json`);
+} catch (error) {
+  console.error("❌ Failed to load apps.json:", error);
+  // Continue with empty apps list
+}
 
 // Check if a device was just deleted successfully - must happen before any device lookup
 const deleteActionResult = Astro.getActionResult(actions.wisephones.deleteWisephone);
@@ -151,6 +165,20 @@ try {
       console.error("Error checking subscription status:", subscriptionError);
     }
   }
+
+  // const formData = new FormData();
+  // formData.append("imei", String(wisephone?.imei || ""));
+  // try {
+  //   const getInstalledAppsResult = await Astro.callAction(actions.wisephones.getInstalledApps, formData);
+  //   installedApps = getInstalledAppsResult?.data?.apps || [];
+  //   console.log("[DEBUG] getInstalledApps installed Appsresult", installedApps);
+  //   // Printing every item in the installedApps array
+  //   installedApps.forEach((app) => {
+  //     console.log("[DEBUG] getInstalledApps installed Appsitem", app.packageName);
+  //   });
+  // } catch (appsError) {
+  //   console.error("Error getting installed apps:", appsError);
+  // }
 
   // Fetch device screentime details from DB
   console.log("📊 Fetching device screentime for IMEI:", imei);
@@ -358,43 +386,11 @@ try {
     console.log("📊 No screentime data found for IMEI:", imei);
   }
 
-  // Get installed apps
-  const formData = new FormData();
-  formData.append("imei", String(wisephone?.imei || ""));
-
-  try {
-    const getInstalledAppsResult = await Astro.callAction(actions.wisephones.getInstalledApps, formData);
-    installedApps = getInstalledAppsResult?.data?.apps || [];
-  } catch (appsError) {
-    console.error("Error getting installed apps:", appsError);
-  }
-
-  // Create apps list with type safety
+  // Installed apps will be fetched client-side asynchronously
+  // Initialize as empty - will be populated after page loads
+  installedApps = [];
   appsList = {};
-
-  // Process Faith Tools apps with similar protection
-  try {
-    FAITH_TOOLS_APPS.forEach((app) => {
-      try {
-        const packageName = getPackageNameFromPlayStoreUrl(app["Play Store URL"]);
-        if (!packageName) return;
-
-        appsList[packageName] = {
-          source: "faith.tools",
-          installed: installedApps.some((app) => app.packageName === packageName),
-          name: app.Name || "Unknown App"
-        };
-      } catch (appError) {
-        console.error("Error processing Faith Tools app:", appError);
-        // Continue with next app instead of crashing
-      }
-    });
-  } catch (faithToolsError) {
-    console.error("Error processing Faith Tools apps:", faithToolsError);
-  }
-
-  // Sort apps by name
-  sortedAppsList = Object.fromEntries(Object.entries(appsList).sort(([, a], [, b]) => a.name.localeCompare(b.name)));
+  sortedAppsList = {};
 } catch (error) {
   console.error("Unexpected error in manage page:", error);
   return Astro.redirect(
@@ -408,7 +404,7 @@ try {
   description="Manage your Wisephone device settings, features, and apps."
 >
   <div
-    class="flex h-screen bg-[#f7f6f2]"
+    class="flex h-screen bg-[#f7f6f2] relative"
     x-data="manageDevice"
     x-init={`
       mobileMenuOpen = false;
@@ -424,13 +420,23 @@ try {
       userName = \`${user?.firstName || ""} ${user?.lastName || ""}\`;
       userPhone = \`${wisephone?.phoneNumber || "(111) 111-1111"}\`;
       userEmail = \`${user?.emailAddresses?.[0]?.emailAddress || ""}\`;
+      isLoading = true;
     `}
   >
+    <progress
+      x-show="isLoading || isToolDrawerLoading"
+      x-cloak
+      x-transition
+      class="absolute top-0 left-0 right-0 w-full progress"
+      style="--progress-color: var(--evergreen);"></progress>
+
     <!-- Sidebar -->
     <DashboardSidebar activeLink="devices" />
 
     <!-- Main Content Area -->
     <main
+      x-show="!isLoading"
+      x-cloak
       class="device-dashboard-main-container relative flex-1 overflow-auto md:rounded-xl md:mt-4 md:mb-4 md:mr-4 bg-[#ffffff] w-full pt-16 md:pt-0"
     >
       <!-- Mobile Menu Button -->
@@ -479,20 +485,20 @@ try {
           <!-- Two Column Layout: Tabs + Tab Content (Left) and Screen Time (Right) -->
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <!-- Left Column: Tabs and Tab Content -->
-            <div class="mb-6">
+            <div class="mb-6" :class="currentTab === 'app-management' ? 'lg:col-span-2' : ''">
               <!-- Tabs -->
-              <div class="flex gap-4 mb-6 border-b-[3px] border-gray-300">
+              <div class="flex gap-4 mb-6 border-b-[2px] border-gray-300 max-w-[500px]">
                 <button
                   @click="currentTab = 'device-info'"
-                  class="px-6 py-3 text-sm font-medium transition-all relative border-b-[3px] -mb-[3px]"
-                  :class="currentTab === 'device-info' ? 'bg-[#DBD5CD] text-gray-900 border-[#C07F53]' : 'bg-transparent text-gray-600 border-transparent hover:text-gray-900'"
+                  class="px-6 py-3 text-sm font-medium transition-all relative"
+                  :class="currentTab === 'device-info' ? 'bg-[#DBD5CD] text-gray-900 border-b-[3px] border-[#C07F53] -mb-[3px]' : 'bg-transparent text-gray-600 border-transparent hover:text-gray-900'"
                 >
                   Device Info
                 </button>
                 <button
                   @click="currentTab = 'features'"
-                  class="px-6 py-3 text-sm font-medium transition-all relative border-b-[3px] -mb-[3px]"
-                  :class="currentTab === 'features' ? 'bg-[#DBD5CD] text-gray-900 border-[#C07F53]' : 'bg-transparent text-gray-600 border-transparent hover:text-gray-900'"
+                  class="px-6 py-3 text-sm font-medium transition-all relative"
+                  :class="currentTab === 'features' ? 'bg-[#DBD5CD] text-gray-900 border-b-[3px] border-[#C07F53] -mb-[3px]' : 'bg-transparent text-gray-600 border-transparent hover:text-gray-900'"
                 >
                   Features
                 </button>
@@ -500,8 +506,8 @@ try {
                   x-show="isSubscribed && isToolDrawerEnabled"
                   x-cloak
                   @click="currentTab = 'app-management'"
-                  class="px-6 py-3 text-sm font-medium transition-all relative border-b-[3px] -mb-[3px]"
-                  :class="currentTab === 'app-management' ? 'bg-[#DBD5CD] text-gray-900 border-[#C07F53]' : 'bg-transparent text-gray-600 border-transparent hover:text-gray-900'"
+                  class="px-6 py-3 text-sm font-medium transition-all relative"
+                  :class="currentTab === 'app-management' ? 'bg-[#DBD5CD] text-gray-900 border-b-[3px] border-[#C07F53] -mb-[3px]' : 'bg-transparent text-gray-600 border-transparent hover:text-gray-900'"
                 >
                   App Management
                 </button>
@@ -766,9 +772,9 @@ try {
                         />
                         <input
                           type="text"
-                          x-model="appSearchQuery"
-                          placeholder="Search apps, or categories"
-                          class="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                          x-model.debounce.300ms="appSearchQuery"
+                          placeholder="Search apps or categories (e.g., Finance, Books & Reference)"
+                          class="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-md text-sm bg-gray-100 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                         />
                       </div>
                     </div>
@@ -781,8 +787,17 @@ try {
                       <template x-for="app in availableApps" :key="app.packageName">
                         <div class="flex items-center gap-4 p-3 border border-gray-300 rounded-lg hover:bg-gray-50">
                           <div class="flex items-center gap-2 flex-1 min-w-0 overflow-hidden">
-                            <div class="w-8 h-8 bg-gray-200 rounded-md flex items-center justify-center flex-shrink-0">
-                              <Icon name="lucide:package" class="w-4 h-4 text-gray-500" />
+                            <div
+                              class="w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0 overflow-hidden"
+                              :class="app.iconUrl ? 'bg-transparent' : 'bg-gray-200'"
+                            >
+                              <img
+                                x-show="app.iconUrl"
+                                :src="app.iconUrl"
+                                :alt="app.name"
+                                class="w-8 h-8 object-cover"
+                              />
+                              <Icon x-show="!app.iconUrl" name="lucide:package" class="w-4 h-4 text-gray-500" />
                             </div>
                             <span class="text-sm text-gray-900 truncate" x-text="app.name"></span>
                           </div>
@@ -805,12 +820,28 @@ try {
                       Installed Apps (<span x-text="systemApps.length + installedFilteredApps.length">0</span>)
                     </h3>
                     <div class="space-y-2 flex-1 overflow-y-auto pr-2 min-h-0">
+                      <!-- Loading State -->
+                      <div x-show="isAppsLoading" class="flex items-center justify-center py-8">
+                        <div class="flex flex-col items-center gap-2">
+                          <div class="loading loading-spinner loading-md text-[var(--evergreen)]"></div>
+                          <p class="text-xs text-gray-500">Loading apps...</p>
+                        </div>
+                      </div>
                       <!-- System Applications -->
                       <template x-for="app in systemApps" :key="app.packageName">
                         <div class="flex items-center gap-4 p-3 border border-gray-300 rounded-lg bg-white">
                           <div class="flex items-center gap-2 flex-1 min-w-0 overflow-hidden">
-                            <div class="w-8 h-8 bg-blue-600 rounded-md flex items-center justify-center flex-shrink-0">
-                              <Icon name="lucide:smartphone" class="w-4 h-4 text-white" />
+                            <div
+                              class="w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0 overflow-hidden"
+                              :class="app.iconUrl ? 'bg-transparent' : 'bg-blue-600'"
+                            >
+                              <img
+                                x-show="app.iconUrl"
+                                :src="app.iconUrl"
+                                :alt="app.name"
+                                class="w-8 h-8 object-cover"
+                              />
+                              <Icon x-show="!app.iconUrl" name="lucide:smartphone" class="w-4 h-4 text-white" />
                             </div>
                             <span class="text-sm text-gray-900 truncate" x-text="app.name"></span>
                           </div>
@@ -835,8 +866,17 @@ try {
                       <template x-for="app in installedFilteredApps" :key="app.packageName">
                         <div class="flex items-center gap-4 p-3 border border-gray-300 rounded-lg bg-white">
                           <div class="flex items-center gap-2 flex-1 min-w-0 overflow-hidden">
-                            <div class="w-8 h-8 bg-teal-600 rounded-md flex items-center justify-center flex-shrink-0">
-                              <Icon name="lucide:package" class="w-4 h-4 text-white" />
+                            <div
+                              class="w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0 overflow-hidden"
+                              :class="app.iconUrl ? 'bg-transparent' : 'bg-teal-600'"
+                            >
+                              <img
+                                x-show="app.iconUrl"
+                                :src="app.iconUrl"
+                                :alt="app.name"
+                                class="w-8 h-8 object-cover"
+                              />
+                              <Icon x-show="!app.iconUrl" name="lucide:package" class="w-4 h-4 text-white" />
                             </div>
                             <span class="text-sm text-gray-900 truncate" x-text="app.name"></span>
                           </div>
@@ -872,8 +912,8 @@ try {
                       />
                       <input
                         type="text"
-                        x-model="appSearchQuery"
-                        placeholder="Search apps, or categories"
+                        x-model.debounce.300ms="appSearchQuery"
+                        placeholder="Search apps or categories (e.g., Finance, Books & Reference)"
                         class="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                       />
                     </div>
@@ -901,14 +941,28 @@ try {
                     </button>
                     <div x-show="installedOpen" x-collapse class="px-4 pb-4">
                       <div class="space-y-2 max-h-[300px] overflow-y-auto">
+                        <!-- Loading State -->
+                        <div x-show="isAppsLoading" class="flex items-center justify-center py-8">
+                          <div class="flex flex-col items-center gap-2">
+                            <div class="loading loading-spinner loading-md text-[var(--evergreen)]"></div>
+                            <p class="text-xs text-gray-500">Loading apps...</p>
+                          </div>
+                        </div>
                         <!-- System Applications -->
                         <template x-for="app in systemApps" :key="app.packageName">
                           <div class="flex items-center justify-between p-3 border border-gray-300 rounded-lg bg-white">
                             <div class="flex items-center gap-2 flex-1 min-w-0">
                               <div
-                                class="w-8 h-8 bg-blue-600 rounded-md flex items-center justify-center flex-shrink-0"
+                                class="w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0 overflow-hidden"
+                                :class="app.iconUrl ? 'bg-transparent' : 'bg-blue-600'"
                               >
-                                <Icon name="lucide:smartphone" class="w-4 h-4 text-white" />
+                                <img
+                                  x-show="app.iconUrl"
+                                  :src="app.iconUrl"
+                                  :alt="app.name"
+                                  class="w-8 h-8 object-cover"
+                                />
+                                <Icon x-show="!app.iconUrl" name="lucide:smartphone" class="w-4 h-4 text-white" />
                               </div>
                               <div class="flex flex-col min-w-0">
                                 <span class="text-sm text-gray-900 truncate" x-text="app.name"></span>
@@ -930,9 +984,16 @@ try {
                           <div class="flex items-center justify-between p-3 border border-gray-300 rounded-lg bg-white">
                             <div class="flex items-center gap-2 flex-1 min-w-0">
                               <div
-                                class="w-8 h-8 bg-teal-600 rounded-md flex items-center justify-center flex-shrink-0"
+                                class="w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0 overflow-hidden"
+                                :class="app.iconUrl ? 'bg-transparent' : 'bg-teal-600'"
                               >
-                                <Icon name="lucide:package" class="w-4 h-4 text-white" />
+                                <img
+                                  x-show="app.iconUrl"
+                                  :src="app.iconUrl"
+                                  :alt="app.name"
+                                  class="w-8 h-8 object-cover"
+                                />
+                                <Icon x-show="!app.iconUrl" name="lucide:package" class="w-4 h-4 text-white" />
                               </div>
                               <span class="text-sm text-gray-900 truncate" x-text="app.name"></span>
                             </div>
@@ -977,9 +1038,16 @@ try {
                           >
                             <div class="flex items-center gap-2 flex-1 min-w-0">
                               <div
-                                class="w-8 h-8 bg-gray-200 rounded-md flex items-center justify-center flex-shrink-0"
+                                class="w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0 overflow-hidden"
+                                :class="app.iconUrl ? 'bg-transparent' : 'bg-gray-200'"
                               >
-                                <Icon name="lucide:package" class="w-4 h-4 text-gray-500" />
+                                <img
+                                  x-show="app.iconUrl"
+                                  :src="app.iconUrl"
+                                  :alt="app.name"
+                                  class="w-8 h-8 object-cover"
+                                />
+                                <Icon x-show="!app.iconUrl" name="lucide:package" class="w-4 h-4 text-gray-500" />
                               </div>
                               <span class="text-sm text-gray-900 truncate" x-text="app.name"></span>
                             </div>
@@ -999,8 +1067,8 @@ try {
               </div>
             </div>
 
-            <!-- Right Column: Screen Time Stats (Always Visible) -->
-            <div class="mb-6 bg-[#F7F6F2] rounded-lg p-6 w-full h-full">
+            <!-- Right Column: Screen Time Stats (Only visible on Device Info tab) -->
+            <div class="mb-6 w-full h-full" x-show="currentTab === 'device-info'" x-cloak>
               <ScreenTimeStats imei={imei || ""} screenTimeData={screenTimeData} />
             </div>
           </div>
@@ -1217,6 +1285,9 @@ try {
           </div>
         </div>
 
+        <script is:inline define:vars={{ appsJsonData }}>
+          window.APPS_JSON_DATA = appsJsonData;
+        </script>
         <script>
           import Alpine from "alpinejs";
           import { actions } from "astro:actions";
@@ -1258,8 +1329,12 @@ try {
               devicePhone: "",
               originalDeviceName: "",
               originalDevicePhone: "",
+              isLoading: true,
               isToolDrawerLoading: false,
               isToolDrawerLoaded: false,
+              isAppsLoading: false,
+              isAppsLoaded: false,
+              isAvailableAppsLoaded: false,
               mobileMenuOpen: false,
               showAccountMenu: false,
               showConfirmModal: false,
@@ -1278,65 +1353,129 @@ try {
               editImei: "",
               editPhoneNumber: "",
               showRemoveModal: false,
-
+              // TODO :  Not a todo, but note to the future dev : all apps are embedded inside apps.json file,
+              // TODO :since ottogrid support is not available and Healthy Tech Index is not yet integrated
+              // TODO : apps in apps.json  from line 4 to 2537 are faith tools apps and the rest are from ottogrid (approved apps)
               get availableApps() {
-                const apps = Object.entries(this.appsList)
-                  .filter(([packageName, app]) => !app.installed)
+                // Only show apps that are NOT installed
+                // Also double-check against installedApps array to ensure no installed apps slip through
+                let apps = Object.entries(this.appsList)
+                  .filter(([packageName, app]) => {
+                    // First check: app.installed flag must be false
+                    if (app.installed) {
+                      return false;
+                    }
+                    // Second check: verify it's not in installedApps array (defensive check)
+                    const isInInstalledApps = (this.installedApps || []).some(
+                      (installedApp: { packageName: string }) =>
+                        installedApp && installedApp.packageName && installedApp.packageName === packageName
+                    );
+                    return !isInInstalledApps;
+                  })
                   .map(([packageName, app]) => ({ packageName, ...app }));
 
-                if (!this.appSearchQuery) return apps;
+                // Filter by search query (searches both name and category)
+                if (this.appSearchQuery) {
+                  const query = this.appSearchQuery.toLowerCase();
+                  apps = apps.filter(
+                    (app) =>
+                      app.name.toLowerCase().includes(query) ||
+                      (app.category && app.category.toLowerCase().includes(query))
+                  );
+                }
 
-                const query = this.appSearchQuery.toLowerCase();
-                return apps.filter((app) => app.name.toLowerCase().includes(query));
+                return apps;
               },
 
               get systemApps() {
                 // Get installed system apps based on the device model
                 const deviceModel = this.deviceName || ""; // Use device name/model if available
-                return getInstalledSystemApps(this.installedApps, deviceModel);
+                // Filter out null/undefined values from installedApps before processing
+                const validInstalledApps = (this.installedApps || []).filter((app) => app && app.packageName);
+                const result = getInstalledSystemApps(validInstalledApps, deviceModel);
+                // Ensure result doesn't contain null values
+                let filteredResult = result.filter((app) => app && app.packageName);
+
+                // Enrich with icon URLs from appsList if available
+                filteredResult = filteredResult.map((app) => {
+                  const appFromList = this.appsList?.[app.packageName];
+                  return {
+                    ...app,
+                    iconUrl: appFromList?.iconUrl || undefined
+                  };
+                });
+
+                return filteredResult;
               },
 
               get installedFilteredApps() {
+                // Filter out null/undefined values first
+                const validInstalledApps = (this.installedApps || []).filter(
+                  (app) => app && (app.packageName || app.appName)
+                );
+
                 // Show all installed apps from the device (filtered by isGoogleManaged === "Y")
-                let apps = this.installedApps
-                  .filter((app) => app.isGoogleManaged === "Y")
+                let apps = validInstalledApps
+                  .filter((app) => app && app.isGoogleManaged === "Y")
                   .map((app) => ({
-                    packageName: app.packageName || app.appName,
+                    packageName: app.packageName || app.appName || "unknown",
                     name: app.appName || app.packageName || "Unknown App",
                     installed: true,
                     source: "Tool Drawer" as const
-                  }));
+                  }))
+                  .filter((app) => app && app.packageName && app.packageName !== "unknown");
 
                 // Also include apps from appsList that are marked as installed
-                const appsListInstalled = Object.entries(this.appsList)
-                  .filter(([packageName, app]) => app.installed)
-                  .map(([packageName, app]) => ({ packageName, ...app }));
+                const appsListInstalled = Object.entries(this.appsList || {})
+                  .filter(([packageName, app]) => app && app.installed && packageName)
+                  .map(([packageName, app]) => ({ packageName, ...app }))
+                  .filter((app) => app && app.packageName);
 
-                // Merge and deduplicate by packageName
+                // Merge and deduplicate by packageName, prioritizing appsList data (which has icons)
                 const appsMap = new Map();
-                apps.forEach((app) => appsMap.set(app.packageName, app));
-                appsListInstalled.forEach((app) => {
-                  if (!appsMap.has(app.packageName)) {
+                apps.forEach((app) => {
+                  if (app && app.packageName) {
                     appsMap.set(app.packageName, app);
                   }
                 });
-                apps = Array.from(appsMap.values());
+                appsListInstalled.forEach((app) => {
+                  if (app && app.packageName) {
+                    // If already exists, merge to preserve iconUrl from appsList
+                    const existing = appsMap.get(app.packageName);
+                    if (existing) {
+                      appsMap.set(app.packageName, { ...existing, ...app, iconUrl: app.iconUrl || existing.iconUrl });
+                    } else {
+                      appsMap.set(app.packageName, app);
+                    }
+                  }
+                });
+                apps = Array.from(appsMap.values()).filter((app) => app && app.packageName);
 
                 // Filter out system apps (they're shown in a separate section)
                 const systemAppPackages = getSystemAppPackageNames();
-                apps = apps.filter((app) => !systemAppPackages.includes(app.packageName));
+                apps = apps.filter((app) => app && app.packageName && !systemAppPackages.includes(app.packageName));
 
                 // Sort by name
-                apps.sort((a, b) => a.name.localeCompare(b.name));
+                apps.sort((a, b) => {
+                  if (!a || !b || !a.name || !b.name) return 0;
+                  return a.name.localeCompare(b.name);
+                });
 
-                return apps;
+                // Final filter to ensure no null values
+                const finalApps = apps.filter((app) => app && app.packageName && app.name);
+
+                return finalApps;
               },
 
               async getFeatures() {
                 if (!this.imei) {
                   console.error("IMEI is not set, cannot fetch features");
+                  this.isLoading = false;
                   return;
                 }
+
+                // Ensure loading is true at the start
+                this.isLoading = true;
 
                 try {
                   const url = new URL(`/api/samsung-knox.json`, window.location.origin);
@@ -1354,6 +1493,503 @@ try {
                 } catch (error) {
                   console.error("Error fetching features:", error);
                   this.showErrorToast("Failed to load device features. Please try again.");
+                } finally {
+                  // Set loading to false after all operations complete
+                  this.isLoading = false;
+                }
+              },
+
+              // Load available apps from apps.json - both Tool Drawer and Faith Tools
+              // This should be called immediately when App Management tab is clicked
+              loadAvailableApps() {
+                if (this.isAvailableAppsLoaded) {
+                  return;
+                }
+
+                try {
+                  console.log("[DEBUG] Loading available apps from apps.json...");
+                  const updatedAppsList: Record<string, Omit<AppEntry, "packageName">> = {};
+
+                  // Load apps from apps.json - filter for apps where "Tool Drawer" === "Yes" OR "faith.tools"
+                  const appsJsonData = (window as any).APPS_JSON_DATA || { rows: [] };
+                  const appsFromJson = (appsJsonData.rows || []).filter((row: any) => {
+                    const toolDrawer = row.cells && row.cells["Tool Drawer"];
+                    return toolDrawer === "Yes" || toolDrawer === "faith.tools";
+                  });
+
+                  appsFromJson.forEach((row: any) => {
+                    try {
+                      const cells = row.cells || {};
+                      const playStoreUrl = cells["Play Store URL"];
+                      const toolName = cells["Tool Name"]?.trim() || "Unknown App";
+                      const iconUrl = cells["Play Store Icon URL"] || "";
+
+                      if (!playStoreUrl || playStoreUrl === "n/a") return;
+
+                      const packageName = getPackageNameFromPlayStoreUrl(playStoreUrl);
+                      if (!packageName) return;
+
+                      // Skip if already added (deduplication)
+                      if (updatedAppsList[packageName]) return;
+
+                      // Check if app is installed by comparing with installedApps
+                      const isInstalled = (this.installedApps || []).some(
+                        (installedApp: { packageName: string }) =>
+                          installedApp && installedApp.packageName === packageName
+                      );
+
+                      // Determine source based on Tool Drawer value
+                      const toolDrawerValue = cells["Tool Drawer"];
+                      const source = toolDrawerValue === "faith.tools" ? "faith.tools" : "Tool Drawer";
+
+                      const category = cells["Play Store Category"] || "";
+
+                      updatedAppsList[packageName] = {
+                        source: source as "faith.tools" | "Tool Drawer",
+                        installed: isInstalled,
+                        name: toolName,
+                        iconUrl: iconUrl || undefined,
+                        category: category || undefined
+                      };
+                    } catch (appError) {
+                      console.error("Error processing app from apps.json:", appError);
+                    }
+                  });
+
+                  // Sort apps by name
+                  this.appsList = Object.fromEntries(
+                    Object.entries(updatedAppsList).sort(([, a], [, b]) => a.name.localeCompare(b.name))
+                  );
+
+                  this.isAvailableAppsLoaded = true;
+                  console.log(
+                    `[DEBUG] Loaded ${Object.keys(this.appsList).length} available apps from apps.json (Tool Drawer + Faith Tools)`
+                  );
+                } catch (error) {
+                  console.error("Error loading available apps:", error);
+                }
+              },
+
+              // Fetch installed apps from Samsung Knox API when App Management tab is clicked
+              // Flow:
+              // 1. User clicks "App Management" tab -> currentTab watcher triggers
+              // 2. loadAvailableApps() is called immediately (fast, no API call)
+              // 3. This function fetches installed apps from Samsung Knox API (async, slow)
+              // 4. Updates installedApps array
+              // 5. Updates appsList to mark which available apps are installed
+              // 6. System apps are automatically classified via systemApps getter (reactive)
+              // 7. Installed apps are automatically filtered via installedFilteredApps getter (reactive)
+              // 8. UI updates automatically via Alpine.js reactivity
+              async getInstalledApps() {
+                if (!this.imei || this.isAppsLoading || this.isAppsLoaded) {
+                  return;
+                }
+
+                try {
+                  this.isAppsLoading = true;
+
+                  const formData = new FormData();
+                  formData.append("imei", String(this.imei));
+
+                  console.log("[TESTING] non-blocking implementation");
+                  const response = await fetch("/_actions/wisephones.getInstalledApps", {
+                    method: "POST",
+                    body: formData
+                  });
+
+                  if (!response.ok) {
+                    throw new Error(`Failed to fetch installed apps: ${response.status} ${response.statusText}`);
+                  }
+
+                  // Check the raw response text first to see what we're actually getting
+                  const responseText = await response.text();
+                  console.log("[DEBUG] Raw response text (first 1000 chars):", responseText.substring(0, 1000));
+                  console.log("[DEBUG] Raw response text length:", responseText.length);
+
+                  // Try to parse the JSON
+                  let result;
+                  try {
+                    result = JSON.parse(responseText);
+                  } catch (parseError) {
+                    console.error("[DEBUG] Failed to parse JSON:", parseError);
+                    console.error("[DEBUG] Response text:", responseText);
+                    throw new Error("Failed to parse response as JSON");
+                  }
+
+                  console.log("[DEBUG] Raw result from fetch:", {
+                    resultType: typeof result,
+                    isArray: Array.isArray(result),
+                    resultLength: Array.isArray(result) ? result.length : null,
+                    resultKeys: result && !Array.isArray(result) ? Object.keys(result) : [],
+                    hasApps: !!result?.apps,
+                    hasData: !!result?.data
+                  });
+
+                  // Log first few elements if result is an array
+                  if (Array.isArray(result) && result.length > 0) {
+                    console.log("[DEBUG] Result is array, checking first 10 elements:");
+                    for (let i = 0; i < Math.min(10, result.length); i++) {
+                      const elem = result[i];
+                      console.log(`[DEBUG] result[${i}]:`, {
+                        value: elem,
+                        type: typeof elem,
+                        isArray: Array.isArray(elem),
+                        length: Array.isArray(elem) ? elem.length : null,
+                        firstItem: Array.isArray(elem) && elem.length > 0 ? elem[0] : null,
+                        firstItemType: Array.isArray(elem) && elem.length > 0 ? typeof elem[0] : null,
+                        hasPackageName:
+                          elem && typeof elem === "object" && !Array.isArray(elem) ? !!elem.packageName : null
+                      });
+                    }
+                  }
+
+                  // Astro actions when called via fetch might use a compressed/referenced format
+                  // Check if result[0] contains metadata with indices
+                  let fetchedApps = [];
+
+                  if (Array.isArray(result) && result.length > 0 && result[0] && typeof result[0] === "object") {
+                    const metadata = result[0];
+                    console.log("[DEBUG] Found metadata object:", metadata);
+
+                    // If metadata.apps is a number, it might be an index to the apps array
+                    if (typeof metadata.apps === "number" && metadata.apps < result.length) {
+                      const appsIndex = metadata.apps;
+                      const appsData = result[appsIndex];
+                      console.log(`[DEBUG] metadata.apps points to result[${appsIndex}]:`, appsData);
+
+                      if (Array.isArray(appsData)) {
+                        // appsData might be an array of indices to app objects
+                        console.log(`[DEBUG] result[${appsIndex}] is an array of ${appsData.length} items`);
+
+                        // Collect app objects using these indices
+                        const rawApps = [];
+                        for (let i = 0; i < appsData.length; i++) {
+                          const appIdx = appsData[i];
+                          if (typeof appIdx === "number" && appIdx < result.length) {
+                            const appObj = result[appIdx];
+                            if (appObj && typeof appObj === "object" && !Array.isArray(appObj)) {
+                              rawApps.push({ index: appIdx, raw: appObj });
+                            }
+                          }
+                        }
+
+                        console.log(`[DEBUG] Collected ${rawApps.length} raw app objects from indices`);
+
+                        // Dereference numeric properties to strings
+                        fetchedApps = rawApps.map(({ raw: app }) => {
+                          const dereferenced: any = {};
+                          for (const [key, value] of Object.entries(app)) {
+                            if (typeof value === "number" && value < result.length) {
+                              const stringValue = result[value];
+                              if (typeof stringValue === "string") {
+                                dereferenced[key] = stringValue;
+                              } else if (stringValue && typeof stringValue === "object") {
+                                // Nested object - recursively dereference
+                                dereferenced[key] = stringValue;
+                              } else {
+                                dereferenced[key] = value;
+                              }
+                            } else {
+                              dereferenced[key] = value;
+                            }
+                          }
+                          return dereferenced;
+                        });
+
+                        console.log(`[DEBUG] Dereferenced ${fetchedApps.length} apps`);
+                        if (fetchedApps.length > 0) {
+                          console.log("[DEBUG] Sample dereferenced app:", {
+                            packageName: fetchedApps[0].packageName,
+                            appName: fetchedApps[0].appName,
+                            keys: Object.keys(fetchedApps[0])
+                          });
+                        }
+                      }
+                    }
+                  }
+
+                  // Fallback: Check if result is an object with apps property
+                  if (
+                    fetchedApps.length === 0 &&
+                    result &&
+                    typeof result === "object" &&
+                    !Array.isArray(result) &&
+                    result.apps &&
+                    Array.isArray(result.apps)
+                  ) {
+                    fetchedApps = result.apps;
+                    console.log("[DEBUG] Found apps in result.apps, count:", fetchedApps.length);
+                  }
+                  // Fallback: Check if result is an object with data.apps
+                  else if (
+                    fetchedApps.length === 0 &&
+                    result &&
+                    typeof result === "object" &&
+                    !Array.isArray(result) &&
+                    result.data?.apps &&
+                    Array.isArray(result.data.apps)
+                  ) {
+                    fetchedApps = result.data.apps;
+                    console.log("[DEBUG] Found apps in result.data.apps, count:", fetchedApps.length);
+                  }
+                  // Fallback: Check if result[2] is the apps array (based on debug output showing array structure)
+                  else if (
+                    fetchedApps.length === 0 &&
+                    Array.isArray(result) &&
+                    result.length > 2 &&
+                    Array.isArray(result[2])
+                  ) {
+                    // Check if result[2] contains app objects or just numbers
+                    const thirdElement = result[2];
+                    if (thirdElement.length > 0 && typeof thirdElement[0] === "object" && thirdElement[0] !== null) {
+                      fetchedApps = thirdElement;
+                      console.log("[DEBUG] Found apps in result[2], count:", fetchedApps.length);
+                    } else {
+                      // result[2] contains numbers (likely indices), so apps might be at those indices
+                      // Or apps might start from result[3] onwards
+                      console.log("[DEBUG] result[2] is array of numbers, checking if they're indices...");
+                      console.log("[DEBUG] Checking result[3], result[4], result[5] for app objects...");
+
+                      // result[2] contains indices to app objects: [3, 35, 47, 61, ...]
+                      // Use these indices to collect all app objects
+                      if (Array.isArray(result[2]) && result[2].length > 0) {
+                        console.log("[DEBUG] Using result[2] indices to collect app objects...");
+                        const appIndices = result[2];
+                        const rawApps = [];
+
+                        for (let i = 0; i < appIndices.length; i++) {
+                          const idx = appIndices[i];
+                          if (typeof idx === "number" && idx < result.length) {
+                            const appObj = result[idx];
+                            if (appObj && typeof appObj === "object" && !Array.isArray(appObj)) {
+                              rawApps.push(appObj);
+                            }
+                          }
+                        }
+
+                        console.log(`[DEBUG] Collected ${rawApps.length} raw app objects`);
+
+                        // Now dereference numeric properties to actual strings
+                        // If packageName is a number, it's an index to the actual string
+                        const dereferencedApps = rawApps.map((app) => {
+                          const dereferenced: any = {};
+                          for (const [key, value] of Object.entries(app)) {
+                            if (typeof value === "number" && value < result.length) {
+                              // This number is likely an index to a string value
+                              const stringValue = result[value];
+                              if (typeof stringValue === "string") {
+                                dereferenced[key] = stringValue;
+                              } else {
+                                // Keep the number if it's not a string index
+                                dereferenced[key] = value;
+                              }
+                            } else {
+                              dereferenced[key] = value;
+                            }
+                          }
+                          return dereferenced;
+                        });
+
+                        fetchedApps = dereferencedApps;
+                        console.log(`[DEBUG] Dereferenced ${fetchedApps.length} apps`);
+                        if (fetchedApps.length > 0) {
+                          console.log("[DEBUG] First dereferenced app:", fetchedApps[0]);
+                        }
+                      } else {
+                        // Fallback: Check if result[3] onwards contain app objects
+                        console.log("[DEBUG] result[2] is not an array of indices, checking result[3] onwards...");
+                        for (let i = 3; i < Math.min(result.length, 20); i++) {
+                          const elem = result[i];
+                          if (
+                            elem &&
+                            typeof elem === "object" &&
+                            !Array.isArray(elem) &&
+                            (elem.packageName || elem.appName)
+                          ) {
+                            // Found an app object! Check if subsequent elements are also apps
+                            console.log(`[DEBUG] Found app object at result[${i}]:`, elem);
+                            // Collect all app objects starting from this index
+                            fetchedApps = [];
+                            for (let j = i; j < result.length; j++) {
+                              const app = result[j];
+                              if (
+                                app &&
+                                typeof app === "object" &&
+                                !Array.isArray(app) &&
+                                (app.packageName || app.appName)
+                              ) {
+                                fetchedApps.push(app);
+                              } else {
+                                // Stop when we hit a non-app element
+                                break;
+                              }
+                            }
+                            console.log(`[DEBUG] Found ${fetchedApps.length} apps starting from result[${i}]`);
+                            break;
+                          }
+                        }
+                      }
+
+                      // If still not found, check if result[2] numbers are indices pointing to apps
+                      if (fetchedApps.length === 0 && Array.isArray(result[2]) && result[2].length > 0) {
+                        console.log("[DEBUG] Checking if result[2] numbers are indices to app objects...");
+                        const indices = result[2];
+                        const potentialApps = [];
+                        for (let i = 0; i < Math.min(indices.length, 10); i++) {
+                          const idx = indices[i];
+                          if (typeof idx === "number" && idx < result.length) {
+                            const elem = result[idx];
+                            if (
+                              elem &&
+                              typeof elem === "object" &&
+                              !Array.isArray(elem) &&
+                              (elem.packageName || elem.appName)
+                            ) {
+                              potentialApps.push(elem);
+                            }
+                          }
+                        }
+                        if (potentialApps.length > 0) {
+                          console.log(`[DEBUG] Found ${potentialApps.length} apps using result[2] indices`);
+                          // Collect all apps using all indices
+                          fetchedApps = [];
+                          for (let i = 0; i < indices.length; i++) {
+                            const idx = indices[i];
+                            if (typeof idx === "number" && idx < result.length) {
+                              const elem = result[idx];
+                              if (
+                                elem &&
+                                typeof elem === "object" &&
+                                !Array.isArray(elem) &&
+                                (elem.packageName || elem.appName)
+                              ) {
+                                fetchedApps.push(elem);
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                  // Check if result is directly the apps array
+                  else if (Array.isArray(result) && result.length > 0) {
+                    const firstItem = result[0];
+                    if (firstItem && typeof firstItem === "object" && (firstItem.packageName || firstItem.appName)) {
+                      fetchedApps = result;
+                      console.log("[DEBUG] Result is directly apps array, count:", fetchedApps.length);
+                    }
+                  }
+                  // Check if result.data is the apps array
+                  else if (result?.data && Array.isArray(result.data)) {
+                    const firstItem = result.data[0];
+                    if (firstItem && typeof firstItem === "object" && (firstItem.packageName || firstItem.appName)) {
+                      fetchedApps = result.data;
+                      console.log("[DEBUG] Found apps in result.data (array), count:", fetchedApps.length);
+                    }
+                  }
+
+                  if (fetchedApps.length === 0) {
+                    console.error("[DEBUG] Could not find apps array in result", {
+                      resultType: typeof result,
+                      isArray: Array.isArray(result),
+                      resultLength: Array.isArray(result) ? result.length : null,
+                      resultKeys:
+                        result && typeof result === "object" && !Array.isArray(result) ? Object.keys(result) : [],
+                      firstFewElements: Array.isArray(result) ? result.slice(0, 5) : null,
+                      resultSample: result ? JSON.stringify(result).substring(0, 2000) : null
+                    });
+                  }
+
+                  // Log first app structure to see what we're getting
+                  if (fetchedApps.length > 0) {
+                    console.log("[DEBUG] First app structure:", {
+                      app: fetchedApps[0],
+                      appType: typeof fetchedApps[0],
+                      hasPackageName: !!fetchedApps[0]?.packageName,
+                      packageNameType: typeof fetchedApps[0]?.packageName,
+                      packageNameValue: fetchedApps[0]?.packageName,
+                      allKeys: fetchedApps[0] ? Object.keys(fetchedApps[0]) : []
+                    });
+                  }
+
+                  // Update installed apps - filter out null/undefined values
+                  this.installedApps = (fetchedApps || []).filter(
+                    (app: any) => app && (app.packageName || app.appName)
+                  );
+
+                  console.log("[DEBUG] After filtering, installedApps count:", this.installedApps.length);
+
+                  // Log first few apps to see structure
+                  this.installedApps.slice(0, 5).forEach((app, index) => {
+                    console.log(`[DEBUG] App ${index} full object:`, app);
+                    console.log(`[DEBUG] App ${index} details:`, {
+                      app: app,
+                      appType: typeof app,
+                      isArray: Array.isArray(app),
+                      isObject: typeof app === "object" && app !== null,
+                      packageName: app?.packageName,
+                      packageNameType: typeof app?.packageName,
+                      packageNameValue: app?.packageName,
+                      appName: app?.appName,
+                      allKeys: app && typeof app === "object" ? Object.keys(app) : "not an object"
+                    });
+                  });
+
+                  // Update appsList to mark which available apps are now installed
+                  // This updates the installed status of apps that were already loaded by loadAvailableApps()
+                  // IMPORTANT: Installed apps should NOT appear in availableApps (they're filtered out by the getter)
+                  if (this.appsList && Object.keys(this.appsList).length > 0) {
+                    console.log("[DEBUG] Updating installed status in appsList...");
+                    const updatedAppsList = { ...this.appsList };
+                    let installedCount = 0;
+                    Object.keys(updatedAppsList).forEach((packageName) => {
+                      // Check if this package is in the installedApps array
+                      const isInstalled = this.installedApps.some(
+                        (installedApp: { packageName: string }) =>
+                          installedApp &&
+                          installedApp.packageName &&
+                          installedApp.packageName.trim() === packageName.trim()
+                      );
+                      updatedAppsList[packageName].installed = isInstalled;
+                      if (isInstalled) {
+                        installedCount++;
+                      }
+                    });
+                    this.appsList = updatedAppsList;
+                    console.log(
+                      `[DEBUG] Updated ${Object.keys(this.appsList).length} apps in appsList: ${installedCount} installed, ${Object.keys(this.appsList).length - installedCount} available`
+                    );
+                  } else {
+                    // If appsList is empty, load available apps first, then update installed status
+                    console.log("[DEBUG] appsList is empty, loading available apps first...");
+                    this.loadAvailableApps();
+                    // Update installed status after loading
+                    const updatedAppsList = { ...this.appsList };
+                    let installedCount = 0;
+                    Object.keys(updatedAppsList).forEach((packageName) => {
+                      const isInstalled = this.installedApps.some(
+                        (installedApp: { packageName: string }) =>
+                          installedApp &&
+                          installedApp.packageName &&
+                          installedApp.packageName.trim() === packageName.trim()
+                      );
+                      updatedAppsList[packageName].installed = isInstalled;
+                      if (isInstalled) {
+                        installedCount++;
+                      }
+                    });
+                    this.appsList = updatedAppsList;
+                    console.log(
+                      `[DEBUG] Loaded and updated ${Object.keys(this.appsList).length} apps: ${installedCount} installed, ${Object.keys(this.appsList).length - installedCount} available`
+                    );
+                  }
+
+                  this.isAppsLoaded = true;
+                } catch (error) {
+                  console.error("Error getting installed apps:", error);
+                  this.showErrorToast("Failed to load installed apps. Please try again.");
+                } finally {
+                  this.isAppsLoading = false;
                 }
               },
 
@@ -1703,7 +2339,6 @@ try {
               },
 
               async init() {
-                console.log("Manage page init() called");
                 // Watch for IMEI to be set before fetching features (same pattern as device/[imei].astro)
                 this.$watch("imei", async (value) => {
                   try {
@@ -1712,6 +2347,21 @@ try {
                     }
                   } catch (error) {
                     console.error("Failed to load features:", error);
+                    this.isLoading = false;
+                  }
+                });
+
+                // Watch for currentTab changes - load apps when App Management tab is clicked
+                this.$watch("currentTab", async (newTab) => {
+                  if (newTab === "app-management") {
+                    // Load available apps immediately (fast, no API call)
+                    if (!this.isAvailableAppsLoaded) {
+                      this.loadAvailableApps();
+                    }
+                    // Fetch installed apps from API (slow, async)
+                    if (!this.isAppsLoaded && !this.isAppsLoading) {
+                      await this.getInstalledApps();
+                    }
                   }
                 });
 
@@ -1723,18 +2373,24 @@ try {
                   }
                 });
 
-                // Watch for installedApps changes and log Google-managed apps
+                // Watch for installedApps changes
                 this.$watch("installedApps", (apps) => {
                   this.logGoogleManagedApps();
                 });
 
-                // If IMEI is already set, fetch features immediately
+                // If IMEI is already set, fetch features immediately (but not apps - wait for tab click)
+                // This is the main blocking operation - keep loading until it completes
                 if (this.imei) {
                   try {
+                    // getFeatures() will set isLoading = false when done
                     await this.getFeatures();
                   } catch (error) {
                     console.error("Failed to load features:", error);
+                    this.isLoading = false;
                   }
+                } else {
+                  // If no IMEI, don't show loading
+                  this.isLoading = false;
                 }
 
                 // Log all Google-managed apps excluding system apps

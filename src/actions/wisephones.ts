@@ -301,6 +301,7 @@ export const wisephones = {
       imei: z.number()
     }),
     handler: async ({ imei }) => {
+      console.log(`[SERVER] getInstalledApps called for IMEI: ${imei}`);
       try {
         // First verify the Wisephone exists
         const wisephone = await db
@@ -310,20 +311,34 @@ export const wisephones = {
           .get();
 
         if (!wisephone) {
+          console.log(`[SERVER] Wisephone not found for IMEI: ${imei}`);
           throw new ActionError({
             code: "NOT_FOUND",
             message: "Wisephone not found"
           });
         }
 
+        console.log(`[SERVER] Wisephone found, fetching installed apps from Samsung Knox API...`);
         // Use the SamsungKnoxService to get installed apps
         const result = await SamsungKnoxService.getInstalledApps(imei.toString());
 
+        const apps = result.resultValue.appList || [];
+        console.log(`[SERVER] Retrieved ${apps.length} installed apps from Samsung Knox API`);
+        // console.log(
+        //   `[SERVER] Sample apps (first 20):`,
+        //   apps.slice(0, 20).map((app: any) => ({
+        //     packageName: app.packageName,
+        //     appName: app.appName,
+        //     isGoogleManaged: app.isGoogleManaged
+        //   }))
+        // );
+
         return {
           success: "Retrieved installed applications",
-          apps: result.resultValue.appList
+          apps: apps
         };
       } catch (error) {
+        console.error(`[SERVER] Error getting installed apps for IMEI ${imei}:`, error);
         throw new ActionError({
           code: "BAD_REQUEST",
           message: `Failed to get installed apps: ${error instanceof Error ? error.message : "Unknown error"}`

@@ -109,12 +109,48 @@ const serializedData = screenTimeData.map((week) => {
 ---
 
 <div
-  class="bg-white rounded-lg border border-gray-200 p-6 w-full"
+  class="bg-[#F7F6F2] rounded-lg p-6 w-full"
   x-data={`{
     currentWeekIndex: 0,
     screenTimeData: ${JSON.stringify(serializedData)},
-    init() {
-      // Component initialized
+    isLoading: ${serializedData.length === 0},
+    imei: ${JSON.stringify(imei)},
+    async init() {
+      // If no data provided, fetch it client-side
+      if (this.screenTimeData.length === 0 && this.imei) {
+        this.isLoading = true;
+        try {
+          const response = await fetch("/api/device-stats/" + this.imei + "?weeks=4");
+          if (response.ok) {
+            const data = await response.json();
+            if (data.weeks && Array.isArray(data.weeks) && data.weeks.length > 0) {
+              // Transform API response to match component format
+              this.screenTimeData = data.weeks.map((week) => ({
+                ...week,
+                weekStartDate: week.weekStartDate ? new Date(week.weekStartDate).toISOString() : null,
+                weekEndDate: week.weekEndDate ? new Date(week.weekEndDate).toISOString() : null,
+                syncedAt: week.syncedAt ? new Date(week.syncedAt).toISOString() : new Date().toISOString(),
+                apps: (week.apps || []).map((app) => ({
+                  ...app,
+                  weekStartDate: app.weekStartDate ? new Date(app.weekStartDate).toISOString() : null
+                })),
+                days: (week.days || []).map((day) => ({
+                  ...day,
+                  date: day.date ? new Date(day.date).toISOString() : null
+                }))
+              }));
+            }
+          } else {
+            console.error("Failed to fetch screen time data:", response.status, response.statusText);
+          }
+        } catch (error) {
+          console.error("Error fetching screen time data:", error);
+        } finally {
+          this.isLoading = false;
+        }
+      } else {
+        this.isLoading = false;
+      }
     },
     formatDuration(ms) {
       if (!ms || ms <= 0) return "0m";
@@ -221,145 +257,156 @@ const serializedData = screenTimeData.map((week) => {
       }
     }
   }`}
+  x-show="!isLoading"
+  x-cloak
 >
-  <h3 class="text-lg font-semibold text-gray-900 mb-4">Screen Time</h3>
-
+  <!-- Content - only visible when not loading and has data -->
   <template x-if="screenTimeData.length > 0">
-    <div class="space-y-6">
-      <!-- Week Navigation -->
-      <div class="flex items-center justify-between mb-4">
-        <h4 class="text-base font-semibold text-gray-900">
-          Week <span x-text="screenTimeData.length - currentWeekIndex"></span> of <span x-text="screenTimeData.length"
-          ></span>
-        </h4>
-        <div class="flex items-center gap-2">
-          <button
-            type="button"
-            class="p-1 hover:bg-gray-100 rounded disabled:opacity-50 disabled:cursor-not-allowed"
-            aria-label="Previous week"
-            @click="prevWeek()"
-            :disabled="currentWeekIndex >= screenTimeData.length - 1"
-          >
-            <svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
-            </svg>
-          </button>
-          <span class="text-sm text-gray-600" x-text="weekLabel"></span>
-          <button
-            type="button"
-            class="p-1 hover:bg-gray-100 rounded disabled:opacity-50 disabled:cursor-not-allowed"
-            aria-label="Next week"
-            @click="nextWeek()"
-            :disabled="currentWeekIndex <= 0"
-          >
-            <svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-            </svg>
-          </button>
+    <div class="bg-white rounded-lg border border-gray-200 p-6 w-full">
+      <h3 class="text-lg font-semibold text-gray-900 mb-4">Screen Time</h3>
+      <div class="space-y-6">
+        <!-- Week Navigation -->
+        <div class="flex items-center justify-between mb-4">
+          <h4 class="text-base font-semibold text-gray-900">
+            Week <span x-text="screenTimeData.length - currentWeekIndex"></span> of <span x-text="screenTimeData.length"
+            ></span>
+          </h4>
+          <div class="flex items-center gap-2">
+            <button
+              type="button"
+              class="p-1 hover:bg-gray-100 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+              aria-label="Previous week"
+              @click="prevWeek()"
+              :disabled="currentWeekIndex >= screenTimeData.length - 1"
+            >
+              <svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+              </svg>
+            </button>
+            <span class="text-sm text-gray-600" x-text="weekLabel"></span>
+            <button
+              type="button"
+              class="p-1 hover:bg-gray-100 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+              aria-label="Next week"
+              @click="nextWeek()"
+              :disabled="currentWeekIndex <= 0"
+            >
+              <svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+              </svg>
+            </button>
+          </div>
         </div>
-      </div>
 
-      <!-- Daily Average Pill -->
-      <div class="mb-4">
-        <span class="inline-block px-4 py-2 bg-[#C07F53] text-white text-sm font-medium rounded-full">
-          Daily Average: <span x-text="dailyAverageFormatted"></span>
-        </span>
-      </div>
+        <!-- Daily Average Pill -->
+        <div class="mb-4">
+          <span class="inline-block px-4 py-2 bg-[#C07F53] text-white text-sm font-medium rounded-full">
+            Daily Average: <span x-text="dailyAverageFormatted"></span>
+          </span>
+        </div>
 
-      <!-- Weekly Bar Chart -->
-      <div class="mb-6">
-        <!-- Chart Container -->
-        <div class="relative h-48 border-l-2 border-b-2 border-gray-300" x-show="currentWeek">
-          <!-- Y-axis labels (hours) - Inside the chart -->
-          <div class="absolute left-2 top-0 bottom-0 flex flex-col justify-between text-xs text-gray-500">
-            <template x-if="maxTime > 0">
-              <>
-                <span x-text="formatHours(maxTime)"></span>
-                <span x-text="formatHours(maxTime / 2)"></span>
-                <span>0hr</span>
-              </>
-            </template>
-          </div>
+        <!-- Weekly Bar Chart -->
+        <div class="mb-6">
+          <!-- Chart Container -->
+          <div class="relative h-48 border-l-2 border-b-2 border-gray-300" x-show="currentWeek">
+            <!-- Y-axis labels (hours) - Inside the chart -->
+            <div class="absolute left-2 top-0 bottom-0 flex flex-col justify-between text-xs text-gray-500">
+              <template x-if="maxTime > 0">
+                <>
+                  <span x-text="formatHours(maxTime)"></span>
+                  <span x-text="formatHours(maxTime / 2)"></span>
+                  <span>0hr</span>
+                </>
+              </template>
+            </div>
 
-          <!-- Horizontal grid lines (dotted) -->
-          <div
-            class="absolute inset-0 flex flex-col justify-between pointer-events-none z-0"
-            style="left: 2rem; right: 0;"
-          >
-            <template x-if="maxTime > 0">
-              <>
-                <!-- Top line (2hr) -->
-                <div class="border-t border-dashed border-gray-400 w-full opacity-60"></div>
-                <!-- Middle line (1hr) -->
-                <div class="border-t border-dashed border-gray-400 w-full opacity-60"></div>
-                <!-- Bottom line (0hr) - at the bottom border -->
-                <div class="border-t border-dashed border-gray-400 w-full opacity-60"></div>
-              </>
-            </template>
-          </div>
+            <!-- Horizontal grid lines (dotted) -->
+            <div
+              class="absolute inset-0 flex flex-col justify-between pointer-events-none z-0"
+              style="left: 2rem; right: 0;"
+            >
+              <template x-if="maxTime > 0">
+                <>
+                  <!-- Top line (2hr) -->
+                  <div class="border-t border-dashed border-gray-400 w-full opacity-60"></div>
+                  <!-- Middle line (1hr) -->
+                  <div class="border-t border-dashed border-gray-400 w-full opacity-60"></div>
+                  <!-- Bottom line (0hr) - at the bottom border -->
+                  <div class="border-t border-dashed border-gray-400 w-full opacity-60"></div>
+                </>
+              </template>
+            </div>
 
-          <!-- Bars -->
-          <div
-            class="absolute inset-0 flex items-end justify-around gap-1 pl-8 pr-2 pb-2 z-10"
-            x-show="dailyTimes && dailyTimes.length > 0 && maxTime > 0"
-          >
-            <template x-for="(time, index) in dailyTimes" :key="index">
-              <div class="flex flex-col items-center flex-1 group relative" style="min-width: 0; height: 100%;">
-                <!-- Tooltip on hover -->
-                <div
-                  class="absolute bottom-full mb-2 hidden group-hover:block bg-gray-900 text-white text-xs rounded px-2 py-1 whitespace-nowrap z-10 pointer-events-none"
-                >
-                  <span x-text="formatDuration(time)"></span>
-                </div>
-                <!-- Bar container - grows to fill space, aligns bar to bottom -->
-                <div class="flex-1 w-full flex items-end" style="height: 100%;">
+            <!-- Bars -->
+            <div
+              class="absolute inset-0 flex items-end justify-around gap-1 pl-8 pr-2 pb-2 z-10"
+              x-show="dailyTimes && dailyTimes.length > 0 && maxTime > 0"
+            >
+              <template x-for="(time, index) in dailyTimes" :key="index">
+                <div class="flex flex-col items-center flex-1 group relative" style="min-width: 0; height: 100%;">
+                  <!-- Tooltip on hover -->
                   <div
-                    class="w-full bg-teal-500 rounded-t transition-all hover:bg-teal-600 cursor-pointer"
-                    :style="`height: ${maxTime > 0 ? (time / maxTime) * 100 : 0}%; min-height: ${time > 0 ? '2px' : '0'};`"
-                    :title="formatDuration(time)"
+                    class="absolute bottom-full mb-2 hidden group-hover:block bg-gray-900 text-white text-xs rounded px-2 py-1 whitespace-nowrap z-10 pointer-events-none"
                   >
+                    <span x-text="formatDuration(time)"></span>
                   </div>
+                  <!-- Bar container - grows to fill space, aligns bar to bottom -->
+                  <div class="flex-1 w-full flex items-end" style="height: 100%;">
+                    <div
+                      class="w-full bg-teal-500 rounded-t transition-all hover:bg-teal-600 cursor-pointer"
+                      :style="`height: ${maxTime > 0 ? (time / maxTime) * 100 : 0}%; min-height: ${time > 0 ? '2px' : '0'};`"
+                      :title="formatDuration(time)"
+                    >
+                    </div>
+                  </div>
+                  <!-- Day label -->
+                  <span class="text-xs text-gray-600 mt-1" x-text="getDayLabel(currentWeek.weekStartDate, index)"
+                  ></span>
+                  <!-- Time label below bar -->
+                  <span class="text-xs text-gray-500 mt-0.5" x-text="formatDuration(time)"></span>
                 </div>
-                <!-- Day label -->
-                <span class="text-xs text-gray-600 mt-1" x-text="getDayLabel(currentWeek.weekStartDate, index)"></span>
-                <!-- Time label below bar -->
-                <span class="text-xs text-gray-500 mt-0.5" x-text="formatDuration(time)"></span>
-              </div>
-            </template>
+              </template>
+            </div>
           </div>
         </div>
-      </div>
 
-      <!-- App Usage List (Weekly Summary) -->
-      <div>
-        <h4 class="text-sm font-semibold text-gray-900 mb-3">Weekly App Usage Summary</h4>
-        <div class="space-y-2 max-h-64 overflow-y-auto">
-          <template x-if="currentWeek && currentWeek.apps && currentWeek.apps.length > 0">
-            <template x-for="app in currentWeek.apps" :key="app.id">
-              <div class="flex items-center gap-3">
-                <div class="w-8 h-8 bg-gray-300 rounded flex-shrink-0"></div>
-                <div class="flex-1 min-w-0">
-                  <p class="text-sm font-medium text-gray-900 truncate" x-text="app.appName"></p>
-                  <div class="mt-1 h-2 bg-gray-200 rounded-full overflow-hidden">
-                    <div class="h-full bg-gray-400 rounded-full" :style="`width: ${getAppBarWidth(app)}%`"></div>
+        <!-- App Usage List (Weekly Summary) -->
+        <div>
+          <h4 class="text-sm font-semibold text-gray-900 mb-3">Weekly App Usage Summary</h4>
+          <div class="space-y-2 max-h-64 overflow-y-auto">
+            <template x-if="currentWeek && currentWeek.apps && currentWeek.apps.length > 0">
+              <template
+                x-for="(app, index) in currentWeek.apps"
+                :key="`app-${index}-${app.packageName || app.appName || index}`"
+              >
+                <div class="flex items-center gap-3">
+                  <div class="w-8 h-8 bg-gray-300 rounded flex-shrink-0"></div>
+                  <div class="flex-1 min-w-0">
+                    <p class="text-sm font-medium text-gray-900 truncate" x-text="app.appName"></p>
+                    <div class="mt-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+                      <div class="h-full bg-gray-400 rounded-full" :style="`width: ${getAppBarWidth(app)}%`"></div>
+                    </div>
                   </div>
+                  <span class="text-sm text-gray-600 whitespace-nowrap" x-text="formatDuration(app.totalTimeMs)"></span>
                 </div>
-                <span class="text-sm text-gray-600 whitespace-nowrap" x-text="formatDuration(app.totalTimeMs)"></span>
-              </div>
+              </template>
             </template>
-          </template>
-          <template x-if="!currentWeek || !currentWeek.apps || currentWeek.apps.length === 0">
-            <p class="text-sm text-gray-500">No app usage data available</p>
-          </template>
+            <template x-if="!currentWeek || !currentWeek.apps || currentWeek.apps.length === 0">
+              <p class="text-sm text-gray-500">No app usage data available</p>
+            </template>
+          </div>
         </div>
       </div>
     </div>
   </template>
 
+  <!-- Empty State - only visible when not loading and no data -->
   <template x-if="screenTimeData.length === 0">
-    <div class="text-center py-8">
-      <p class="text-sm text-gray-500">No screen time data available</p>
-      <p class="text-xs text-gray-400 mt-1">Device has not synced yet</p>
+    <div class="bg-white rounded-lg border border-gray-200 p-6 w-full">
+      <h3 class="text-lg font-semibold text-gray-900 mb-4">Screen Time</h3>
+      <div class="text-center py-16 min-h-[400px] flex flex-col items-center justify-center">
+        <p class="text-sm text-gray-500">Screen time data is not available yet</p>
+      </div>
     </div>
   </template>
 </div>

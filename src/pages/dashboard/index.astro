@@ -314,7 +314,13 @@ const actionResult = Astro.getActionResult(actions.wisephones.createWisephone);
   }
 </style>
 
-<div class="dashboard-container flex h-screen w-full min-w-[360px] bg-[#f7f6f2]" x-data="dashboard">
+<div class="dashboard-container flex h-screen w-full min-w-[360px] bg-[#f7f6f2] relative" x-data="dashboard">
+  <progress
+    x-show="isLoading"
+    x-cloak
+    x-transition
+    class="absolute top-0 left-0 right-0 w-full progress"
+    style="--progress-color: var(--evergreen);"></progress>
 
   <!-- Mobile Header -->
   <div class="md:hidden fixed top-0 left-0 right-0 bg-[#f7f6f2] z-30 flex items-center justify-between p-4 shadow-sm">
@@ -397,6 +403,7 @@ const actionResult = Astro.getActionResult(actions.wisephones.createWisephone);
                 </div>
                 <a
                   href={`/manage/${wisephone.imei.toString().padEnd(15, "0")}`}
+                  @click="isLoading = true"
                   class="border border-gray-300 bg-white text-gray-900 text-sm px-2.5 py-1 rounded-md hover:bg-gray-50 whitespace-nowrap flex-shrink-0"
                 >
                   Manage Device

@@ -8,6 +8,8 @@ export interface AppEntry {
   installed: boolean;
   name: string;
   source: AppSource;
+  iconUrl?: string;
+  category?: string;
 }
 
 export type AppsList = Record<string, Omit<AppEntry, "packageName">>;
