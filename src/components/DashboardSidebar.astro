@@ -85,10 +85,10 @@ const { activeLink = "devices" } = Astro.props;
           <span class="ml-4">Devices</span>
         </a>
 
-        <!-- Request an app -->
-        <a
+        <!-- Request an app - Hidden -->
+        <!-- <a
           href="https://getwisephone.com/request-app"
-          target="_blank" 
+          target="_blank"
           rel="noopener noreferrer"
           @click="mobileMenuOpen = false"
           class={`flex items-center px-4 py-3 text-sm rounded-lg ${activeLink === "request-app" ? "text-gray-800" : "text-gray-600 hover:bg-gray-50"}`}
@@ -96,7 +96,7 @@ const { activeLink = "devices" } = Astro.props;
         >
           <img src="/assets/portal-icons/app-request.svg" alt="" class="w-5 h-5" />
           <span class="ml-4">Request an App</span>
-        </a>
+        </a> -->
 
         <!-- Desktop: Show only bottom section -->
         <!-- Mobile: Show all options in one list -->
