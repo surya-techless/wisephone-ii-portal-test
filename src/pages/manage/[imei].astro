@@ -284,37 +284,21 @@ try {
               .where(eq(DeviceDailyAppUsage.dailyScreenTimeId, dailyRecord.id))
               .orderBy(desc(DeviceDailyAppUsage.totalTimeMs));
 
-            // TESTING: Add 10 minutes (600,000 ms) to each day's screen time
-            const testScreenTimeMs = (dailyRecord.totalScreenTimeMs ?? 0) + 600000;
-
             return {
               id: dailyRecord.id,
               date: dailyRecord.date,
-              totalScreenTimeMs: testScreenTimeMs,
-              apps: dailyApps.map((app) => ({
-                id: app.id,
-                packageName: app.packageName,
-                appName: app.appName,
-                totalTimeMs: app.totalTimeMs ?? 0
-              }))
+              totalScreenTimeMs: dailyRecord.totalScreenTimeMs ?? 0,
+              apps: dailyApps
+                .filter((app) => (app.totalTimeMs ?? 0) > 0)
+                .map((app) => ({
+                  id: app.id,
+                  packageName: app.packageName,
+                  appName: app.appName,
+                  totalTimeMs: app.totalTimeMs ?? 0
+                }))
             };
           })
         );
-
-        // If no daily records exist, create test data for all 7 days of the week
-        if (daysWithApps.length === 0) {
-          const weekStart = new Date(record.weekStartDate);
-          for (let i = 0; i < 7; i++) {
-            const dayDate = new Date(weekStart);
-            dayDate.setDate(weekStart.getDate() + i);
-            daysWithApps.push({
-              id: 0, // Use 0 as placeholder for test data
-              date: dayDate,
-              totalScreenTimeMs: 600000, // 10 minutes for testing
-              apps: []
-            });
-          }
-        }
 
         const weekData = {
           id: record.id ?? null,
@@ -326,16 +310,18 @@ try {
           syncedAt: record.syncedAt ?? new Date(),
           deviceName: record.deviceName ?? null,
           deviceManufacturer: record.deviceManufacturer ?? null,
-          apps: apps.map((app) => ({
-            id: app.id ?? null,
-            screenTimeId: app.screenTimeId ?? record.id ?? null,
-            imei: app.imei ?? imei ?? "",
-            packageName: app.packageName ?? "",
-            appName: app.appName ?? "",
-            totalTimeMs: app.totalTimeMs ?? 0,
-            dailyAverageMs: app.dailyAverageMs ?? 0,
-            weekStartDate: app.weekStartDate ?? record.weekStartDate ?? null
-          })),
+          apps: apps
+            .filter((app) => (app.totalTimeMs ?? 0) > 0)
+            .map((app) => ({
+              id: app.id ?? null,
+              screenTimeId: app.screenTimeId ?? record.id ?? null,
+              imei: app.imei ?? imei ?? "",
+              packageName: app.packageName ?? "",
+              appName: app.appName ?? "",
+              totalTimeMs: app.totalTimeMs ?? 0,
+              dailyAverageMs: app.dailyAverageMs ?? 0,
+              weekStartDate: app.weekStartDate ?? record.weekStartDate ?? null
+            })),
           days: daysWithApps // Add daily breakdown
         };
 

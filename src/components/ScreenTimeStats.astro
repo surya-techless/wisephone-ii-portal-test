@@ -374,9 +374,11 @@ const serializedData = screenTimeData.map((week) => {
         <div>
           <h4 class="text-sm font-semibold text-gray-900 mb-3">Weekly App Usage Summary</h4>
           <div class="space-y-2 max-h-64 overflow-y-auto">
-            <template x-if="currentWeek && currentWeek.apps && currentWeek.apps.length > 0">
+            <template
+              x-if="currentWeek && currentWeek.apps && currentWeek.apps.filter(app => (app.totalTimeMs || 0) > 0).length > 0"
+            >
               <template
-                x-for="(app, index) in currentWeek.apps"
+                x-for="(app, index) in currentWeek.apps.filter(app => (app.totalTimeMs || 0) > 0)"
                 :key="`app-${index}-${app.packageName || app.appName || index}`"
               >
                 <div class="flex items-center gap-3">
@@ -391,7 +393,9 @@ const serializedData = screenTimeData.map((week) => {
                 </div>
               </template>
             </template>
-            <template x-if="!currentWeek || !currentWeek.apps || currentWeek.apps.length === 0">
+            <template
+              x-if="!currentWeek || !currentWeek.apps || currentWeek.apps.filter(app => (app.totalTimeMs || 0) > 0).length === 0"
+            >
               <p class="text-sm text-gray-500">No app usage data available</p>
             </template>
           </div>
