@@ -123,14 +123,16 @@ export const GET: APIRoute = async ({ params, locals, request }) => {
           totalScreenTimeFormatted: formatDuration(record.totalScreenTimeMs),
           dailyAverageFormatted: formatDuration(record.dailyAverageMs),
           syncedAt: record.syncedAt,
-          apps: apps.map((app) => ({
-            packageName: app.packageName,
-            appName: app.appName,
-            totalTimeMs: app.totalTimeMs,
-            dailyAverageMs: app.dailyAverageMs,
-            totalTimeFormatted: formatDuration(app.totalTimeMs),
-            dailyAverageFormatted: formatDuration(app.dailyAverageMs)
-          }))
+          apps: apps
+            .filter((app) => (app.totalTimeMs ?? 0) > 0)
+            .map((app) => ({
+              packageName: app.packageName,
+              appName: app.appName,
+              totalTimeMs: app.totalTimeMs,
+              dailyAverageMs: app.dailyAverageMs,
+              totalTimeFormatted: formatDuration(app.totalTimeMs),
+              dailyAverageFormatted: formatDuration(app.dailyAverageMs)
+            }))
         };
       })
     );
@@ -195,4 +197,3 @@ function getWeekLabel(weekStart: Date): string {
   if (weeksDiff === 1) return "Last Week";
   return `${weeksDiff + 1} Weeks Ago`;
 }
-

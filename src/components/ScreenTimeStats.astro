@@ -76,20 +76,22 @@ const serializedData = screenTimeData.map((week) => {
     weekStartDate,
     weekEndDate,
     syncedAt,
-    apps: (week.apps || []).map((app) => {
-      let appWeekStartDate = app.weekStartDate;
-      if (appWeekStartDate instanceof Date) {
-        appWeekStartDate = appWeekStartDate.toISOString();
-      } else if (typeof appWeekStartDate === "string") {
-        // Already a string
-      } else if (appWeekStartDate) {
-        appWeekStartDate = new Date(appWeekStartDate).toISOString();
-      }
-      return {
-        ...app,
-        weekStartDate: appWeekStartDate
-      };
-    }),
+    apps: (week.apps || [])
+      .filter((app) => (app.totalTimeMs || 0) > 0)
+      .map((app) => {
+        let appWeekStartDate = app.weekStartDate;
+        if (appWeekStartDate instanceof Date) {
+          appWeekStartDate = appWeekStartDate.toISOString();
+        } else if (typeof appWeekStartDate === "string") {
+          // Already a string
+        } else if (appWeekStartDate) {
+          appWeekStartDate = new Date(appWeekStartDate).toISOString();
+        }
+        return {
+          ...app,
+          weekStartDate: appWeekStartDate
+        };
+      }),
     days: (week.days || []).map((day) => {
       let dayDate = day.date;
       if (dayDate instanceof Date) {
@@ -101,7 +103,8 @@ const serializedData = screenTimeData.map((week) => {
       }
       return {
         ...day,
-        date: dayDate
+        date: dayDate,
+        apps: (day.apps || []).filter((app) => (app.totalTimeMs || 0) > 0)
       };
     })
   };
@@ -130,13 +133,16 @@ const serializedData = screenTimeData.map((week) => {
                 weekStartDate: week.weekStartDate ? new Date(week.weekStartDate).toISOString() : null,
                 weekEndDate: week.weekEndDate ? new Date(week.weekEndDate).toISOString() : null,
                 syncedAt: week.syncedAt ? new Date(week.syncedAt).toISOString() : new Date().toISOString(),
-                apps: (week.apps || []).map((app) => ({
-                  ...app,
-                  weekStartDate: app.weekStartDate ? new Date(app.weekStartDate).toISOString() : null
-                })),
+                apps: (week.apps || [])
+                  .filter((app) => (app.totalTimeMs || 0) > 0)
+                  .map((app) => ({
+                    ...app,
+                    weekStartDate: app.weekStartDate ? new Date(app.weekStartDate).toISOString() : null
+                  })),
                 days: (week.days || []).map((day) => ({
                   ...day,
-                  date: day.date ? new Date(day.date).toISOString() : null
+                  date: day.date ? new Date(day.date).toISOString() : null,
+                  apps: (day.apps || []).filter((app) => (app.totalTimeMs || 0) > 0)
                 }))
               }));
             }
