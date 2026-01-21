@@ -51,6 +51,8 @@ interface ImportMetaEnv {
   readonly STRIPE_SECRET_KEY: string;
   /** https://developers.gigs.com/ */
   readonly GIGS_API_KEY: string;
+  /** Server-side API key for device sync authentication */
+  readonly DEVICE_SYNC_API_KEY: string;
 }
 
 interface ImportMeta {

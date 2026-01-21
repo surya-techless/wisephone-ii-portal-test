@@ -277,7 +277,7 @@ export const POST: APIRoute = async ({ request }) => {
 
     if (!expectedKey) {
       console.error("DEVICE_SYNC_API_KEY not configured");
-      return new Response(JSON.stringify({ error: "Server misconfigured" }), {
+      return new Response(JSON.stringify({ error: "Server misconfigured without Api key" }), {
         status: 500,
         headers: {
           "Content-Type": "application/json",
