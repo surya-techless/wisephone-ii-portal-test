@@ -99,6 +99,10 @@ export const DEFAULT_SYSTEM_APPS: SystemApp[] = [
   {
     name: "2FA Authenticator (2FAS)",
     packageName: "com.twofasapp"
+  },
+  {
+    name: "Android Device Policy",
+    packageName: "com.google.android.apps.work.clouddpc"
   }
 ];
 
