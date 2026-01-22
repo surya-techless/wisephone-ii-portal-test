@@ -1,6 +1,6 @@
 ---
 import { actions } from "astro:actions";
-import { db, eq, Wisephone } from "astro:db";
+import { db, eq, Wisephone, BypassTechlessSubscription } from "astro:db";
 import Icon from "astro-iconify";
 import phoneImg from "@/assets/phone.png";
 import Header from "@/components/Header.astro";
@@ -11,6 +11,7 @@ import WisephoneLogo from "@/components/WisephoneLogo.astro";
 import DashboardSidebar from "@/components/DashboardSidebar.astro";
 import IsAdmin from "@/components/server-islands/IsAdmin.astro";
 import { SignOutButton } from "@clerk/astro/components";
+import { validateIsSubscribed } from "@/libs/stripe";
 
 if (!Astro.locals.auth().userId) {
   return Astro.redirect("/");
@@ -26,6 +27,41 @@ const wisephones = await db.select().from(Wisephone).where(eq(Wisephone.userId, 
 console.log("Index.astro wisephones list",wisephones);
 const derivedHasNoWisephone = wisephones.length === 0;
 console.log(derivedHasNoWisephone);
+
+// Check subscription status for each device
+const wisephonesWithSubscription = await Promise.all(
+  wisephones.map(async (wisephone) => {
+    // Check for bypass subscription first
+    const bypassTechlessSubscription = await db
+      .select()
+      .from(BypassTechlessSubscription)
+      .where(eq(BypassTechlessSubscription.imei, Number(wisephone.imei)))
+      .limit(1);
+
+    let isSubscribed = bypassTechlessSubscription.length > 0;
+
+    // If not bypassed, check actual subscription
+    if (!isSubscribed && wisephone.phoneNumber) {
+      try {
+        isSubscribed = await validateIsSubscribed({
+          imei: wisephone.imei.toString(),
+          phoneNumber: `${wisephone.phoneNumber.replace(/[^0-9+]/g, "") || ""}`
+        });
+        console.log(`Device ${wisephone.imei} subscription status: ${isSubscribed}`);
+      } catch (error) {
+        console.error(`Error checking subscription for device ${wisephone.imei}:`, error);
+        isSubscribed = false;
+      }
+    } else if (!wisephone.phoneNumber) {
+      console.log(`Device ${wisephone.imei} has no phone number, defaulting to not subscribed`);
+    }
+
+    return {
+      ...wisephone,
+      isSubscribed
+    };
+  })
+);
 
 const actionResult = Astro.getActionResult(actions.wisephones.createWisephone);
 ---
@@ -314,7 +350,7 @@ const actionResult = Astro.getActionResult(actions.wisephones.createWisephone);
   }
 </style>
 
-<div class="dashboard-container flex h-screen w-full min-w-[360px] bg-[#f7f6f2] relative" x-data="dashboard">
+<div class="dashboard-container flex h-screen w-full min-w-[360px] bg-[#f7f6f2] relative" x-data="dashboard" @activate-modal.window="openActivateModal($event.detail?.imei || $event.detail)">
   <progress
     x-show="isLoading"
     x-cloak
@@ -383,31 +419,45 @@ const actionResult = Astro.getActionResult(actions.wisephones.createWisephone);
 
         <!-- Device Cards Grid -->
         <div class="mt-6 flex flex-wrap gap-6">
-          {wisephones.map((wisephone) => {
+          {wisephonesWithSubscription.map((wisephone) => {
             const initials = (wisephone.nickname || 'Device')
               .split(' ')
               .map(word => word[0])
               .join('')
               .toUpperCase()
               .slice(0, 2);
+            const imeiString = wisephone.imei.toString().padEnd(15, "0");
+            const deviceData = { imei: imeiString, isSubscribed: Boolean(wisephone.isSubscribed) };
+            console.log(`Device card data for ${imeiString}:`, deviceData, `isSubscribed type: ${typeof wisephone.isSubscribed}, value: ${wisephone.isSubscribed}`);
 
             return (
-              <div class="border border-gray-300 rounded-md bg-white p-3 w-[400px] flex items-start gap-4">
+              <div class="border border-gray-300 rounded-md bg-white p-3 w-full md:w-[400px] flex items-start gap-4" x-data={`deviceCard(${JSON.stringify(deviceData)})`}>
                 <div class="w-10 h-10 bg-[#4b918e] rounded-full flex items-center justify-center text-white text-sm font-semibold flex-shrink-0">
                   {initials}
                 </div>
                 <div class="flex-1 min-w-0 flex flex-col gap-0.5">
                   <p class="font-semibold text-base text-gray-900 truncate">{wisephone.nickname || 'Device'}</p>
                   <p class="text-gray-500 text-sm">{wisephone.phoneNumber || '(111) 111-1111'}</p>
-                  <p class="text-gray-500 text-sm">IMEI: {wisephone.imei.toString().padEnd(15, "0")}</p>
+                  <p class="text-gray-500 text-sm">IMEI: {imeiString}</p>
                 </div>
-                <a
-                  href={`/manage/${wisephone.imei.toString().padEnd(15, "0")}`}
-                  @click="isLoading = true"
-                  class="border border-gray-300 bg-white text-gray-900 text-sm px-2.5 py-1 rounded-md hover:bg-gray-50 whitespace-nowrap flex-shrink-0"
-                >
-                  Manage Device
-                </a>
+                <template x-if="isSubscribed">
+                  <a
+                    href={`/manage/${imeiString}`}
+                    @click="$root.isLoading = true"
+                    class="border border-gray-300 bg-white text-gray-900 text-sm px-2.5 py-1 rounded-md hover:bg-gray-50 whitespace-nowrap flex-shrink-0"
+                  >
+                    Manage Device
+                  </a>
+                </template>
+                <template x-if="!isSubscribed">
+                  <button
+                    type="button"
+                    @click="openActivateModal(); console.log('Button clicked, isSubscribed:', isSubscribed)"
+                    class="border border-gray-300 bg-white text-gray-900 text-sm px-2.5 py-1 rounded-md hover:bg-gray-50 whitespace-nowrap flex-shrink-0"
+                  >
+                    Activate Plan
+                  </button>
+                </template>
               </div>
             );
           })}
@@ -588,6 +638,120 @@ const actionResult = Astro.getActionResult(actions.wisephones.createWisephone);
 
   </Fragment>
 
+  <!-- Activate Plan Modal -->
+  <div
+    x-show="showActivateModal"
+    x-cloak
+    x-transition.opacity
+    class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+    @click.self="closeActivateModal()"
+  >
+    <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+      <div class="sticky top-0 bg-white border-b border-gray-200 p-4 md:p-6 flex justify-between items-center">
+        <h2 class="text-xl md:text-2xl font-semibold text-gray-800">Activate Plan</h2>
+        <button @click="closeActivateModal()" class="text-gray-400 hover:text-gray-600">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M18 6 6 18"></path>
+            <path d="m6 6 12 12"></path>
+          </svg>
+        </button>
+      </div>
+
+      <div class="p-4 md:p-6">
+        <p class="text-sm md:text-base text-gray-600 mb-6">
+          Please activate a subscription for your Wisephone. Select from either the Wisephone Carrier Plan or the WiseOS subscription (if you would like to bring your own carrier plan).
+        </p>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+          <!-- Wisephone Carrier Plan -->
+          <div class="border border-gray-300 rounded-lg p-4 md:p-6 flex flex-col">
+            <h3 class="text-base md:text-lg font-semibold text-gray-900 mb-1">
+              Wisephone Carrier Plan
+              <span class="font-normal text-gray-500 text-sm">(Includes WiseOS Subscription)</span>
+            </h3>
+            <p class="text-sm md:text-base text-gray-700 mb-4 leading-snug flex-grow">
+              Get all-in-one connectivity with our Wisephone Carrier Plan, which bundles your data, talk, and text with your WiseOS Subscription for a complete experience.
+              <a
+                class="text-blue-600 underline text-xs md:text-sm"
+                href="https://wisephone.com/pages/plans"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Learn more
+              </a>
+            </p>
+            <a
+              href="https://plans.techless.com/"
+              target="_blank"
+              rel="noopener noreferrer"
+              @click="handleActivatePlan('carrier')"
+              class="flex items-center justify-center gap-1 w-full px-4 py-2 bg-[#C07F53] text-white rounded-md text-sm font-medium hover:bg-[#A06F43] transition-colors"
+            >
+              Activate Carrier Plan
+              <Icon name="lucide:external-link" class="w-4 h-4" />
+            </a>
+          </div>
+
+          <!-- Bring Your Own Carrier -->
+          <div class="border border-gray-300 rounded-lg p-4 md:p-6 flex flex-col">
+            <h3 class="text-base md:text-lg font-semibold text-gray-900 mb-1">
+              Bring Your Own Carrier
+              <span class="font-normal text-gray-500 text-sm">(WiseOS Subscription Required)</span>
+            </h3>
+            <p class="text-sm md:text-base text-gray-700 mb-4 leading-snug flex-grow">
+              Continue using your existing carrier and unlock your Wisephone's features by activating your WiseOS Subscription.
+              <a
+                class="text-blue-600 underline text-xs md:text-sm"
+                href="https://wisephone.com/pages/plans"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Learn more
+              </a>
+            </p>
+            <a
+              href="https://getwisephone.com/my-subscription"
+              target="_blank"
+              rel="noopener noreferrer"
+              @click="handleActivatePlan('wiseos')"
+              class="flex items-center justify-center gap-1 w-full px-4 py-2 bg-[#C07F53] text-white rounded-md text-sm font-medium hover:bg-[#A06F43] transition-colors"
+            >
+              Activate WiseOS Subscription
+              <Icon name="lucide:external-link" class="w-4 h-4" />
+            </a>
+          </div>
+        </div>
+
+        <!-- Remove Device Button -->
+        <div class="border-t border-gray-200 p-4 md:p-6">
+          <form
+            method="POST"
+            action={actions.wisephones.deleteWisephone}
+            @submit.prevent="handleRemoveDevice($event)"
+          >
+            <input type="hidden" name="imei" x-bind:value="activeDeviceImei ? parseInt(activeDeviceImei.replace(/[^0-9]/g, '')) : ''" />
+            <button
+              type="submit"
+              class="w-full px-4 py-2 text-sm font-medium text-red-600 bg-white border border-red-300 rounded-md hover:bg-red-50 transition-colors"
+            >
+              Remove Device
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </main>
 
 </div>
@@ -602,6 +766,8 @@ const actionResult = Astro.getActionResult(actions.wisephones.createWisephone);
       isLoading: false,
       mobileMenuOpen: false,
       showAccountMenu: false,
+      showActivateModal: false,
+      activeDeviceImei: null as string | null,
       imei1: "",
       imei2: "",
       phoneNumber: "",
@@ -637,6 +803,75 @@ const actionResult = Astro.getActionResult(actions.wisephones.createWisephone);
         this.hasBlurredImei = false;
         this.hasBlurredImeiVerification = false;
         this.isImeiValid = true;
+      },
+      openActivateModal(imei: string | { imei?: string }) {
+        // Handle both direct call and event detail
+        const imeiValue = typeof imei === 'string' ? imei : (imei?.imei || '');
+        console.log("Opening activate modal for IMEI:", imeiValue);
+        this.activeDeviceImei = imeiValue;
+        this.showActivateModal = true;
+      },
+      closeActivateModal() {
+        this.showActivateModal = false;
+        this.activeDeviceImei = null;
+      },
+      handleActivatePlan(type: string) {
+        // Close modal immediately
+        this.closeActivateModal();
+        // The link will open in a new tab, user will be redirected there
+        // After they complete activation, they can refresh the page to see updated status
+      },
+      handleRemoveDevice(event: Event) {
+        const form = event.target as HTMLFormElement;
+        if (!this.activeDeviceImei) {
+          console.error("No device IMEI selected");
+          return;
+        }
+        if (confirm('Are you sure you want to remove this device from your account? You can re-add it later by selecting "Add Device" on the Devices page.')) {
+          // Convert IMEI string to number for the form
+          const imeiInput = form.querySelector('input[name="imei"]') as HTMLInputElement;
+          if (imeiInput) {
+            const imeiNumber = parseInt(this.activeDeviceImei.replace(/[^0-9]/g, ''), 10);
+            imeiInput.value = imeiNumber.toString();
+          }
+          form.submit();
+        }
+      }
+    }));
+
+    Alpine.data("deviceCard", (deviceData: { imei: string; isSubscribed: boolean }) => ({
+      imei: deviceData.imei,
+      isSubscribed: deviceData.isSubscribed,
+      init() {
+        console.log("Device card initialized:", { imei: this.imei, isSubscribed: this.isSubscribed });
+      },
+      openActivateModal() {
+        console.log("Device card openActivateModal called for IMEI:", this.imei, "isSubscribed:", this.isSubscribed);
+        // Try to find the dashboard component
+        const dashboardEl = document.querySelector('[x-data="dashboard"]');
+        if (dashboardEl) {
+          // Use Alpine's $data to get the dashboard component data
+          const dashboardData = (window as any).Alpine?.$data?.(dashboardEl);
+          if (dashboardData && typeof dashboardData.openActivateModal === 'function') {
+            console.log("Found dashboard, calling openActivateModal");
+            dashboardData.openActivateModal(this.imei);
+            return;
+          }
+        }
+        // Fallback: dispatch event
+        console.log("Dispatching activate-modal event");
+        (this as any).$dispatch('activate-modal', { imei: this.imei });
+      },
+      async checkSubscriptionStatus() {
+        // This can be called after user returns from activation
+        // For now, we'll rely on page refresh, but this allows for future dynamic updates
+        try {
+          // Could call an API endpoint here to check subscription status
+          // For now, we'll just refresh the page
+          window.location.reload();
+        } catch (error) {
+          console.error("Error checking subscription:", error);
+        }
       }
     }));
   });
