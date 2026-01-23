@@ -511,7 +511,7 @@ try {
                   class="px-4 py-3 text-sm font-medium transition-all relative"
                   :class="currentTab === 'app-management' ? 'bg-[#DBD5CD] text-gray-900 border-b-[3px] border-[#C07F53] -mb-[3px]' : 'bg-transparent text-gray-600 border-transparent hover:text-gray-900'"
                 >
-                  App Management
+                  Tool Management
                 </button>
               </div>
               <!-- Device Info Tab -->
@@ -555,6 +555,7 @@ try {
 
                       <!-- Subscription & Billing -->
                       <div class="subscription-container mb-6 pb-6 border-b border-gray-200 max-w-[26rem]">
+                        <hr class="border-gray-200 mb-4" />
                         <h4 class="text-sm font-semibold text-gray-900 mb-4">Manage My Subscription</h4>
                         <div class="flex gap-3">
                           <a
@@ -563,7 +564,7 @@ try {
                             rel="noopener noreferrer"
                             class="px-3 py-1.5 border border-black rounded-lg text-xs font-medium text-gray-700 hover:bg-gray-50 w-fit inline-flex items-center gap-1"
                           >
-                            WiseOS Only
+                          I have a Wisephone data plan
                             <Icon name="lucide:external-link" class="w-3 h-3" />
                           </a>
                           <a
@@ -572,7 +573,8 @@ try {
                             rel="noopener noreferrer"
                             class="px-3 py-1.5 border border-black rounded-lg text-xs font-medium text-gray-700 hover:bg-gray-50 w-fit inline-flex items-center gap-1"
                           >
-                            Wisephone Carrier Plan
+                          I have a data plan with my own carrier
+
                             <Icon name="lucide:external-link" class="w-3 h-3" />
                           </a>
                         </div>
@@ -1280,6 +1282,9 @@ try {
                   <input
                     type="text"
                     x-model="editPhoneNumber"
+                    @input="formatPhoneNumber($event)"
+                    placeholder="222-222-2222"
+                    maxlength="12"
                     class="w-full mt-3 pl-6 pb-3 pt-1 text-m text-gray-700 tracking-wide"
                   />
                 </div>
@@ -2107,10 +2112,62 @@ try {
                 this.isEditing = false;
               },
 
+              formatPhoneNumber(event: Event) {
+                const input = event.target as HTMLInputElement;
+                const cursorPosition = input.selectionStart || 0;
+                let value = input.value.replace(/\D/g, ""); // Remove all non-digits (accepts both formats)
+
+                // Limit to 10 digits
+                if (value.length > 10) {
+                  value = value.slice(0, 10);
+                }
+
+                // Format as XXX-XXX-XXXX
+                let formatted = "";
+                if (value.length > 6) {
+                  formatted = value.slice(0, 3) + "-" + value.slice(3, 6) + "-" + value.slice(6, 10);
+                } else if (value.length > 3) {
+                  formatted = value.slice(0, 3) + "-" + value.slice(3);
+                } else {
+                  formatted = value;
+                }
+
+                this.editPhoneNumber = formatted;
+
+                // Restore cursor position after formatting
+                // Adjust cursor position based on added dashes
+                let newCursorPosition = cursorPosition;
+                const beforeCursor = input.value.substring(0, cursorPosition);
+                const digitsBeforeCursor = beforeCursor.replace(/\D/g, "").length;
+
+                // Calculate new position accounting for dashes
+                if (digitsBeforeCursor > 6) {
+                  newCursorPosition = digitsBeforeCursor + 2; // Two dashes before
+                } else if (digitsBeforeCursor > 3) {
+                  newCursorPosition = digitsBeforeCursor + 1; // One dash before
+                } else {
+                  newCursorPosition = digitsBeforeCursor;
+                }
+
+                // Ensure cursor doesn't exceed formatted length
+                newCursorPosition = Math.min(newCursorPosition, formatted.length);
+
+                // Use setTimeout to ensure DOM is updated before setting cursor
+                setTimeout(() => {
+                  input.setSelectionRange(newCursorPosition, newCursorPosition);
+                }, 0);
+              },
+
               openEditModal() {
                 this.editName = this.deviceName;
                 this.editImei = this.imei;
-                this.editPhoneNumber = this.devicePhone;
+                // Format phone number when opening modal
+                const phoneDigits = this.devicePhone.replace(/\D/g, "");
+                if (phoneDigits.length === 10) {
+                  this.editPhoneNumber = `${phoneDigits.slice(0, 3)}-${phoneDigits.slice(3, 6)}-${phoneDigits.slice(6)}`;
+                } else {
+                  this.editPhoneNumber = this.devicePhone;
+                }
                 this.showEditModal = true;
               },
 
@@ -2124,11 +2181,26 @@ try {
 
               async saveDeviceDetails() {
                 try {
+                  // Clean phone number (remove dashes, keep only digits)
+                  const cleanedPhoneNumber = this.editPhoneNumber.replace(/\D/g, "");
+
+                  // Validate phone number format (should be 10 digits)
+                  if (cleanedPhoneNumber.length !== 10 && cleanedPhoneNumber.length > 0) {
+                    this.showErrorToast("Phone number must be 10 digits");
+                    return;
+                  }
+
+                  // Format phone number for API (must be in format 123-456-7890 for validation)
+                  const formattedPhoneNumber =
+                    cleanedPhoneNumber.length === 10
+                      ? `${cleanedPhoneNumber.slice(0, 3)}-${cleanedPhoneNumber.slice(3, 6)}-${cleanedPhoneNumber.slice(6)}`
+                      : this.editPhoneNumber;
+
                   // Create form data for submission
                   const formData = new FormData();
                   formData.append("imei", this.imei);
                   formData.append("nickname", this.editName.trim() || "Device");
-                  formData.append("phoneNumber", this.editPhoneNumber);
+                  formData.append("phoneNumber", formattedPhoneNumber);
 
                   // Submit via fetch to the update action
                   const response = await fetch("/_actions/wisephones.updateWisephone", {
@@ -2137,17 +2209,59 @@ try {
                   });
 
                   if (response.ok) {
+                    // Format phone number for display
+                    const formattedPhone =
+                      cleanedPhoneNumber.length === 10
+                        ? `${cleanedPhoneNumber.slice(0, 3)}-${cleanedPhoneNumber.slice(3, 6)}-${cleanedPhoneNumber.slice(6)}`
+                        : this.editPhoneNumber;
+
                     // Update local state
                     this.deviceName = this.editName.trim() || "Device";
-                    this.devicePhone = this.editPhoneNumber;
+                    this.devicePhone = formattedPhone;
                     this.originalDeviceName = this.deviceName;
                     this.originalDevicePhone = this.devicePhone;
 
                     // Close modal
                     this.closeEditModal();
 
-                    // Show success message
-                    this.showSuccessToast("Device details updated successfully");
+                    // Re-check subscription status with new phone number (reusing same logic as page load)
+                    // The page load checks: 1) bypassTechlessSubscription, 2) validateIsSubscribed
+                    // We use the validateIsUserSubscribed action which calls validateIsSubscribed
+                    console.log("[DEBUG] Re-checking subscription after phone number update", {
+                      imei: this.imei,
+                      phoneNumber: formattedPhoneNumber
+                    });
+
+                    try {
+                      // Use the existing action that mirrors the page load subscription check
+                      // This action calls validateIsSubscribed (same as page load logic)
+                      const subscriptionResult = await actions.wisephones.validateIsUserSubscribed.orThrow({
+                        imei: this.imei,
+                        phoneNumber: formattedPhoneNumber
+                      });
+
+                      const hasSubscription = subscriptionResult?.isSubscribed === true;
+
+                      console.log("[DEBUG] Subscription check result:", {
+                        isSubscribed: hasSubscription,
+                        subscriptionResult
+                      });
+
+                      if (!hasSubscription) {
+                        // No subscription found, close manage page and redirect to dashboard immediately
+                        // The dashboard will show "Activate Plan" button for this device
+                        window.location.href = "/dashboard";
+                        return;
+                      } else {
+                        // Subscription found, update local state
+                        this.isSubscribed = true;
+                        this.showSuccessToast("Device details updated successfully");
+                      }
+                    } catch (subscriptionError) {
+                      console.error("[DEBUG] Error checking subscription:", subscriptionError);
+                      // Continue anyway, subscription check failed but device was updated
+                      this.showSuccessToast("Device details updated successfully");
+                    }
                   } else {
                     console.error("Failed to update device");
                     this.showErrorToast("Failed to update device. Please try again.");
@@ -2256,8 +2370,27 @@ try {
                 try {
                   const packageName = this.pendingAppToInstall;
 
+                  console.log("[DEBUG] confirmAppInstall called", {
+                    packageName,
+                    imei: this.imei,
+                    imeiType: typeof this.imei,
+                    imeiLength: this.imei?.length,
+                    pendingAppToInstall: this.pendingAppToInstall,
+                    appsListHasApp: packageName ? !!this.appsList[packageName] : false
+                  });
+
                   if (!packageName) {
-                    console.error("No pending app to install");
+                    console.error("[DEBUG] No pending app to install");
+                    this.showAppInstallModal = false;
+                    return;
+                  }
+
+                  if (!this.imei) {
+                    console.error("[DEBUG] IMEI is not set!", {
+                      imei: this.imei,
+                      imeiType: typeof this.imei
+                    });
+                    this.showErrorToast("IMEI is not set. Please refresh the page.");
                     this.showAppInstallModal = false;
                     return;
                   }
@@ -2267,6 +2400,7 @@ try {
 
                   // If app is not in appsList yet, add it
                   if (!this.appsList[packageName]) {
+                    console.log("[DEBUG] App not in appsList, adding it:", packageName);
                     this.appsList[packageName] = {
                       source: "Tool Drawer",
                       installed: false,
@@ -2274,7 +2408,15 @@ try {
                     };
                   }
 
+                  console.log("[DEBUG] Calling appManagement.installApp", {
+                    imei: this.imei,
+                    packageName: packageName
+                  });
+
                   await appManagement.installApp(this.imei, packageName);
+
+                  console.log("[DEBUG] appManagement.installApp completed successfully");
+
                   this.appsList[packageName].installed = true;
 
                   // Add to installedApps array if not already there
@@ -2295,7 +2437,13 @@ try {
                   this.pendingAppToInstall = null;
                   this.pendingAppName = "";
                 } catch (error) {
-                  console.error("App installation failed:", error);
+                  console.error("[DEBUG] App installation failed:", {
+                    error,
+                    errorMessage: error instanceof Error ? error.message : String(error),
+                    errorStack: error instanceof Error ? error.stack : undefined,
+                    imei: this.imei,
+                    packageName: this.pendingAppToInstall
+                  });
                   this.showErrorToast("Failed to install app");
                 }
               },
