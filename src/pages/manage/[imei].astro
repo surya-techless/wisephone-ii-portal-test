@@ -784,7 +784,7 @@ try {
                         <input
                           type="checkbox"
                           class="sr-only peer"
-                          :checked="isFeatureEnabled(feature.knoxManageId, feature.isInverse || false)"
+                          :checked="isFeatureEnabled(feature, feature.isInverse || false)"
                           @click.prevent="toggleFeature(feature)"
                         />
                         <div
@@ -1425,6 +1425,8 @@ try {
               editPhoneNumber: "",
               showRemoveModal: false,
               cachedTotalApps: 0,
+              cachedDeviceModel: null as string | null,
+              isA16Device: false,
               // @ts-ignore
               isPhoneSetUp: this.$persist(false),
               // TODO :  Not a todo, but note to the future dev : all apps are embedded inside apps.json file,
@@ -1602,6 +1604,157 @@ try {
                   // Set loading to false after all operations complete
                   this.isLoading = false;
                 }
+              },
+
+              /**
+               * Gets device model from Samsung Knox API
+               * @returns Device model string or null if not found
+               */
+              async getDeviceModelFromKnox(): Promise<string | null> {
+                try {
+                  const deviceInfoUrl = new URL(`/api/samsung-knox.json`, window.location.origin);
+                  deviceInfoUrl.searchParams.set("action", "get-device-info");
+                  deviceInfoUrl.searchParams.set("imei", this.imei);
+
+                  const deviceInfoRes = await fetch(deviceInfoUrl, { method: "GET" });
+                  if (!deviceInfoRes.ok) {
+                    return null;
+                  }
+
+                  const deviceInfo = await deviceInfoRes.json();
+                  const rv = deviceInfo?.resultValue;
+                  if (!rv) {
+                    return null;
+                  }
+
+                  const model =
+                    rv.deviceModelName ||
+                    rv.modelName ||
+                    rv.deviceModel ||
+                    rv.model ||
+                    rv.deviceName ||
+                    rv.name ||
+                    null;
+
+                  return model;
+                } catch (error) {
+                  console.error("Error fetching device model:", error);
+                  return null;
+                }
+              },
+
+              /**
+               * Caches device model on page load
+               */
+              async cacheDeviceModel() {
+                if (this.cachedDeviceModel === null) {
+                  const model = await this.getDeviceModelFromKnox();
+                  this.cachedDeviceModel = model;
+                  if (model) {
+                    const modelUpper = model.toUpperCase();
+                    this.isA16Device = modelUpper.includes("A16") || modelUpper.includes("SM-A16");
+                    console.log(`Device model cached: ${model}, isA16Device: ${this.isA16Device}`);
+                  }
+                }
+              },
+
+              /**
+               * Gets the appropriate group ID for a feature based on device model
+               * For A16 devices, returns a16KnoxManageId if available, otherwise knoxManageId
+               * For other devices, returns knoxManageId
+               */
+              getGroupIdForFeature(feature: Feature): string {
+                if (this.isA16Device && feature.a16KnoxManageId) {
+                  return feature.a16KnoxManageId;
+                }
+                return feature.knoxManageId;
+              },
+
+              /**
+               * Checks device model and assigns appropriate subscription group
+               * - A16 devices -> A16_SUBSCRIBED group
+               * - A15 and other devices -> SUBSCRIBED group (default)
+               */
+              async assignSubscriptionGroupByDeviceModel() {
+                try {
+                  const deviceModel = await this.getDeviceModelFromKnox();
+                  if (!deviceModel) {
+                    console.warn("Could not determine device model, using default SUBSCRIBED group");
+                    // Default to SUBSCRIBED if we can't determine model
+                    await this.addFeatureToDevice(KNOX_USER_GROUPS.SUBSCRIBED);
+                    this.features.push(KNOX_USER_GROUPS.SUBSCRIBED);
+                    return;
+                  }
+
+                  const modelUpper = deviceModel.toUpperCase();
+
+                  // Check if device is A16
+                  if (modelUpper.includes("A16") || modelUpper.includes("SM-A16")) {
+                    console.log(`Device model detected as A16: ${deviceModel}, assigning to A16_SUBSCRIBED group`);
+                    await this.addFeatureToDevice(KNOX_USER_GROUPS.A16_SUBSCRIBED);
+                    this.features.push(KNOX_USER_GROUPS.A16_SUBSCRIBED);
+                  } else {
+                    // Default to SUBSCRIBED for A15 and all other devices
+                    console.log(`Device model: ${deviceModel}, assigning to SUBSCRIBED group`);
+                    await this.addFeatureToDevice(KNOX_USER_GROUPS.SUBSCRIBED);
+                    this.features.push(KNOX_USER_GROUPS.SUBSCRIBED);
+                  }
+                } catch (error) {
+                  console.error("Error assigning subscription group by device model:", error);
+                  // Fallback to default SUBSCRIBED group on error
+                  await this.addFeatureToDevice(KNOX_USER_GROUPS.SUBSCRIBED);
+                  this.features.push(KNOX_USER_GROUPS.SUBSCRIBED);
+                }
+              },
+
+              /**
+               * Checks device model and assigns appropriate unpaid group
+               * - A16 devices -> A16_UNPAID group
+               * - A15 and other devices -> UNPAID group (default)
+               */
+              async assignUnpaidGroupByDeviceModel() {
+                try {
+                  // Ensure device model is cached
+                  await this.cacheDeviceModel();
+
+                  if (this.isA16Device) {
+                    console.log(`A16 device detected, assigning to A16_UNPAID group`);
+                    await this.addFeatureToDevice(KNOX_USER_GROUPS.A16_UNPAID);
+                    this.features.push(KNOX_USER_GROUPS.A16_UNPAID);
+                  } else {
+                    // Default to UNPAID for A15 and all other devices
+                    console.log(`Non-A16 device, assigning to UNPAID group`);
+                    await this.addFeatureToDevice(KNOX_USER_GROUPS.UNPAID);
+                    this.features.push(KNOX_USER_GROUPS.UNPAID);
+                  }
+                } catch (error) {
+                  console.error("Error assigning unpaid group by device model:", error);
+                  // Fallback to default UNPAID group on error
+                  await this.addFeatureToDevice(KNOX_USER_GROUPS.UNPAID);
+                  this.features.push(KNOX_USER_GROUPS.UNPAID);
+                }
+              },
+
+              /**
+               * Adds a feature to the device using the Knox API
+               */
+              async addFeatureToDevice(knoxManageId: string) {
+                const url = new URL(`/api/samsung-knox.json`, window.location.origin);
+                url.searchParams.set("action", "apply-feature");
+                url.searchParams.set("imei", this.imei);
+                url.searchParams.set("knoxManageId", knoxManageId);
+                await fetch(url, { method: "POST" });
+              },
+
+              /**
+               * Removes a feature from the device using the Knox API
+               */
+              async removeFeatureFromDevice(knoxManageId: string) {
+                const url = new URL(`/api/samsung-knox.json`, window.location.origin);
+                url.searchParams.set("action", "remove-feature");
+                url.searchParams.set("imei", this.imei);
+                url.searchParams.set("knoxManageId", knoxManageId);
+                await fetch(url, { method: "POST" });
               },
 
               // Load available apps from apps.json - both Tool Drawer and Faith Tools
@@ -2122,16 +2275,50 @@ try {
                 this.isEditing = false;
               },
 
-              completeSetup() {
+              async completeSetup() {
                 if (
                   confirm(
                     "Completing the setup will close the Portal and remove 'Setup' from your Wisephone II's home screen. Continue?"
                   )
                 ) {
-                  this.isPhoneSetUp = true;
-                  this.$nextTick(() => {
-                    window.location.href = this.completeSetupUrl;
-                  });
+                  try {
+                    // Ensure device model is cached before assigning groups
+                    await this.cacheDeviceModel();
+
+                    // Get current features to check subscription status
+                    await this.getFeatures();
+
+                    // Check if device is subscribed but doesn't have any subscription group
+                    if (this.isSubscribed) {
+                      const hasSubscribedGroup =
+                        this.features.includes(KNOX_USER_GROUPS.SUBSCRIBED) ||
+                        this.features.includes(KNOX_USER_GROUPS.A16_SUBSCRIBED);
+                      if (!hasSubscribedGroup) {
+                        // Assign appropriate subscription group based on device model
+                        await this.assignSubscriptionGroupByDeviceModel();
+                      }
+                    } else {
+                      // If not subscribed, ensure device has unpaid group
+                      const hasUnpaidGroup =
+                        this.features.includes(KNOX_USER_GROUPS.UNPAID) ||
+                        this.features.includes(KNOX_USER_GROUPS.A16_UNPAID);
+                      if (!hasUnpaidGroup) {
+                        // Assign appropriate unpaid group based on device model
+                        await this.assignUnpaidGroupByDeviceModel();
+                      }
+                    }
+
+                    // Ensure no conflicting groups exist
+                    await this.removeExclusiveGroups(this.features);
+
+                    this.isPhoneSetUp = true;
+                    this.$nextTick(() => {
+                      window.location.href = this.completeSetupUrl;
+                    });
+                  } catch (error) {
+                    console.error("Error during complete setup:", error);
+                    this.showErrorToast("Failed to complete setup. Please try again.");
+                  }
                 }
               },
 
@@ -2301,7 +2488,23 @@ try {
                     throw new Error("Active subscription required");
                   }
 
-                  const currentEnabled = this.features.includes(feature.knoxManageId);
+                  if (!feature?.knoxManageId) {
+                    throw new Error("Invalid feature configuration");
+                  }
+
+                  // Ensure device model is cached
+                  await this.cacheDeviceModel();
+
+                  // Get the appropriate group ID based on device model
+                  const groupIdForDevice = this.getGroupIdForFeature(feature);
+                  const regularGroupId = feature.knoxManageId;
+                  const a16GroupId = feature.a16KnoxManageId;
+
+                  // Check if feature is enabled (check both regular and A16 groups if applicable)
+                  const isRegularEnabled = this.features.includes(regularGroupId);
+                  const isA16Enabled = a16GroupId ? this.features.includes(a16GroupId) : false;
+                  const currentEnabled = isRegularEnabled || isA16Enabled;
+
                   const updatedValue = !currentEnabled;
 
                   // Store the pending feature change
@@ -2334,16 +2537,34 @@ try {
                   // Close modal
                   this.showConfirmModal = false;
 
+                  // Ensure device model is cached
+                  await this.cacheDeviceModel();
+
+                  // Get the appropriate group ID based on device model
+                  const groupIdForDevice = this.getGroupIdForFeature(feature);
+                  const regularGroupId = feature.knoxManageId;
+                  const a16GroupId = feature.a16KnoxManageId;
+
+                  // Use the device-appropriate group ID for the API call
+                  const featureToToggle = {
+                    ...feature,
+                    knoxManageId: groupIdForDevice
+                  };
+
                   await featureManagement.toggleFeature({
                     imei: this.imei,
-                    feature,
+                    feature: featureToToggle,
                     enabled: updatedValue
                   });
 
-                  if (!updatedValue) {
-                    this.features = this.features.filter((id) => id !== feature.knoxManageId);
-                  } else {
-                    this.features.push(feature.knoxManageId);
+                  // Update features list - remove both regular and A16 versions, then add the correct one
+                  const groupsToRemove = [regularGroupId];
+                  if (a16GroupId) {
+                    groupsToRemove.push(a16GroupId);
+                  }
+                  this.features = this.features.filter((id) => !groupsToRemove.includes(id));
+                  if (updatedValue) {
+                    this.features.push(groupIdForDevice);
                   }
 
                   this.showSuccessToast(
@@ -2609,9 +2830,138 @@ try {
                 return this.isSubscribed && this.features.includes(KNOX_USER_GROUPS.ADD_ON_FAITH_TOOLS);
               },
 
-              isFeatureEnabled(knoxManageId: string, isInverse = false) {
-                const isEnabled = this.features.includes(knoxManageId);
+              isFeatureEnabled(feature: Feature, isInverse = false) {
+                // Ensure device model is cached (synchronous check, will use cached value)
+                if (this.cachedDeviceModel === null && !this.isA16Device) {
+                  // If not cached yet, trigger async cache (but don't wait)
+                  this.cacheDeviceModel();
+                }
+
+                // Get the appropriate group ID based on device model
+                const groupId = this.getGroupIdForFeature(feature);
+                const regularGroupId = feature.knoxManageId;
+                const a16GroupId = feature.a16KnoxManageId;
+
+                // Check both regular and A16 groups if applicable
+                const isRegularEnabled = this.features.includes(regularGroupId);
+                const isA16Enabled = a16GroupId ? this.features.includes(a16GroupId) : false;
+                const isEnabled = isRegularEnabled || isA16Enabled;
+
                 return isInverse ? !isEnabled : isEnabled;
+              },
+
+              /**
+               * Ensures a device has the correct Knox user group configuration by managing exclusive group memberships.
+               * This prevents conflicts between incompatible feature combinations.
+               * @param userGroups - Array of Knox user group IDs currently assigned to the device
+               */
+              async removeExclusiveGroups(userGroups: string[]) {
+                const exclusiveGroups = this.getExclusiveGroups(userGroups);
+                if (!this.hasMultipleExclusiveGroups(exclusiveGroups)) {
+                  await this.ensureBaseGroup(userGroups);
+                } else {
+                  await this.removeIncompatibleFeatures(userGroups);
+                }
+              },
+
+              /**
+               * Gets the list of exclusive groups from the user's current groups
+               */
+              getExclusiveGroups(userGroups: string[]): string[] {
+                // Unpaid, Subscribed, A16_Unpaid, and A16_Subscribed are exclusive
+                return userGroups.filter(
+                  (group) =>
+                    group === KNOX_USER_GROUPS.UNPAID ||
+                    group === KNOX_USER_GROUPS.SUBSCRIBED ||
+                    group === KNOX_USER_GROUPS.A16_SUBSCRIBED ||
+                    group === KNOX_USER_GROUPS.A16_UNPAID
+                );
+              },
+
+              /**
+               * Checks if the device has more than one exclusive group assigned
+               */
+              hasMultipleExclusiveGroups(exclusiveGroups: string[]): boolean {
+                return exclusiveGroups.length > 1;
+              },
+
+              /**
+               * Ensures the device has at least one base group (Subscribed or Unpaid)
+               * based on subscription status and device model
+               */
+              async ensureBaseGroup(userGroups: string[]) {
+                const hasBaseGroup = userGroups.some(
+                  (group) =>
+                    group === KNOX_USER_GROUPS.UNPAID ||
+                    group === KNOX_USER_GROUPS.SUBSCRIBED ||
+                    group === KNOX_USER_GROUPS.A16_SUBSCRIBED ||
+                    group === KNOX_USER_GROUPS.A16_UNPAID
+                );
+                if (!hasBaseGroup) {
+                  if (this.isSubscribed) {
+                    // Assign appropriate subscription group based on device model
+                    await this.assignSubscriptionGroupByDeviceModel();
+                  } else {
+                    // Assign appropriate unpaid group based on device model
+                    await this.assignUnpaidGroupByDeviceModel();
+                  }
+                }
+              },
+
+              /**
+               * Removes incompatible feature combinations from the device
+               */
+              async removeIncompatibleFeatures(userGroups: string[]) {
+                const featuresToRemove = this.getIncompatibleFeatures(userGroups);
+                for (const knoxManageId of featuresToRemove) {
+                  await this.removeFeatureFromDevice(knoxManageId);
+                }
+                window.location.reload();
+              },
+
+              /**
+               * Determines which features need to be removed to resolve conflicts
+               */
+              getIncompatibleFeatures(userGroups: string[]): string[] {
+                const featuresToRemove: string[] = [];
+
+                // Remove UNPAID if present with any subscription group
+                if (userGroups.includes(KNOX_USER_GROUPS.UNPAID)) {
+                  if (
+                    userGroups.includes(KNOX_USER_GROUPS.SUBSCRIBED) ||
+                    userGroups.includes(KNOX_USER_GROUPS.A16_SUBSCRIBED)
+                  ) {
+                    featuresToRemove.push(KNOX_USER_GROUPS.UNPAID);
+                  }
+                }
+
+                // Remove A16_UNPAID if present with any subscription group
+                if (userGroups.includes(KNOX_USER_GROUPS.A16_UNPAID)) {
+                  if (
+                    userGroups.includes(KNOX_USER_GROUPS.SUBSCRIBED) ||
+                    userGroups.includes(KNOX_USER_GROUPS.A16_SUBSCRIBED)
+                  ) {
+                    featuresToRemove.push(KNOX_USER_GROUPS.A16_UNPAID);
+                  }
+                }
+
+                // Remove SUBSCRIBED if A16_SUBSCRIBED is present (they shouldn't have both)
+                if (
+                  userGroups.includes(KNOX_USER_GROUPS.SUBSCRIBED) &&
+                  userGroups.includes(KNOX_USER_GROUPS.A16_SUBSCRIBED)
+                ) {
+                  featuresToRemove.push(KNOX_USER_GROUPS.SUBSCRIBED);
+                }
+
+                // Remove UNPAID if A16_UNPAID is present (they shouldn't have both)
+                if (
+                  userGroups.includes(KNOX_USER_GROUPS.UNPAID) &&
+                  userGroups.includes(KNOX_USER_GROUPS.A16_UNPAID)
+                ) {
+                  featuresToRemove.push(KNOX_USER_GROUPS.UNPAID);
+                }
+
+                return featuresToRemove;
               },
 
               async init() {
@@ -2622,6 +2972,8 @@ try {
                 this.$watch("imei", async (value) => {
                   try {
                     if (this.imei) {
+                      // Cache device model on page load
+                      await this.cacheDeviceModel();
                       // Reload cached total apps when IMEI changes
                       this.loadCachedTotalApps();
                       await this.getFeatures();
@@ -2630,6 +2982,22 @@ try {
                     console.error("Failed to load features:", error);
                     this.isLoading = false;
                   }
+                });
+
+                // Watch for features changes to automatically assign groups
+                this.$watch("features", async (userGroups: string[]) => {
+                  // Check if device is subscribed but doesn't have any subscription group
+                  if (this.isSubscribed) {
+                    const hasSubscribedGroup =
+                      userGroups.includes(KNOX_USER_GROUPS.SUBSCRIBED) ||
+                      userGroups.includes(KNOX_USER_GROUPS.A16_SUBSCRIBED);
+                    if (!hasSubscribedGroup) {
+                      // Assign appropriate subscription group based on device model
+                      await this.assignSubscriptionGroupByDeviceModel();
+                    }
+                  }
+
+                  await this.removeExclusiveGroups(userGroups);
                 });
 
                 // Watch for currentTab changes - load apps when App Management tab is clicked
