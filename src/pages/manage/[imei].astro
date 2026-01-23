@@ -537,6 +537,14 @@ try {
                       <p class="text-sm text-gray-600" x-text="devicePhone">(111) 111-1111</p>
                       <p class="text-xs text-gray-500">IMEI: <span x-text="imei"></span></p>
                     </div>
+                    <button
+                      x-cloak
+                      class="sm:hidden px-4 py-2 bg-gray-700 text-white text-sm font-medium rounded-md hover:bg-gray-800 whitespace-nowrap flex-shrink-0"
+                      x-show="!isPhoneSetUp && isSubscribed"
+                      @click="completeSetup()"
+                    >
+                      Complete Setup
+                    </button>
                   </div>
 
                   <template x-if="isSubscribed">
@@ -564,7 +572,7 @@ try {
                             rel="noopener noreferrer"
                             class="px-3 py-1.5 border border-black rounded-lg text-xs font-medium text-gray-700 hover:bg-gray-50 w-fit inline-flex items-center gap-1"
                           >
-                          I have a Wisephone data plan
+                            I have a Wisephone data plan
                             <Icon name="lucide:external-link" class="w-3 h-3" />
                           </a>
                           <a
@@ -573,7 +581,7 @@ try {
                             rel="noopener noreferrer"
                             class="px-3 py-1.5 border border-black rounded-lg text-xs font-medium text-gray-700 hover:bg-gray-50 w-fit inline-flex items-center gap-1"
                           >
-                          I have a data plan with my own carrier
+                            I have a data plan with my own carrier
 
                             <Icon name="lucide:external-link" class="w-3 h-3" />
                           </a>
@@ -1417,6 +1425,8 @@ try {
               editPhoneNumber: "",
               showRemoveModal: false,
               cachedTotalApps: 0,
+              // @ts-ignore
+              isPhoneSetUp: this.$persist(false),
               // TODO :  Not a todo, but note to the future dev : all apps are embedded inside apps.json file,
               // TODO :since ottogrid support is not available and Healthy Tech Index is not yet integrated
               // TODO : apps in apps.json  from line 4 to 2537 are faith tools apps and the rest are from ottogrid (approved apps)
@@ -2112,6 +2122,19 @@ try {
                 this.isEditing = false;
               },
 
+              completeSetup() {
+                if (
+                  confirm(
+                    "Completing the setup will close the Portal and remove 'Setup' from your Wisephone II's home screen. Continue?"
+                  )
+                ) {
+                  this.isPhoneSetUp = true;
+                  this.$nextTick(() => {
+                    window.location.href = this.completeSetupUrl;
+                  });
+                }
+              },
+
               formatPhoneNumber(event: Event) {
                 const input = event.target as HTMLInputElement;
                 const cursorPosition = input.selectionStart || 0;
@@ -2567,6 +2590,12 @@ try {
                 } finally {
                   this.isToolDrawerLoading = false;
                 }
+              },
+
+              get completeSetupUrl() {
+                // Clean phone number (remove dashes) for the deeplink
+                const cleanedPhone = this.devicePhone.replace(/\D/g, "");
+                return `http://localhost?imei=${this.imei}&phone=${cleanedPhone}&subscription=done`;
               },
 
               get isToolDrawerEnabled() {
