@@ -22,8 +22,12 @@ export const stripe = {
       deviceIMEI: z.string()
     }),
     handler: async (input, context) => {
-      const returnUrl = new URL("/manage/" + input.deviceIMEI, context.url.origin);
-      // const returnUrl = new URL("/dashboard/device/" + input.deviceIMEI, context.url.origin);
+      // Return to dashboard with activation parameters for polling
+      const returnUrl = new URL("/dashboard", context.url.origin);
+      returnUrl.searchParams.set("activated", "true");
+      returnUrl.searchParams.set("imei", input.deviceIMEI);
+      returnUrl.searchParams.set("session_id", "{CHECKOUT_SESSION_ID}");
+
       const session = await stripeInstance.checkout.sessions.create({
         ui_mode: "embedded",
         line_items: [
@@ -38,7 +42,7 @@ export const stripe = {
           enabled: true
         },
         // Required param replaced by Stripe, and we can't have it percent encoded
-        return_url: returnUrl.toString() + "?session_id={CHECKOUT_SESSION_ID}",
+        return_url: returnUrl.toString(),
         automatic_tax: { enabled: true },
         allow_promotion_codes: true
       });

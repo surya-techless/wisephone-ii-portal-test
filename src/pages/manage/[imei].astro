@@ -537,14 +537,6 @@ try {
                       <p class="text-sm text-gray-600" x-text="devicePhone">(111) 111-1111</p>
                       <p class="text-xs text-gray-500">IMEI: <span x-text="imei"></span></p>
                     </div>
-                    <button
-                      x-cloak
-                      class="sm:hidden px-4 py-2 bg-gray-700 text-white text-sm font-medium rounded-md hover:bg-gray-800 whitespace-nowrap flex-shrink-0"
-                      x-show="!isPhoneSetUp && isSubscribed"
-                      @click="completeSetup()"
-                    >
-                      Complete Setup
-                    </button>
                   </div>
 
                   <template x-if="isSubscribed">
@@ -799,7 +791,7 @@ try {
                         <input
                           type="checkbox"
                           class="sr-only peer"
-                          :checked="isFeatureEnabled(feature, feature.isInverse || false)"
+                          :checked="isFeatureEnabled(feature.knoxManageId, feature.isInverse || false)"
                           @click.prevent="toggleFeature(feature)"
                         />
                         <div
@@ -817,33 +809,36 @@ try {
                 x-show="currentTab === 'app-management'"
                 x-cloak
                 class="flex flex-col h-[calc(100vh-280px)] max-h-[calc(100vh-280px)]"
-                x-data="{ installedOpen: true, availableOpen: false }"
+                x-data="{ installedOpen: false }"
               >
-                <!-- Desktop: App Lists Grid -->
-                <div class="hidden md:grid grid-cols-2 gap-4 flex-1 min-h-0">
-                  <!-- Available Apps -->
-                  <div class="flex flex-col min-h-0">
-                    <!-- Search Header -->
-                    <div class="mb-4 flex-shrink-0">
-                      <div class="relative">
-                        <Icon
-                          name="lucide:search"
-                          class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                        />
-                        <input
-                          type="text"
-                          x-model.debounce.300ms="appSearchQuery"
-                          placeholder="Search apps or categories (e.g., Finance, Books & Reference)"
-                          class="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-md text-sm bg-gray-100 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                        />
-                      </div>
-                    </div>
+                <!-- Header Text -->
+                <div class="mb-4 flex-shrink-0 md:max-w-[500px]">
+                  <p class="text-sm text-gray-700">Search for an app you want to install on your Wisephone here.</p>
+                </div>
 
-                    <h3 class="text-xs font-semibold text-gray-600 mb-3 flex items-center gap-1.5 flex-shrink-0">
-                      <Icon name="lucide:download-cloud" class="w-3.5 h-3.5" />
-                      Available Apps
-                    </h3>
-                    <div class="space-y-2 flex-1 overflow-y-auto pr-2 min-h-0">
+                <!-- Search Bar -->
+                <div class="mb-4 flex-shrink-0 md:max-w-[500px]">
+                  <div class="relative">
+                    <Icon name="lucide:search" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="text"
+                      x-model.debounce.300ms="appSearchQuery"
+                      placeholder="Search apps or categories (e.g., Finance, Books & Reference)"
+                      class="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-md text-sm bg-gray-100 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+
+                <!-- Content Container: Search Results + Installed Apps -->
+                <div class="flex flex-col flex-1 min-h-0">
+                  <!-- Search Results Area (Scrollable when long, only shown when searching) -->
+                  <div
+                    x-show="appSearchQuery && appSearchQuery.trim().length > 0"
+                    x-cloak
+                    class="mb-4 overflow-y-auto md:max-w-[500px]"
+                    style="flex: 0 1 auto; max-height: calc(100% - 100px);"
+                  >
+                    <div class="space-y-2 pr-2">
                       <template x-for="app in availableApps" :key="app.packageName">
                         <div class="flex items-center gap-4 p-3 border border-gray-300 rounded-lg hover:bg-gray-50">
                           <div class="flex items-center gap-2 flex-1 min-w-0 overflow-hidden">
@@ -870,117 +865,17 @@ try {
                           </button>
                         </div>
                       </template>
-                    </div>
-                  </div>
-
-                  <!-- Installed Apps (Combined) -->
-                  <div class="bg-[#f5f5f0] p-4 rounded-lg flex flex-col min-h-0">
-                    <h3 class="text-xs font-semibold text-gray-600 mb-3 flex items-center gap-1.5 flex-shrink-0">
-                      <Icon name="lucide:check-circle" class="w-3.5 h-3.5" />
-                      Installed Apps<span x-text="'(' + totalAppsCount + ')'">0</span>
-                    </h3>
-                    <div class="space-y-2 flex-1 overflow-y-auto pr-2 min-h-0">
-                      <!-- Loading State -->
-                      <div x-show="isAppsLoading" class="flex items-center justify-center py-8">
-                        <div class="flex flex-col items-center gap-2">
-                          <div class="loading loading-spinner loading-md text-[var(--evergreen)]"></div>
-                          <p class="text-xs text-gray-500">Loading apps...</p>
-                        </div>
+                      <div
+                        x-show="availableApps.length === 0 && appSearchQuery && appSearchQuery.trim().length > 0"
+                        class="text-center py-8 text-sm text-gray-500"
+                      >
+                        No apps found matching your search.
                       </div>
-                      <!-- Regular Installed Apps -->
-                      <template x-for="app in installedFilteredApps" :key="app.packageName">
-                        <div class="flex items-center gap-4 p-3 border border-gray-300 rounded-lg bg-white">
-                          <div class="flex items-center gap-2 flex-1 min-w-0 overflow-hidden">
-                            <div
-                              class="w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0 overflow-hidden"
-                              :class="app.iconUrl ? 'bg-transparent' : 'bg-teal-600'"
-                            >
-                              <img
-                                x-show="app.iconUrl"
-                                :src="app.iconUrl"
-                                :alt="app.name"
-                                class="w-8 h-8 object-cover"
-                              />
-                              <Icon x-show="!app.iconUrl" name="lucide:package" class="w-4 h-4 text-white" />
-                            </div>
-                            <span class="text-sm text-gray-900 truncate" x-text="app.name"></span>
-                          </div>
-                          <div class="flex items-center gap-1.5 flex-shrink-0">
-                            <button
-                              class="hidden px-3 py-1.5 bg-white border border-gray-300 rounded-md text-xs font-medium text-gray-700 hover:bg-gray-50 items-center gap-1.5 whitespace-nowrap"
-                            >
-                              <Icon name="lucide:refresh-cw" class="w-3.5 h-3.5" />
-                              Update
-                            </button>
-                            <button
-                              @click="uninstallApp(app.packageName)"
-                              class="px-3 py-1.5 bg-white border border-gray-300 rounded-md text-xs font-medium text-gray-700 hover:bg-red-50 hover:border-red-300 hover:text-red-600 flex items-center gap-1.5 whitespace-nowrap"
-                            >
-                              <Icon name="lucide:trash-2" class="w-3.5 h-3.5" />
-                              Uninstall
-                            </button>
-                          </div>
-                        </div>
-                      </template>
-
-                      <!-- Divider -->
-                      <div x-show="systemApps.length > 0 && installedFilteredApps.length > 0" class="relative py-2">
-                        <div class="absolute inset-0 flex items-center">
-                          <div class="w-full border-t border-gray-300"></div>
-                        </div>
-                      </div>
-
-                      <!-- System Applications -->
-                      <template x-for="app in systemApps" :key="app.packageName">
-                        <div class="flex items-center gap-4 p-3 border border-gray-300 rounded-lg bg-white">
-                          <div class="flex items-center gap-2 flex-1 min-w-0 overflow-hidden">
-                            <div
-                              class="w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0 overflow-hidden"
-                              :class="app.iconUrl ? 'bg-transparent' : 'bg-blue-600'"
-                            >
-                              <img
-                                x-show="app.iconUrl"
-                                :src="app.iconUrl"
-                                :alt="app.name"
-                                class="w-8 h-8 object-cover"
-                              />
-                              <Icon x-show="!app.iconUrl" name="lucide:smartphone" class="w-4 h-4 text-white" />
-                            </div>
-                            <span class="text-sm text-gray-900 truncate" x-text="app.name"></span>
-                          </div>
-                          <div class="flex-shrink-0">
-                            <span
-                              class="px-3 py-1.5 bg-gray-100 border border-gray-200 rounded-md text-xs font-medium text-gray-600 whitespace-nowrap"
-                            >
-                              System App
-                            </span>
-                          </div>
-                        </div>
-                      </template>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Mobile: Accordion Layout -->
-                <div class="md:hidden flex flex-col gap-4 flex-1 overflow-hidden">
-                  <!-- Search Header -->
-                  <div class="flex-shrink-0">
-                    <div class="relative">
-                      <Icon
-                        name="lucide:search"
-                        class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                      />
-                      <input
-                        type="text"
-                        x-model.debounce.300ms="appSearchQuery"
-                        placeholder="Search apps or categories (e.g., Finance, Books & Reference)"
-                        class="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                      />
                     </div>
                   </div>
 
-                  <!-- Installed Apps Accordion -->
-                  <div class="bg-[#f5f5f0] rounded-lg overflow-hidden flex-shrink-0">
+                  <!-- Installed Apps Section (Always below search results, never beyond viewport) -->
+                  <div class="bg-[#f5f5f0] rounded-lg overflow-hidden flex-shrink-0 md:max-w-[500px]">
                     <button
                       @click="installedOpen = !installedOpen"
                       class="w-full flex items-center justify-between p-4 text-left"
@@ -1000,7 +895,7 @@ try {
                       </svg>
                     </button>
                     <div x-show="installedOpen" x-collapse class="px-4 pb-4">
-                      <div class="space-y-2 max-h-[300px] overflow-y-auto">
+                      <div class="space-y-2 max-h-[400px] overflow-y-auto">
                         <!-- Loading State -->
                         <div x-show="isAppsLoading" class="flex items-center justify-center py-8">
                           <div class="flex flex-col items-center gap-2">
@@ -1069,193 +964,138 @@ try {
                       </div>
                     </div>
                   </div>
+                </div>
+              </div>
 
-                  <!-- Available Apps Accordion -->
-                  <div class="border border-gray-300 rounded-lg overflow-hidden flex-shrink-0">
-                    <button
-                      @click="availableOpen = !availableOpen"
-                      class="w-full flex items-center justify-between p-4 text-left bg-white"
-                    >
-                      <h3 class="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                        <Icon name="lucide:download-cloud" class="w-4 h-4" />
-                        Available Apps
-                      </h3>
-                      <svg
-                        class="w-5 h-5 transition-transform text-gray-600"
-                        :class="{ 'rotate-180': availableOpen }"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                      </svg>
-                    </button>
-                    <div x-show="availableOpen" x-collapse class="px-4 pb-4">
-                      <div class="space-y-2 max-h-[300px] overflow-y-auto">
-                        <template x-for="app in availableApps" :key="app.packageName">
-                          <div
-                            class="flex items-center justify-between p-3 border border-gray-300 rounded-lg hover:bg-gray-50"
-                          >
-                            <div class="flex items-center gap-2 flex-1 min-w-0">
-                              <div
-                                class="w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0 overflow-hidden"
-                                :class="app.iconUrl ? 'bg-transparent' : 'bg-gray-200'"
-                              >
-                                <img
-                                  x-show="app.iconUrl"
-                                  :src="app.iconUrl"
-                                  :alt="app.name"
-                                  class="w-8 h-8 object-cover"
-                                />
-                                <Icon x-show="!app.iconUrl" name="lucide:package" class="w-4 h-4 text-gray-500" />
-                              </div>
-                              <span class="text-sm text-gray-900 truncate" x-text="app.name"></span>
-                            </div>
-                            <button
-                              @click="installApp(app.packageName)"
-                              class="px-3 py-1.5 bg-white border border-gray-300 rounded-md text-xs font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-1.5 flex-shrink-0 ml-2"
-                            >
-                              <Icon name="lucide:download" class="w-3.5 h-3.5" />
-                              Install
-                            </button>
-                          </div>
-                        </template>
-                      </div>
-                    </div>
-                  </div>
+              <!-- Right Column: Screen Time Stats (Only visible on Device Info tab and when feature flag is enabled) -->
+              <div class="mb-6 w-full h-full" x-show="currentTab === 'device-info' && enableScreenTime" x-cloak>
+                <ScreenTimeStats imei={imei || ""} screenTimeData={enableScreenTime ? screenTimeData : []} />
+              </div>
+
+              <!-- Device Removal (Mobile View - Below Screen Time) -->
+              <div class="mb-6 w-full lg:hidden" x-show="currentTab === 'device-info' && enableScreenTime" x-cloak>
+                <div class="pt-4">
+                  <h4 class="text-sm font-semibold text-gray-900 mb-2">Device Removal</h4>
+                  <p class="text-sm text-gray-600 mb-2">
+                    Remove this device from this list of managed devices. Perform this action if you want to manage this
+                    device on a different account.
+                  </p>
+                  <p class="text-sm text-gray-600 mb-3">
+                    If you need to re-add this device in the future, select "Add Device" on the Devices page.
+                  </p>
+                  <button
+                    @click="showRemoveModal = true"
+                    class="px-4 py-2 bg-white border border-red-300 rounded-md text-sm font-medium text-red-600 hover:bg-red-50 inline-flex items-center gap-2"
+                  >
+                    <Icon name="lucide:trash-2" class="w-4 h-4" />
+                    Remove Device
+                  </button>
                 </div>
               </div>
             </div>
 
-            <!-- Right Column: Screen Time Stats (Only visible on Device Info tab and when feature flag is enabled) -->
-            <div class="mb-6 w-full h-full" x-show="currentTab === 'device-info' && enableScreenTime" x-cloak>
-              <ScreenTimeStats imei={imei || ""} screenTimeData={enableScreenTime ? screenTimeData : []} />
-            </div>
-
-            <!-- Device Removal (Mobile View - Below Screen Time) -->
-            <div class="mb-6 w-full lg:hidden" x-show="currentTab === 'device-info' && enableScreenTime" x-cloak>
-              <div class="pt-4">
-                <h4 class="text-sm font-semibold text-gray-900 mb-2">Device Removal</h4>
-                <p class="text-sm text-gray-600 mb-2">
-                  Remove this device from this list of managed devices. Perform this action if you want to manage this
-                  device on a different account.
-                </p>
-                <p class="text-sm text-gray-600 mb-3">
-                  If you need to re-add this device in the future, select "Add Device" on the Devices page.
-                </p>
-                <button
-                  @click="showRemoveModal = true"
-                  class="px-4 py-2 bg-white border border-red-300 rounded-md text-sm font-medium text-red-600 hover:bg-red-50 inline-flex items-center gap-2"
-                >
-                  <Icon name="lucide:trash-2" class="w-4 h-4" />
-                  Remove Device
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <!-- Confirmation Modal -->
-          <div
-            x-show="showConfirmModal"
-            x-cloak
-            @click.self="cancelFeatureToggle()"
-            class="absolute inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4"
-          >
-            <div @click.stop class="bg-white rounded-lg shadow-xl max-w-md w-full p-6 space-y-4">
-              <h3 class="text-lg font-semibold text-gray-900">Are you sure?</h3>
-
-              <p class="text-sm text-gray-700 leading-relaxed" x-text="confirmationMessage"></p>
-
-              <div class="flex justify-end gap-3 pt-2">
-                <button
-                  @click="cancelFeatureToggle()"
-                  class="px-4 py-2 text-sm font-medium text-white bg-gray-800 rounded hover:bg-gray-700 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  @click="confirmFeatureToggle()"
-                  class="px-4 py-2 text-sm font-medium text-gray-900 bg-white border border-gray-300 rounded hover:bg-gray-50 transition-colors"
-                  x-text="pendingFeatureEnabled ? 'Turn On' : 'Turn Off'"
-                >
-                  Ok
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <!-- App Install Confirmation Modal -->
-          <div
-            x-show="showAppInstallModal"
-            x-cloak
-            @click.self="cancelAppInstall()"
-            class="absolute inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4"
-          >
-            <div @click.stop class="bg-white rounded-lg shadow-xl max-w-md w-full p-6 space-y-4">
-              <h3 class="text-lg font-semibold text-gray-900">
-                Are you sure you want to install <span x-text="pendingAppName"></span>?
-              </h3>
-
-              <div class="flex justify-end gap-3 pt-2">
-                <button
-                  @click="cancelAppInstall()"
-                  class="px-4 py-2 text-sm font-medium text-white bg-gray-800 rounded hover:bg-gray-700 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  @click="confirmAppInstall()"
-                  class="px-4 py-2 text-sm font-medium text-gray-900 bg-white border border-gray-300 rounded hover:bg-gray-50 transition-colors"
-                >
-                  Install
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <!-- App Uninstall Confirmation Modal -->
-          <div
-            x-show="showAppUninstallModal"
-            x-cloak
-            @click.self="cancelAppUninstall()"
-            class="absolute inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4"
-          >
-            <div @click.stop class="bg-white rounded-lg shadow-xl max-w-md w-full p-6 space-y-4">
-              <h3 class="text-lg font-semibold text-gray-900">
-                Are you sure you want to uninstall <span x-text="pendingAppToUninstallName"></span>?
-              </h3>
-
-              <p class="text-sm text-gray-700 leading-relaxed">
-                All app data will be permanently deleted. This cannot be undone.
-              </p>
-
-              <div class="flex justify-end gap-3 pt-2">
-                <button
-                  @click="cancelAppUninstall()"
-                  class="px-4 py-2 text-sm font-medium text-white bg-gray-800 rounded hover:bg-gray-700 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  @click="confirmAppUninstall()"
-                  class="px-4 py-2 text-sm font-medium text-gray-900 bg-white border border-gray-300 rounded hover:bg-gray-50 transition-colors"
-                >
-                  Uninstall
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <!-- Edit Device Modal -->
-          <div
-            x-show="showEditModal"
-            x-cloak
-            x-transition.opacity
-            class="absolute inset-0 bg-black/50 flex items-center justify-center z-50"
-            @click.self="closeEditModal()"
-          >
+            <!-- Confirmation Modal -->
             <div
-              class='bg-white rounded-lg shadow-xl max-w-md w-full mx-4
+              x-show="showConfirmModal"
+              x-cloak
+              @click.self="cancelFeatureToggle()"
+              class="absolute inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4"
+            >
+              <div @click.stop class="bg-white rounded-lg shadow-xl max-w-md w-full p-6 space-y-4">
+                <h3 class="text-lg font-semibold text-gray-900">Are you sure?</h3>
+
+                <p class="text-sm text-gray-700 leading-relaxed" x-text="confirmationMessage"></p>
+
+                <div class="flex justify-end gap-3 pt-2">
+                  <button
+                    @click="cancelFeatureToggle()"
+                    class="px-4 py-2 text-sm font-medium text-white bg-gray-800 rounded hover:bg-gray-700 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    @click="confirmFeatureToggle()"
+                    class="px-4 py-2 text-sm font-medium text-gray-900 bg-white border border-gray-300 rounded hover:bg-gray-50 transition-colors"
+                    x-text="pendingFeatureEnabled ? 'Turn On' : 'Turn Off'"
+                  >
+                    Ok
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- App Install Confirmation Modal -->
+            <div
+              x-show="showAppInstallModal"
+              x-cloak
+              @click.self="cancelAppInstall()"
+              class="absolute inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4"
+            >
+              <div @click.stop class="bg-white rounded-lg shadow-xl max-w-md w-full p-6 space-y-4">
+                <h3 class="text-lg font-semibold text-gray-900">
+                  Are you sure you want to install <span x-text="pendingAppName"></span>?
+                </h3>
+
+                <div class="flex justify-end gap-3 pt-2">
+                  <button
+                    @click="cancelAppInstall()"
+                    class="px-4 py-2 text-sm font-medium text-white bg-gray-800 rounded hover:bg-gray-700 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    @click="confirmAppInstall()"
+                    class="px-4 py-2 text-sm font-medium text-gray-900 bg-white border border-gray-300 rounded hover:bg-gray-50 transition-colors"
+                  >
+                    Install
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- App Uninstall Confirmation Modal -->
+            <div
+              x-show="showAppUninstallModal"
+              x-cloak
+              @click.self="cancelAppUninstall()"
+              class="absolute inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4"
+            >
+              <div @click.stop class="bg-white rounded-lg shadow-xl max-w-md w-full p-6 space-y-4">
+                <h3 class="text-lg font-semibold text-gray-900">
+                  Are you sure you want to uninstall <span x-text="pendingAppToUninstallName"></span>?
+                </h3>
+
+                <p class="text-sm text-gray-700 leading-relaxed">
+                  All app data will be permanently deleted. This cannot be undone.
+                </p>
+
+                <div class="flex justify-end gap-3 pt-2">
+                  <button
+                    @click="cancelAppUninstall()"
+                    class="px-4 py-2 text-sm font-medium text-white bg-gray-800 rounded hover:bg-gray-700 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    @click="confirmAppUninstall()"
+                    class="px-4 py-2 text-sm font-medium text-gray-900 bg-white border border-gray-300 rounded hover:bg-gray-50 transition-colors"
+                  >
+                    Uninstall
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Edit Device Modal -->
+            <div
+              x-show="showEditModal"
+              x-cloak
+              x-transition.opacity
+              class="absolute inset-0 bg-black/50 flex items-center justify-center z-50"
+              @click.self="closeEditModal()"
+            >
+              <div
+                class='bg-white rounded-lg shadow-xl max-w-md w-full mx-4
                  font-["Haffer SemiMono"]
                  [&_input]:!border-0
                  [&_input]:!border-b
@@ -1266,869 +1106,698 @@ try {
                  [&_input]:!outline-none
                  [&_input]:!ring-0
                  [&_input]:focus:!border-gray-900'
-            >
-              <!-- Header -->
-              <div class="px-6 pt-6 pb-4 font-haffer relative">
-                <h3 class="text-2xl font-semibold text-gray-900 tracking-tight">Edit Device</h3>
-                <button
-                  @click="closeEditModal()"
-                  class="absolute top-5 right-5 text-gray-700 hover:text-gray-900"
-                  aria-label="Close"
-                >
-                  <Icon name="lucide:x" class="w-7 h-7" />
-                </button>
-              </div>
-
-              <!-- Body -->
-              <div class="px-6 pb-6 space-y-7">
-                <div>
-                  <label class="block text-base text-gray-700">Name</label>
-                  <input
-                    type="text"
-                    x-model="editName"
-                    class="w-full mt-3 pl-6 pb-3 pt-1 text-m text-gray-700 tracking-wide"
-                  />
-                </div>
-
-                <div>
-                  <label class="block text-base text-gray-700">IMEI</label>
-                  <input
-                    type="text"
-                    x-model="editImei"
-                    readonly
-                    class="w-full mt-3 pl-6 pb-3 pt-1 text-m text-gray-700 tracking-wide"
-                  />
-                </div>
-
-                <div>
-                  <label class="block text-base text-gray-700">Phone Number</label>
-                  <input
-                    type="text"
-                    x-model="editPhoneNumber"
-                    @input="formatPhoneNumber($event)"
-                    placeholder="222-222-2222"
-                    maxlength="12"
-                    class="w-full mt-3 pl-6 pb-3 pt-1 text-m text-gray-700 tracking-wide"
-                  />
-                </div>
-              </div>
-
-              <!-- Footer -->
-              <div class="px-6 pb-6 flex justify-end gap-4">
-                <button
-                  @click="closeEditModal()"
-                  class="px-8 py-3 text-base font-semibold text-gray-900 bg-white
-                     border-2 border-gray-900 rounded-md hover:bg-gray-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  @click="saveDeviceDetails()"
-                  class="px-8 py-3 text-base font-semibold text-white bg-gray-700
-                     rounded-md hover:bg-gray-800"
-                >
-                  Update
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <!-- Remove Device Modal -->
-          <div
-            x-show="showRemoveModal"
-            x-cloak
-            @click.self="showRemoveModal = false"
-            class="absolute inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4"
-          >
-            <div @click.stop class="bg-white rounded-lg shadow-xl max-w-md w-full p-6 space-y-4">
-              <h3 class="text-lg font-semibold text-gray-900">Remove Device?</h3>
-
-              <p class="text-sm text-gray-700 leading-relaxed">
-                Are you sure you want to remove this device from your account? You can re-add it later by selecting "Add
-                Device" on the Devices page.
-              </p>
-
-              <form action={actions.wisephones.deleteWisephone} method="POST">
-                <input type="hidden" name="imei" x-bind:value="imei" />
-                <div class="flex justify-end gap-3 pt-2">
+              >
+                <!-- Header -->
+                <div class="px-6 pt-6 pb-4 font-haffer relative">
+                  <h3 class="text-2xl font-semibold text-gray-900 tracking-tight">Edit Device</h3>
                   <button
-                    type="button"
-                    @click="showRemoveModal = false"
-                    class="px-4 py-2 text-sm font-medium text-white bg-gray-800 rounded hover:bg-gray-700 transition-colors"
+                    @click="closeEditModal()"
+                    class="absolute top-5 right-5 text-gray-700 hover:text-gray-900"
+                    aria-label="Close"
+                  >
+                    <Icon name="lucide:x" class="w-7 h-7" />
+                  </button>
+                </div>
+
+                <!-- Body -->
+                <div class="px-6 pb-6 space-y-7">
+                  <div>
+                    <label class="block text-base text-gray-700">Name</label>
+                    <input
+                      type="text"
+                      x-model="editName"
+                      class="w-full mt-3 pl-6 pb-3 pt-1 text-m text-gray-700 tracking-wide"
+                    />
+                  </div>
+
+                  <div>
+                    <label class="block text-base text-gray-700">IMEI</label>
+                    <input
+                      type="text"
+                      x-model="editImei"
+                      readonly
+                      class="w-full mt-3 pl-6 pb-3 pt-1 text-m text-gray-700 tracking-wide"
+                    />
+                  </div>
+
+                  <div>
+                    <label class="block text-base text-gray-700">Phone Number</label>
+                    <input
+                      type="text"
+                      x-model="editPhoneNumber"
+                      @input="formatPhoneNumber($event)"
+                      placeholder="222-222-2222"
+                      maxlength="12"
+                      class="w-full mt-3 pl-6 pb-3 pt-1 text-m text-gray-700 tracking-wide"
+                    />
+                  </div>
+                </div>
+
+                <!-- Footer -->
+                <div class="px-6 pb-6 flex justify-end gap-4">
+                  <button
+                    @click="closeEditModal()"
+                    class="px-8 py-3 text-base font-semibold text-gray-900 bg-white
+                     border-2 border-gray-900 rounded-md hover:bg-gray-50"
                   >
                     Cancel
                   </button>
                   <button
-                    type="submit"
-                    class="px-4 py-2 text-sm font-medium text-gray-900 bg-white border border-gray-300 rounded hover:bg-gray-50 transition-colors"
+                    @click="saveDeviceDetails()"
+                    class="px-8 py-3 text-base font-semibold text-white bg-gray-700
+                     rounded-md hover:bg-gray-800"
                   >
-                    Remove Device
+                    Update
                   </button>
                 </div>
-              </form>
+              </div>
+            </div>
+
+            <!-- Remove Device Modal -->
+            <div
+              x-show="showRemoveModal"
+              x-cloak
+              @click.self="showRemoveModal = false"
+              class="absolute inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4"
+            >
+              <div @click.stop class="bg-white rounded-lg shadow-xl max-w-md w-full p-6 space-y-4">
+                <h3 class="text-lg font-semibold text-gray-900">Remove Device?</h3>
+
+                <p class="text-sm text-gray-700 leading-relaxed">
+                  Are you sure you want to remove this device from your account? You can re-add it later by selecting
+                  "Add Device" on the Devices page.
+                </p>
+
+                <form action={actions.wisephones.deleteWisephone} method="POST">
+                  <input type="hidden" name="imei" x-bind:value="imei" />
+                  <div class="flex justify-end gap-3 pt-2">
+                    <button
+                      type="button"
+                      @click="showRemoveModal = false"
+                      class="px-4 py-2 text-sm font-medium text-white bg-gray-800 rounded hover:bg-gray-700 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      class="px-4 py-2 text-sm font-medium text-gray-900 bg-white border border-gray-300 rounded hover:bg-gray-50 transition-colors"
+                    >
+                      Remove Device
+                    </button>
+                  </div>
+                </form>
+              </div>
             </div>
           </div>
-        </div>
 
-        <script is:inline define:vars={{ appsJsonData }}>
-          window.APPS_JSON_DATA = appsJsonData;
-        </script>
-        <script>
-          import Alpine from "alpinejs";
-          import { actions } from "astro:actions";
-          import {
-            KNOX_USER_GROUPS,
-            updateUnreachableAlpineState,
-            getPackageNameFromPlayStoreUrl,
-            STRIPE_PUBLIC_KEY,
-            type Feature
-          } from "@/libs/utils";
-          import { loadStripe, type Stripe } from "@stripe/stripe-js";
-          import { AppManagementService } from "@/services/AppManagementService";
-          import { FeatureManagementService } from "@/services/FeatureManagementService";
-          import type { AppEntry } from "@/types/apps";
-          import { DEFAULT_SYSTEM_APPS, getInstalledSystemApps, getSystemAppPackageNames } from "@/utils/system-apps";
+          <script is:inline define:vars={{ appsJsonData }}>
+            window.APPS_JSON_DATA = appsJsonData;
+          </script>
+          <script>
+            import Alpine from "alpinejs";
+            import { actions } from "astro:actions";
+            import {
+              KNOX_USER_GROUPS,
+              updateUnreachableAlpineState,
+              getPackageNameFromPlayStoreUrl,
+              STRIPE_PUBLIC_KEY,
+              type Feature
+            } from "@/libs/utils";
+            import { loadStripe, type Stripe } from "@stripe/stripe-js";
+            import { AppManagementService } from "@/services/AppManagementService";
+            import { FeatureManagementService } from "@/services/FeatureManagementService";
+            import type { AppEntry } from "@/types/apps";
+            import { DEFAULT_SYSTEM_APPS, getInstalledSystemApps, getSystemAppPackageNames } from "@/utils/system-apps";
 
-          const appManagement = new AppManagementService();
-          const featureManagement = new FeatureManagementService();
+            const appManagement = new AppManagementService();
+            const featureManagement = new FeatureManagementService();
 
-          Alpine.data("manageDevice", function () {
-            return {
-              currentTab: "device-info",
-              appsList: {} as Record<string, Omit<AppEntry, "packageName">>,
-              installedApps: [] as {
-                packageName: string;
-                appName: string;
-                isGoogleManaged: "Y" | "N";
-                systemApp?: string;
-              }[],
-              appSearchQuery: "",
-              features: [] as string[],
-              availableFeatures: [] as Feature[],
-              isSubscribed: false,
-              imei: "",
-              deviceName: "",
-              userName: "",
-              userPhone: "",
-              userEmail: "",
-              enableScreenTime: false,
+            Alpine.data("manageDevice", function () {
+              return {
+                currentTab: "device-info",
+                appsList: {} as Record<string, Omit<AppEntry, "packageName">>,
+                installedApps: [] as {
+                  packageName: string;
+                  appName: string;
+                  isGoogleManaged: "Y" | "N";
+                  systemApp?: string;
+                }[],
+                appSearchQuery: "",
+                features: [] as string[],
+                availableFeatures: [] as Feature[],
+                isSubscribed: false,
+                imei: "",
+                deviceName: "",
+                userName: "",
+                userPhone: "",
+                userEmail: "",
+                enableScreenTime: false,
 
-              isEditing: false,
-              devicePhone: "",
-              originalDeviceName: "",
-              originalDevicePhone: "",
-              isLoading: true,
-              isToolDrawerLoading: false,
-              isToolDrawerLoaded: false,
-              isAppsLoading: false,
-              isAppsLoaded: false,
-              isAvailableAppsLoaded: false,
-              mobileMenuOpen: false,
-              showAccountMenu: false,
-              showConfirmModal: false,
-              pendingFeature: null as Feature | null,
-              pendingFeatureEnabled: false,
-              confirmationMessage: "",
-              showDisclosureFor: null as string | null,
-              showAppInstallModal: false,
-              pendingAppToInstall: null as string | null,
-              pendingAppName: "",
-              showAppUninstallModal: false,
-              pendingAppToUninstall: null as string | null,
-              pendingAppToUninstallName: "",
-              showEditModal: false,
-              editName: "",
-              editImei: "",
-              editPhoneNumber: "",
-              showRemoveModal: false,
-              cachedTotalApps: 0,
-              cachedDeviceModel: null as string | null,
-              isA16Device: false,
-              // @ts-ignore
-              isPhoneSetUp: this.$persist(false),
-              // TODO :  Not a todo, but note to the future dev : all apps are embedded inside apps.json file,
-              // TODO :since ottogrid support is not available and Healthy Tech Index is not yet integrated
-              // TODO : apps in apps.json  from line 4 to 2537 are faith tools apps and the rest are from ottogrid (approved apps)
-              get totalAppsCount() {
-                // Use cached value if available, otherwise calculate from current state
-                if (this.cachedTotalApps > 0) {
-                  return this.cachedTotalApps;
-                }
-                return this.systemApps.length + this.installedFilteredApps.length;
-              },
-              updateCachedTotalApps() {
-                const total = this.systemApps.length + this.installedFilteredApps.length;
-                this.cachedTotalApps = total;
-                // Save to localStorage with IMEI as key
-                if (this.imei) {
-                  try {
-                    localStorage.setItem(`totalApps_${this.imei}`, String(total));
-                  } catch (error) {
-                    console.error("Failed to save total apps to localStorage:", error);
+                isEditing: false,
+                devicePhone: "",
+                originalDeviceName: "",
+                originalDevicePhone: "",
+                isLoading: true,
+                isToolDrawerLoading: false,
+                isToolDrawerLoaded: false,
+                isAppsLoading: false,
+                isAppsLoaded: false,
+                isAvailableAppsLoaded: false,
+                mobileMenuOpen: false,
+                showAccountMenu: false,
+                showConfirmModal: false,
+                pendingFeature: null as Feature | null,
+                pendingFeatureEnabled: false,
+                confirmationMessage: "",
+                showDisclosureFor: null as string | null,
+                showAppInstallModal: false,
+                pendingAppToInstall: null as string | null,
+                pendingAppName: "",
+                showAppUninstallModal: false,
+                pendingAppToUninstall: null as string | null,
+                pendingAppToUninstallName: "",
+                showEditModal: false,
+                editName: "",
+                editImei: "",
+                editPhoneNumber: "",
+                showRemoveModal: false,
+                cachedTotalApps: 0,
+                // @ts-ignore
+                isPhoneSetUp: this.$persist(false),
+                // TODO :  Not a todo, but note to the future dev : all apps are embedded inside apps.json file,
+                // TODO :since ottogrid support is not available and Healthy Tech Index is not yet integrated
+                // TODO : apps in apps.json  from line 4 to 2537 are faith tools apps and the rest are from ottogrid (approved apps)
+                get totalAppsCount() {
+                  // Use cached value if available, otherwise calculate from current state
+                  if (this.cachedTotalApps > 0) {
+                    return this.cachedTotalApps;
                   }
-                }
-              },
-              loadCachedTotalApps() {
-                if (this.imei) {
-                  try {
-                    const cached = localStorage.getItem(`totalApps_${this.imei}`);
-                    if (cached) {
-                      this.cachedTotalApps = parseInt(cached, 10) || 0;
+                  return this.systemApps.length + this.installedFilteredApps.length;
+                },
+                updateCachedTotalApps() {
+                  const total = this.systemApps.length + this.installedFilteredApps.length;
+                  this.cachedTotalApps = total;
+                  // Save to localStorage with IMEI as key
+                  if (this.imei) {
+                    try {
+                      localStorage.setItem(`totalApps_${this.imei}`, String(total));
+                    } catch (error) {
+                      console.error("Failed to save total apps to localStorage:", error);
                     }
-                  } catch (error) {
-                    console.error("Failed to load total apps from localStorage:", error);
                   }
-                }
-              },
-              get availableApps() {
-                // Only show apps that are NOT installed
-                // Also double-check against installedApps array to ensure no installed apps slip through
-                let apps = Object.entries(this.appsList)
-                  .filter(([packageName, app]) => {
-                    // First check: app.installed flag must be false
-                    if (app.installed) {
-                      return false;
+                },
+                loadCachedTotalApps() {
+                  if (this.imei) {
+                    try {
+                      const cached = localStorage.getItem(`totalApps_${this.imei}`);
+                      if (cached) {
+                        this.cachedTotalApps = parseInt(cached, 10) || 0;
+                      }
+                    } catch (error) {
+                      console.error("Failed to load total apps from localStorage:", error);
                     }
-                    // Second check: verify it's not in installedApps array (defensive check)
-                    const isInInstalledApps = (this.installedApps || []).some(
-                      (installedApp: { packageName: string }) =>
-                        installedApp && installedApp.packageName && installedApp.packageName === packageName
+                  }
+                },
+                get availableApps() {
+                  // Only show apps that are NOT installed
+                  // Also double-check against installedApps array to ensure no installed apps slip through
+                  let apps = Object.entries(this.appsList)
+                    .filter(([packageName, app]) => {
+                      // First check: app.installed flag must be false
+                      if (app.installed) {
+                        return false;
+                      }
+                      // Second check: verify it's not in installedApps array (defensive check)
+                      const isInInstalledApps = (this.installedApps || []).some(
+                        (installedApp: { packageName: string }) =>
+                          installedApp && installedApp.packageName && installedApp.packageName === packageName
+                      );
+                      return !isInInstalledApps;
+                    })
+                    .map(([packageName, app]) => ({ packageName, ...app }));
+
+                  // Filter by search query (searches both name and category)
+                  if (this.appSearchQuery) {
+                    const query = this.appSearchQuery.toLowerCase();
+                    apps = apps.filter(
+                      (app) =>
+                        app.name.toLowerCase().includes(query) ||
+                        (app.category && app.category.toLowerCase().includes(query))
                     );
-                    return !isInInstalledApps;
-                  })
-                  .map(([packageName, app]) => ({ packageName, ...app }));
-
-                // Filter by search query (searches both name and category)
-                if (this.appSearchQuery) {
-                  const query = this.appSearchQuery.toLowerCase();
-                  apps = apps.filter(
-                    (app) =>
-                      app.name.toLowerCase().includes(query) ||
-                      (app.category && app.category.toLowerCase().includes(query))
-                  );
-                }
-
-                return apps;
-              },
-
-              get systemApps() {
-                // Get installed system apps based on the device model
-                const deviceModel = this.deviceName || ""; // Use device name/model if available
-                // Filter out null/undefined values from installedApps before processing
-                const validInstalledApps = (this.installedApps || []).filter((app) => app && app.packageName);
-                const result = getInstalledSystemApps(validInstalledApps, deviceModel);
-                // Ensure result doesn't contain null values
-                let filteredResult = result.filter((app) => app && app.packageName);
-
-                // Enrich with icon URLs from appsList if available
-                filteredResult = filteredResult.map((app) => {
-                  const appFromList = this.appsList?.[app.packageName];
-                  return {
-                    ...app,
-                    iconUrl: appFromList?.iconUrl || undefined
-                  };
-                });
-
-                return filteredResult;
-              },
-
-              get installedFilteredApps() {
-                // Filter out null/undefined values first
-                const validInstalledApps = (this.installedApps || []).filter(
-                  (app) => app && (app.packageName || app.appName)
-                );
-
-                // Show all installed apps from the device (filtered by isGoogleManaged === "Y")
-                let apps = validInstalledApps
-                  .filter((app) => app && app.isGoogleManaged === "Y")
-                  .map((app) => ({
-                    packageName: app.packageName || app.appName || "unknown",
-                    name: app.appName || app.packageName || "Unknown App",
-                    installed: true,
-                    source: "Tool Drawer" as const
-                  }))
-                  .filter((app) => app && app.packageName && app.packageName !== "unknown");
-
-                // Also include apps from appsList that are marked as installed
-                const appsListInstalled = Object.entries(this.appsList || {})
-                  .filter(([packageName, app]) => app && app.installed && packageName)
-                  .map(([packageName, app]) => ({ packageName, ...app }))
-                  .filter((app) => app && app.packageName);
-
-                // Merge and deduplicate by packageName, prioritizing appsList data (which has icons)
-                const appsMap = new Map();
-                apps.forEach((app) => {
-                  if (app && app.packageName) {
-                    appsMap.set(app.packageName, app);
                   }
-                });
-                appsListInstalled.forEach((app) => {
-                  if (app && app.packageName) {
-                    // If already exists, merge to preserve iconUrl from appsList
-                    const existing = appsMap.get(app.packageName);
-                    if (existing) {
-                      appsMap.set(app.packageName, { ...existing, ...app, iconUrl: app.iconUrl || existing.iconUrl });
-                    } else {
+
+                  return apps;
+                },
+
+                get systemApps() {
+                  // Get installed system apps based on the device model
+                  const deviceModel = this.deviceName || ""; // Use device name/model if available
+                  // Filter out null/undefined values from installedApps before processing
+                  const validInstalledApps = (this.installedApps || []).filter((app) => app && app.packageName);
+                  const result = getInstalledSystemApps(validInstalledApps, deviceModel);
+                  // Ensure result doesn't contain null values
+                  let filteredResult = result.filter((app) => app && app.packageName);
+
+                  // Enrich with icon URLs from appsList if available
+                  filteredResult = filteredResult.map((app) => {
+                    const appFromList = this.appsList?.[app.packageName];
+                    return {
+                      ...app,
+                      iconUrl: appFromList?.iconUrl || undefined
+                    };
+                  });
+
+                  return filteredResult;
+                },
+
+                get installedFilteredApps() {
+                  // Filter out null/undefined values first
+                  const validInstalledApps = (this.installedApps || []).filter(
+                    (app) => app && (app.packageName || app.appName)
+                  );
+
+                  // Show all installed apps from the device (filtered by isGoogleManaged === "Y")
+                  let apps = validInstalledApps
+                    .filter((app) => app && app.isGoogleManaged === "Y")
+                    .map((app) => ({
+                      packageName: app.packageName || app.appName || "unknown",
+                      name: app.appName || app.packageName || "Unknown App",
+                      installed: true,
+                      source: "Tool Drawer" as const
+                    }))
+                    .filter((app) => app && app.packageName && app.packageName !== "unknown");
+
+                  // Also include apps from appsList that are marked as installed
+                  const appsListInstalled = Object.entries(this.appsList || {})
+                    .filter(([packageName, app]) => app && app.installed && packageName)
+                    .map(([packageName, app]) => ({ packageName, ...app }))
+                    .filter((app) => app && app.packageName);
+
+                  // Merge and deduplicate by packageName, prioritizing appsList data (which has icons)
+                  const appsMap = new Map();
+                  apps.forEach((app) => {
+                    if (app && app.packageName) {
                       appsMap.set(app.packageName, app);
                     }
-                  }
-                });
-                apps = Array.from(appsMap.values()).filter((app) => app && app.packageName);
+                  });
+                  appsListInstalled.forEach((app) => {
+                    if (app && app.packageName) {
+                      // If already exists, merge to preserve iconUrl from appsList
+                      const existing = appsMap.get(app.packageName);
+                      if (existing) {
+                        appsMap.set(app.packageName, { ...existing, ...app, iconUrl: app.iconUrl || existing.iconUrl });
+                      } else {
+                        appsMap.set(app.packageName, app);
+                      }
+                    }
+                  });
+                  apps = Array.from(appsMap.values()).filter((app) => app && app.packageName);
 
-                // Filter out system apps (they're shown in a separate section)
-                const systemAppPackages = getSystemAppPackageNames();
-                apps = apps.filter((app) => app && app.packageName && !systemAppPackages.includes(app.packageName));
+                  // Filter out system apps (they're shown in a separate section)
+                  const systemAppPackages = getSystemAppPackageNames();
+                  apps = apps.filter((app) => app && app.packageName && !systemAppPackages.includes(app.packageName));
 
-                // Sort by name
-                apps.sort((a, b) => {
-                  if (!a || !b || !a.name || !b.name) return 0;
-                  return a.name.localeCompare(b.name);
-                });
+                  // Sort by name
+                  apps.sort((a, b) => {
+                    if (!a || !b || !a.name || !b.name) return 0;
+                    return a.name.localeCompare(b.name);
+                  });
 
-                // Final filter to ensure no null values
-                const finalApps = apps.filter((app) => app && app.packageName && app.name);
+                  // Final filter to ensure no null values
+                  const finalApps = apps.filter((app) => app && app.packageName && app.name);
 
-                return finalApps;
-              },
+                  return finalApps;
+                },
 
-              async getFeatures() {
-                if (!this.imei) {
-                  console.error("IMEI is not set, cannot fetch features");
-                  this.isLoading = false;
-                  return;
-                }
-
-                // Ensure loading is true at the start
-                this.isLoading = true;
-
-                try {
-                  const url = new URL(`/api/samsung-knox.json`, window.location.origin);
-                  url.searchParams.set("action", "get-device-groups");
-                  url.searchParams.set("imei", this.imei);
-
-                  const res = await fetch(url, { method: "GET" });
-
-                  if (!res.ok) {
-                    throw new Error(`Failed to fetch features: ${res.status} ${res.statusText}`);
-                  }
-
-                  const features = await res.json();
-                  this.features = features;
-                } catch (error) {
-                  console.error("Error fetching features:", error);
-                  this.showErrorToast("Failed to load device features. Please try again.");
-                } finally {
-                  // Set loading to false after all operations complete
-                  this.isLoading = false;
-                }
-              },
-
-              /**
-               * Gets device model from Samsung Knox API
-               * @returns Device model string or null if not found
-               */
-              async getDeviceModelFromKnox(): Promise<string | null> {
-                try {
-                  const deviceInfoUrl = new URL(`/api/samsung-knox.json`, window.location.origin);
-                  deviceInfoUrl.searchParams.set("action", "get-device-info");
-                  deviceInfoUrl.searchParams.set("imei", this.imei);
-
-                  const deviceInfoRes = await fetch(deviceInfoUrl, { method: "GET" });
-                  if (!deviceInfoRes.ok) {
-                    return null;
-                  }
-
-                  const deviceInfo = await deviceInfoRes.json();
-                  const rv = deviceInfo?.resultValue;
-                  if (!rv) {
-                    return null;
-                  }
-
-                  const model =
-                    rv.deviceModelName ||
-                    rv.modelName ||
-                    rv.deviceModel ||
-                    rv.model ||
-                    rv.deviceName ||
-                    rv.name ||
-                    null;
-
-                  return model;
-                } catch (error) {
-                  console.error("Error fetching device model:", error);
-                  return null;
-                }
-              },
-
-              /**
-               * Caches device model on page load
-               */
-              async cacheDeviceModel() {
-                if (this.cachedDeviceModel === null) {
-                  const model = await this.getDeviceModelFromKnox();
-                  this.cachedDeviceModel = model;
-                  if (model) {
-                    const modelUpper = model.toUpperCase();
-                    this.isA16Device = modelUpper.includes("A16") || modelUpper.includes("SM-A16");
-                    console.log(`Device model cached: ${model}, isA16Device: ${this.isA16Device}`);
-                  }
-                }
-              },
-
-              /**
-               * Gets the appropriate group ID for a feature based on device model
-               * For A16 devices, returns a16KnoxManageId if available, otherwise knoxManageId
-               * For other devices, returns knoxManageId
-               */
-              getGroupIdForFeature(feature: Feature): string {
-                if (this.isA16Device && feature.a16KnoxManageId) {
-                  return feature.a16KnoxManageId;
-                }
-                return feature.knoxManageId;
-              },
-
-              /**
-               * Checks device model and assigns appropriate subscription group
-               * - A16 devices -> A16_SUBSCRIBED group
-               * - A15 and other devices -> SUBSCRIBED group (default)
-               */
-              async assignSubscriptionGroupByDeviceModel() {
-                try {
-                  const deviceModel = await this.getDeviceModelFromKnox();
-                  if (!deviceModel) {
-                    console.warn("Could not determine device model, using default SUBSCRIBED group");
-                    // Default to SUBSCRIBED if we can't determine model
-                    await this.addFeatureToDevice(KNOX_USER_GROUPS.SUBSCRIBED);
-                    this.features.push(KNOX_USER_GROUPS.SUBSCRIBED);
+                async getFeatures() {
+                  if (!this.imei) {
+                    console.error("IMEI is not set, cannot fetch features");
+                    this.isLoading = false;
                     return;
                   }
 
-                  const modelUpper = deviceModel.toUpperCase();
+                  // Ensure loading is true at the start
+                  this.isLoading = true;
 
-                  // Check if device is A16
-                  if (modelUpper.includes("A16") || modelUpper.includes("SM-A16")) {
-                    console.log(`Device model detected as A16: ${deviceModel}, assigning to A16_SUBSCRIBED group`);
-                    await this.addFeatureToDevice(KNOX_USER_GROUPS.A16_SUBSCRIBED);
-                    this.features.push(KNOX_USER_GROUPS.A16_SUBSCRIBED);
-                  } else {
-                    // Default to SUBSCRIBED for A15 and all other devices
-                    console.log(`Device model: ${deviceModel}, assigning to SUBSCRIBED group`);
-                    await this.addFeatureToDevice(KNOX_USER_GROUPS.SUBSCRIBED);
-                    this.features.push(KNOX_USER_GROUPS.SUBSCRIBED);
-                  }
-                } catch (error) {
-                  console.error("Error assigning subscription group by device model:", error);
-                  // Fallback to default SUBSCRIBED group on error
-                  await this.addFeatureToDevice(KNOX_USER_GROUPS.SUBSCRIBED);
-                  this.features.push(KNOX_USER_GROUPS.SUBSCRIBED);
-                }
-              },
-
-              /**
-               * Checks device model and assigns appropriate unpaid group
-               * - A16 devices -> A16_UNPAID group
-               * - A15 and other devices -> UNPAID group (default)
-               */
-              async assignUnpaidGroupByDeviceModel() {
-                try {
-                  // Ensure device model is cached
-                  await this.cacheDeviceModel();
-
-                  if (this.isA16Device) {
-                    console.log(`A16 device detected, assigning to A16_UNPAID group`);
-                    await this.addFeatureToDevice(KNOX_USER_GROUPS.A16_UNPAID);
-                    this.features.push(KNOX_USER_GROUPS.A16_UNPAID);
-                  } else {
-                    // Default to UNPAID for A15 and all other devices
-                    console.log(`Non-A16 device, assigning to UNPAID group`);
-                    await this.addFeatureToDevice(KNOX_USER_GROUPS.UNPAID);
-                    this.features.push(KNOX_USER_GROUPS.UNPAID);
-                  }
-                } catch (error) {
-                  console.error("Error assigning unpaid group by device model:", error);
-                  // Fallback to default UNPAID group on error
-                  await this.addFeatureToDevice(KNOX_USER_GROUPS.UNPAID);
-                  this.features.push(KNOX_USER_GROUPS.UNPAID);
-                }
-              },
-
-              /**
-               * Adds a feature to the device using the Knox API
-               */
-              async addFeatureToDevice(knoxManageId: string) {
-                const url = new URL(`/api/samsung-knox.json`, window.location.origin);
-                url.searchParams.set("action", "apply-feature");
-                url.searchParams.set("imei", this.imei);
-                url.searchParams.set("knoxManageId", knoxManageId);
-                await fetch(url, { method: "POST" });
-              },
-
-              /**
-               * Removes a feature from the device using the Knox API
-               */
-              async removeFeatureFromDevice(knoxManageId: string) {
-                const url = new URL(`/api/samsung-knox.json`, window.location.origin);
-                url.searchParams.set("action", "remove-feature");
-                url.searchParams.set("imei", this.imei);
-                url.searchParams.set("knoxManageId", knoxManageId);
-                await fetch(url, { method: "POST" });
-              },
-
-              // Load available apps from apps.json - both Tool Drawer and Faith Tools
-              // This should be called immediately when App Management tab is clicked
-              loadAvailableApps() {
-                if (this.isAvailableAppsLoaded) {
-                  return;
-                }
-
-                try {
-                  console.log("[DEBUG] Loading available apps from apps.json...");
-                  const updatedAppsList: Record<string, Omit<AppEntry, "packageName">> = {};
-
-                  // Load apps from apps.json - filter for apps where "Tool Drawer" === "Yes" OR "faith.tools"
-                  const appsJsonData = (window as any).APPS_JSON_DATA || { rows: [] };
-                  const appsFromJson = (appsJsonData.rows || []).filter((row: any) => {
-                    const toolDrawer = row.cells && row.cells["Tool Drawer"];
-                    return toolDrawer === "Yes" || toolDrawer === "faith.tools";
-                  });
-
-                  appsFromJson.forEach((row: any) => {
-                    try {
-                      const cells = row.cells || {};
-                      const playStoreUrl = cells["Play Store URL"];
-                      const toolName = cells["Tool Name"]?.trim() || "Unknown App";
-                      const iconUrl = cells["Play Store Icon URL"] || "";
-
-                      if (!playStoreUrl || playStoreUrl === "n/a") return;
-
-                      const packageName = getPackageNameFromPlayStoreUrl(playStoreUrl);
-                      if (!packageName) return;
-
-                      // Skip if already added (deduplication)
-                      if (updatedAppsList[packageName]) return;
-
-                      // Check if app is installed by comparing with installedApps
-                      const isInstalled = (this.installedApps || []).some(
-                        (installedApp: { packageName: string }) =>
-                          installedApp && installedApp.packageName === packageName
-                      );
-
-                      // Determine source based on Tool Drawer value
-                      const toolDrawerValue = cells["Tool Drawer"];
-                      const source = toolDrawerValue === "faith.tools" ? "faith.tools" : "Tool Drawer";
-
-                      const category = cells["Play Store Category"] || "";
-
-                      updatedAppsList[packageName] = {
-                        source: source as "faith.tools" | "Tool Drawer",
-                        installed: isInstalled,
-                        name: toolName,
-                        iconUrl: iconUrl || undefined,
-                        category: category || undefined
-                      };
-                    } catch (appError) {
-                      console.error("Error processing app from apps.json:", appError);
-                    }
-                  });
-
-                  // Sort apps by name
-                  this.appsList = Object.fromEntries(
-                    Object.entries(updatedAppsList).sort(([, a], [, b]) => a.name.localeCompare(b.name))
-                  );
-
-                  this.isAvailableAppsLoaded = true;
-                  console.log(
-                    `[DEBUG] Loaded ${Object.keys(this.appsList).length} available apps from apps.json (Tool Drawer + Faith Tools)`
-                  );
-                } catch (error) {
-                  console.error("Error loading available apps:", error);
-                }
-              },
-
-              // Fetch installed apps from Samsung Knox API when App Management tab is clicked
-              // Flow:
-              // 1. User clicks "App Management" tab -> currentTab watcher triggers
-              // 2. loadAvailableApps() is called immediately (fast, no API call)
-              // 3. This function fetches installed apps from Samsung Knox API (async, slow)
-              // 4. Updates installedApps array
-              // 5. Updates appsList to mark which available apps are installed
-              // 6. System apps are automatically classified via systemApps getter (reactive)
-              // 7. Installed apps are automatically filtered via installedFilteredApps getter (reactive)
-              // 8. UI updates automatically via Alpine.js reactivity
-              async getInstalledApps() {
-                if (!this.imei || this.isAppsLoading || this.isAppsLoaded) {
-                  return;
-                }
-
-                try {
-                  this.isAppsLoading = true;
-
-                  const formData = new FormData();
-                  formData.append("imei", String(this.imei));
-
-                  console.log("[TESTING] non-blocking implementation");
-                  const response = await fetch("/_actions/wisephones.getInstalledApps", {
-                    method: "POST",
-                    body: formData
-                  });
-
-                  if (!response.ok) {
-                    throw new Error(`Failed to fetch installed apps: ${response.status} ${response.statusText}`);
-                  }
-
-                  // Check the raw response text first to see what we're actually getting
-                  const responseText = await response.text();
-                  console.log("[DEBUG] Raw response text (first 1000 chars):", responseText.substring(0, 1000));
-                  console.log("[DEBUG] Raw response text length:", responseText.length);
-
-                  // Try to parse the JSON
-                  let result;
                   try {
-                    result = JSON.parse(responseText);
-                  } catch (parseError) {
-                    console.error("[DEBUG] Failed to parse JSON:", parseError);
-                    console.error("[DEBUG] Response text:", responseText);
-                    throw new Error("Failed to parse response as JSON");
-                  }
+                    const url = new URL(`/api/samsung-knox.json`, window.location.origin);
+                    url.searchParams.set("action", "get-device-groups");
+                    url.searchParams.set("imei", this.imei);
 
-                  console.log("[DEBUG] Raw result from fetch:", {
-                    resultType: typeof result,
-                    isArray: Array.isArray(result),
-                    resultLength: Array.isArray(result) ? result.length : null,
-                    resultKeys: result && !Array.isArray(result) ? Object.keys(result) : [],
-                    hasApps: !!result?.apps,
-                    hasData: !!result?.data
-                  });
+                    const res = await fetch(url, { method: "GET" });
 
-                  // Log first few elements if result is an array
-                  if (Array.isArray(result) && result.length > 0) {
-                    console.log("[DEBUG] Result is array, checking first 10 elements:");
-                    for (let i = 0; i < Math.min(10, result.length); i++) {
-                      const elem = result[i];
-                      console.log(`[DEBUG] result[${i}]:`, {
-                        value: elem,
-                        type: typeof elem,
-                        isArray: Array.isArray(elem),
-                        length: Array.isArray(elem) ? elem.length : null,
-                        firstItem: Array.isArray(elem) && elem.length > 0 ? elem[0] : null,
-                        firstItemType: Array.isArray(elem) && elem.length > 0 ? typeof elem[0] : null,
-                        hasPackageName:
-                          elem && typeof elem === "object" && !Array.isArray(elem) ? !!elem.packageName : null
-                      });
+                    if (!res.ok) {
+                      throw new Error(`Failed to fetch features: ${res.status} ${res.statusText}`);
                     }
+
+                    const features = await res.json();
+                    this.features = features;
+                  } catch (error) {
+                    console.error("Error fetching features:", error);
+                    this.showErrorToast("Failed to load device features. Please try again.");
+                  } finally {
+                    // Set loading to false after all operations complete
+                    this.isLoading = false;
+                  }
+                },
+
+                // Load available apps from apps.json - both Tool Drawer and Faith Tools
+                // This should be called immediately when App Management tab is clicked
+                loadAvailableApps() {
+                  if (this.isAvailableAppsLoaded) {
+                    return;
                   }
 
-                  // Astro actions when called via fetch might use a compressed/referenced format
-                  // Check if result[0] contains metadata with indices
-                  let fetchedApps = [];
+                  try {
+                    console.log("[DEBUG] Loading available apps from apps.json...");
+                    const updatedAppsList: Record<string, Omit<AppEntry, "packageName">> = {};
 
-                  if (Array.isArray(result) && result.length > 0 && result[0] && typeof result[0] === "object") {
-                    const metadata = result[0];
-                    console.log("[DEBUG] Found metadata object:", metadata);
+                    // Load apps from apps.json - filter for apps where "Tool Drawer" === "Yes" OR "faith.tools"
+                    const appsJsonData = (window as any).APPS_JSON_DATA || { rows: [] };
+                    const appsFromJson = (appsJsonData.rows || []).filter((row: any) => {
+                      const toolDrawer = row.cells && row.cells["Tool Drawer"];
+                      return toolDrawer === "Yes" || toolDrawer === "faith.tools";
+                    });
 
-                    // If metadata.apps is a number, it might be an index to the apps array
-                    if (typeof metadata.apps === "number" && metadata.apps < result.length) {
-                      const appsIndex = metadata.apps;
-                      const appsData = result[appsIndex];
-                      console.log(`[DEBUG] metadata.apps points to result[${appsIndex}]:`, appsData);
+                    appsFromJson.forEach((row: any) => {
+                      try {
+                        const cells = row.cells || {};
+                        const playStoreUrl = cells["Play Store URL"];
+                        const toolName = cells["Tool Name"]?.trim() || "Unknown App";
+                        const iconUrl = cells["Play Store Icon URL"] || "";
 
-                      if (Array.isArray(appsData)) {
-                        // appsData might be an array of indices to app objects
-                        console.log(`[DEBUG] result[${appsIndex}] is an array of ${appsData.length} items`);
+                        if (!playStoreUrl || playStoreUrl === "n/a") return;
 
-                        // Collect app objects using these indices
-                        const rawApps = [];
-                        for (let i = 0; i < appsData.length; i++) {
-                          const appIdx = appsData[i];
-                          if (typeof appIdx === "number" && appIdx < result.length) {
-                            const appObj = result[appIdx];
-                            if (appObj && typeof appObj === "object" && !Array.isArray(appObj)) {
-                              rawApps.push({ index: appIdx, raw: appObj });
+                        const packageName = getPackageNameFromPlayStoreUrl(playStoreUrl);
+                        if (!packageName) return;
+
+                        // Skip if already added (deduplication)
+                        if (updatedAppsList[packageName]) return;
+
+                        // Check if app is installed by comparing with installedApps
+                        const isInstalled = (this.installedApps || []).some(
+                          (installedApp: { packageName: string }) =>
+                            installedApp && installedApp.packageName === packageName
+                        );
+
+                        // Determine source based on Tool Drawer value
+                        const toolDrawerValue = cells["Tool Drawer"];
+                        const source = toolDrawerValue === "faith.tools" ? "faith.tools" : "Tool Drawer";
+
+                        const category = cells["Play Store Category"] || "";
+
+                        updatedAppsList[packageName] = {
+                          source: source as "faith.tools" | "Tool Drawer",
+                          installed: isInstalled,
+                          name: toolName,
+                          iconUrl: iconUrl || undefined,
+                          category: category || undefined
+                        };
+                      } catch (appError) {
+                        console.error("Error processing app from apps.json:", appError);
+                      }
+                    });
+
+                    // Sort apps by name
+                    this.appsList = Object.fromEntries(
+                      Object.entries(updatedAppsList).sort(([, a], [, b]) => a.name.localeCompare(b.name))
+                    );
+
+                    this.isAvailableAppsLoaded = true;
+                    console.log(
+                      `[DEBUG] Loaded ${Object.keys(this.appsList).length} available apps from apps.json (Tool Drawer + Faith Tools)`
+                    );
+                  } catch (error) {
+                    console.error("Error loading available apps:", error);
+                  }
+                },
+
+                // Fetch installed apps from Samsung Knox API when App Management tab is clicked
+                // Flow:
+                // 1. User clicks "App Management" tab -> currentTab watcher triggers
+                // 2. loadAvailableApps() is called immediately (fast, no API call)
+                // 3. This function fetches installed apps from Samsung Knox API (async, slow)
+                // 4. Updates installedApps array
+                // 5. Updates appsList to mark which available apps are installed
+                // 6. System apps are automatically classified via systemApps getter (reactive)
+                // 7. Installed apps are automatically filtered via installedFilteredApps getter (reactive)
+                // 8. UI updates automatically via Alpine.js reactivity
+                async getInstalledApps() {
+                  if (!this.imei || this.isAppsLoading || this.isAppsLoaded) {
+                    return;
+                  }
+
+                  try {
+                    this.isAppsLoading = true;
+
+                    const formData = new FormData();
+                    formData.append("imei", String(this.imei));
+
+                    console.log("[TESTING] non-blocking implementation");
+                    const response = await fetch("/_actions/wisephones.getInstalledApps", {
+                      method: "POST",
+                      body: formData
+                    });
+
+                    if (!response.ok) {
+                      throw new Error(`Failed to fetch installed apps: ${response.status} ${response.statusText}`);
+                    }
+
+                    // Check the raw response text first to see what we're actually getting
+                    const responseText = await response.text();
+                    console.log("[DEBUG] Raw response text (first 1000 chars):", responseText.substring(0, 1000));
+                    console.log("[DEBUG] Raw response text length:", responseText.length);
+
+                    // Try to parse the JSON
+                    let result;
+                    try {
+                      result = JSON.parse(responseText);
+                    } catch (parseError) {
+                      console.error("[DEBUG] Failed to parse JSON:", parseError);
+                      console.error("[DEBUG] Response text:", responseText);
+                      throw new Error("Failed to parse response as JSON");
+                    }
+
+                    console.log("[DEBUG] Raw result from fetch:", {
+                      resultType: typeof result,
+                      isArray: Array.isArray(result),
+                      resultLength: Array.isArray(result) ? result.length : null,
+                      resultKeys: result && !Array.isArray(result) ? Object.keys(result) : [],
+                      hasApps: !!result?.apps,
+                      hasData: !!result?.data
+                    });
+
+                    // Log first few elements if result is an array
+                    if (Array.isArray(result) && result.length > 0) {
+                      console.log("[DEBUG] Result is array, checking first 10 elements:");
+                      for (let i = 0; i < Math.min(10, result.length); i++) {
+                        const elem = result[i];
+                        console.log(`[DEBUG] result[${i}]:`, {
+                          value: elem,
+                          type: typeof elem,
+                          isArray: Array.isArray(elem),
+                          length: Array.isArray(elem) ? elem.length : null,
+                          firstItem: Array.isArray(elem) && elem.length > 0 ? elem[0] : null,
+                          firstItemType: Array.isArray(elem) && elem.length > 0 ? typeof elem[0] : null,
+                          hasPackageName:
+                            elem && typeof elem === "object" && !Array.isArray(elem) ? !!elem.packageName : null
+                        });
+                      }
+                    }
+
+                    // Astro actions when called via fetch might use a compressed/referenced format
+                    // Check if result[0] contains metadata with indices
+                    let fetchedApps = [];
+
+                    if (Array.isArray(result) && result.length > 0 && result[0] && typeof result[0] === "object") {
+                      const metadata = result[0];
+                      console.log("[DEBUG] Found metadata object:", metadata);
+
+                      // If metadata.apps is a number, it might be an index to the apps array
+                      if (typeof metadata.apps === "number" && metadata.apps < result.length) {
+                        const appsIndex = metadata.apps;
+                        const appsData = result[appsIndex];
+                        console.log(`[DEBUG] metadata.apps points to result[${appsIndex}]:`, appsData);
+
+                        if (Array.isArray(appsData)) {
+                          // appsData might be an array of indices to app objects
+                          console.log(`[DEBUG] result[${appsIndex}] is an array of ${appsData.length} items`);
+
+                          // Collect app objects using these indices
+                          const rawApps = [];
+                          for (let i = 0; i < appsData.length; i++) {
+                            const appIdx = appsData[i];
+                            if (typeof appIdx === "number" && appIdx < result.length) {
+                              const appObj = result[appIdx];
+                              if (appObj && typeof appObj === "object" && !Array.isArray(appObj)) {
+                                rawApps.push({ index: appIdx, raw: appObj });
+                              }
                             }
                           }
-                        }
 
-                        console.log(`[DEBUG] Collected ${rawApps.length} raw app objects from indices`);
+                          console.log(`[DEBUG] Collected ${rawApps.length} raw app objects from indices`);
 
-                        // Dereference numeric properties to strings
-                        fetchedApps = rawApps.map(({ raw: app }) => {
-                          const dereferenced: any = {};
-                          for (const [key, value] of Object.entries(app)) {
-                            if (typeof value === "number" && value < result.length) {
-                              const stringValue = result[value];
-                              if (typeof stringValue === "string") {
-                                dereferenced[key] = stringValue;
-                              } else if (stringValue && typeof stringValue === "object") {
-                                // Nested object - recursively dereference
-                                dereferenced[key] = stringValue;
+                          // Dereference numeric properties to strings
+                          fetchedApps = rawApps.map(({ raw: app }) => {
+                            const dereferenced: any = {};
+                            for (const [key, value] of Object.entries(app)) {
+                              if (typeof value === "number" && value < result.length) {
+                                const stringValue = result[value];
+                                if (typeof stringValue === "string") {
+                                  dereferenced[key] = stringValue;
+                                } else if (stringValue && typeof stringValue === "object") {
+                                  // Nested object - recursively dereference
+                                  dereferenced[key] = stringValue;
+                                } else {
+                                  dereferenced[key] = value;
+                                }
                               } else {
                                 dereferenced[key] = value;
                               }
-                            } else {
-                              dereferenced[key] = value;
                             }
-                          }
-                          return dereferenced;
-                        });
-
-                        console.log(`[DEBUG] Dereferenced ${fetchedApps.length} apps`);
-                        if (fetchedApps.length > 0) {
-                          console.log("[DEBUG] Sample dereferenced app:", {
-                            packageName: fetchedApps[0].packageName,
-                            appName: fetchedApps[0].appName,
-                            keys: Object.keys(fetchedApps[0])
+                            return dereferenced;
                           });
+
+                          console.log(`[DEBUG] Dereferenced ${fetchedApps.length} apps`);
+                          if (fetchedApps.length > 0) {
+                            console.log("[DEBUG] Sample dereferenced app:", {
+                              packageName: fetchedApps[0].packageName,
+                              appName: fetchedApps[0].appName,
+                              keys: Object.keys(fetchedApps[0])
+                            });
+                          }
                         }
                       }
                     }
-                  }
 
-                  // Fallback: Check if result is an object with apps property
-                  if (
-                    fetchedApps.length === 0 &&
-                    result &&
-                    typeof result === "object" &&
-                    !Array.isArray(result) &&
-                    result.apps &&
-                    Array.isArray(result.apps)
-                  ) {
-                    fetchedApps = result.apps;
-                    console.log("[DEBUG] Found apps in result.apps, count:", fetchedApps.length);
-                  }
-                  // Fallback: Check if result is an object with data.apps
-                  else if (
-                    fetchedApps.length === 0 &&
-                    result &&
-                    typeof result === "object" &&
-                    !Array.isArray(result) &&
-                    result.data?.apps &&
-                    Array.isArray(result.data.apps)
-                  ) {
-                    fetchedApps = result.data.apps;
-                    console.log("[DEBUG] Found apps in result.data.apps, count:", fetchedApps.length);
-                  }
-                  // Fallback: Check if result[2] is the apps array (based on debug output showing array structure)
-                  else if (
-                    fetchedApps.length === 0 &&
-                    Array.isArray(result) &&
-                    result.length > 2 &&
-                    Array.isArray(result[2])
-                  ) {
-                    // Check if result[2] contains app objects or just numbers
-                    const thirdElement = result[2];
-                    if (thirdElement.length > 0 && typeof thirdElement[0] === "object" && thirdElement[0] !== null) {
-                      fetchedApps = thirdElement;
-                      console.log("[DEBUG] Found apps in result[2], count:", fetchedApps.length);
-                    } else {
-                      // result[2] contains numbers (likely indices), so apps might be at those indices
-                      // Or apps might start from result[3] onwards
-                      console.log("[DEBUG] result[2] is array of numbers, checking if they're indices...");
-                      console.log("[DEBUG] Checking result[3], result[4], result[5] for app objects...");
+                    // Fallback: Check if result is an object with apps property
+                    if (
+                      fetchedApps.length === 0 &&
+                      result &&
+                      typeof result === "object" &&
+                      !Array.isArray(result) &&
+                      result.apps &&
+                      Array.isArray(result.apps)
+                    ) {
+                      fetchedApps = result.apps;
+                      console.log("[DEBUG] Found apps in result.apps, count:", fetchedApps.length);
+                    }
+                    // Fallback: Check if result is an object with data.apps
+                    else if (
+                      fetchedApps.length === 0 &&
+                      result &&
+                      typeof result === "object" &&
+                      !Array.isArray(result) &&
+                      result.data?.apps &&
+                      Array.isArray(result.data.apps)
+                    ) {
+                      fetchedApps = result.data.apps;
+                      console.log("[DEBUG] Found apps in result.data.apps, count:", fetchedApps.length);
+                    }
+                    // Fallback: Check if result[2] is the apps array (based on debug output showing array structure)
+                    else if (
+                      fetchedApps.length === 0 &&
+                      Array.isArray(result) &&
+                      result.length > 2 &&
+                      Array.isArray(result[2])
+                    ) {
+                      // Check if result[2] contains app objects or just numbers
+                      const thirdElement = result[2];
+                      if (thirdElement.length > 0 && typeof thirdElement[0] === "object" && thirdElement[0] !== null) {
+                        fetchedApps = thirdElement;
+                        console.log("[DEBUG] Found apps in result[2], count:", fetchedApps.length);
+                      } else {
+                        // result[2] contains numbers (likely indices), so apps might be at those indices
+                        // Or apps might start from result[3] onwards
+                        console.log("[DEBUG] result[2] is array of numbers, checking if they're indices...");
+                        console.log("[DEBUG] Checking result[3], result[4], result[5] for app objects...");
 
-                      // result[2] contains indices to app objects: [3, 35, 47, 61, ...]
-                      // Use these indices to collect all app objects
-                      if (Array.isArray(result[2]) && result[2].length > 0) {
-                        console.log("[DEBUG] Using result[2] indices to collect app objects...");
-                        const appIndices = result[2];
-                        const rawApps = [];
+                        // result[2] contains indices to app objects: [3, 35, 47, 61, ...]
+                        // Use these indices to collect all app objects
+                        if (Array.isArray(result[2]) && result[2].length > 0) {
+                          console.log("[DEBUG] Using result[2] indices to collect app objects...");
+                          const appIndices = result[2];
+                          const rawApps = [];
 
-                        for (let i = 0; i < appIndices.length; i++) {
-                          const idx = appIndices[i];
-                          if (typeof idx === "number" && idx < result.length) {
-                            const appObj = result[idx];
-                            if (appObj && typeof appObj === "object" && !Array.isArray(appObj)) {
-                              rawApps.push(appObj);
+                          for (let i = 0; i < appIndices.length; i++) {
+                            const idx = appIndices[i];
+                            if (typeof idx === "number" && idx < result.length) {
+                              const appObj = result[idx];
+                              if (appObj && typeof appObj === "object" && !Array.isArray(appObj)) {
+                                rawApps.push(appObj);
+                              }
                             }
                           }
-                        }
 
-                        console.log(`[DEBUG] Collected ${rawApps.length} raw app objects`);
+                          console.log(`[DEBUG] Collected ${rawApps.length} raw app objects`);
 
-                        // Now dereference numeric properties to actual strings
-                        // If packageName is a number, it's an index to the actual string
-                        const dereferencedApps = rawApps.map((app) => {
-                          const dereferenced: any = {};
-                          for (const [key, value] of Object.entries(app)) {
-                            if (typeof value === "number" && value < result.length) {
-                              // This number is likely an index to a string value
-                              const stringValue = result[value];
-                              if (typeof stringValue === "string") {
-                                dereferenced[key] = stringValue;
+                          // Now dereference numeric properties to actual strings
+                          // If packageName is a number, it's an index to the actual string
+                          const dereferencedApps = rawApps.map((app) => {
+                            const dereferenced: any = {};
+                            for (const [key, value] of Object.entries(app)) {
+                              if (typeof value === "number" && value < result.length) {
+                                // This number is likely an index to a string value
+                                const stringValue = result[value];
+                                if (typeof stringValue === "string") {
+                                  dereferenced[key] = stringValue;
+                                } else {
+                                  // Keep the number if it's not a string index
+                                  dereferenced[key] = value;
+                                }
                               } else {
-                                // Keep the number if it's not a string index
                                 dereferenced[key] = value;
                               }
-                            } else {
-                              dereferenced[key] = value;
                             }
-                          }
-                          return dereferenced;
-                        });
+                            return dereferenced;
+                          });
 
-                        fetchedApps = dereferencedApps;
-                        console.log(`[DEBUG] Dereferenced ${fetchedApps.length} apps`);
-                        if (fetchedApps.length > 0) {
-                          console.log("[DEBUG] First dereferenced app:", fetchedApps[0]);
-                        }
-                      } else {
-                        // Fallback: Check if result[3] onwards contain app objects
-                        console.log("[DEBUG] result[2] is not an array of indices, checking result[3] onwards...");
-                        for (let i = 3; i < Math.min(result.length, 20); i++) {
-                          const elem = result[i];
-                          if (
-                            elem &&
-                            typeof elem === "object" &&
-                            !Array.isArray(elem) &&
-                            (elem.packageName || elem.appName)
-                          ) {
-                            // Found an app object! Check if subsequent elements are also apps
-                            console.log(`[DEBUG] Found app object at result[${i}]:`, elem);
-                            // Collect all app objects starting from this index
-                            fetchedApps = [];
-                            for (let j = i; j < result.length; j++) {
-                              const app = result[j];
-                              if (
-                                app &&
-                                typeof app === "object" &&
-                                !Array.isArray(app) &&
-                                (app.packageName || app.appName)
-                              ) {
-                                fetchedApps.push(app);
-                              } else {
-                                // Stop when we hit a non-app element
-                                break;
-                              }
-                            }
-                            console.log(`[DEBUG] Found ${fetchedApps.length} apps starting from result[${i}]`);
-                            break;
+                          fetchedApps = dereferencedApps;
+                          console.log(`[DEBUG] Dereferenced ${fetchedApps.length} apps`);
+                          if (fetchedApps.length > 0) {
+                            console.log("[DEBUG] First dereferenced app:", fetchedApps[0]);
                           }
-                        }
-                      }
-
-                      // If still not found, check if result[2] numbers are indices pointing to apps
-                      if (fetchedApps.length === 0 && Array.isArray(result[2]) && result[2].length > 0) {
-                        console.log("[DEBUG] Checking if result[2] numbers are indices to app objects...");
-                        const indices = result[2];
-                        const potentialApps = [];
-                        for (let i = 0; i < Math.min(indices.length, 10); i++) {
-                          const idx = indices[i];
-                          if (typeof idx === "number" && idx < result.length) {
-                            const elem = result[idx];
+                        } else {
+                          // Fallback: Check if result[3] onwards contain app objects
+                          console.log("[DEBUG] result[2] is not an array of indices, checking result[3] onwards...");
+                          for (let i = 3; i < Math.min(result.length, 20); i++) {
+                            const elem = result[i];
                             if (
                               elem &&
                               typeof elem === "object" &&
                               !Array.isArray(elem) &&
                               (elem.packageName || elem.appName)
                             ) {
-                              potentialApps.push(elem);
+                              // Found an app object! Check if subsequent elements are also apps
+                              console.log(`[DEBUG] Found app object at result[${i}]:`, elem);
+                              // Collect all app objects starting from this index
+                              fetchedApps = [];
+                              for (let j = i; j < result.length; j++) {
+                                const app = result[j];
+                                if (
+                                  app &&
+                                  typeof app === "object" &&
+                                  !Array.isArray(app) &&
+                                  (app.packageName || app.appName)
+                                ) {
+                                  fetchedApps.push(app);
+                                } else {
+                                  // Stop when we hit a non-app element
+                                  break;
+                                }
+                              }
+                              console.log(`[DEBUG] Found ${fetchedApps.length} apps starting from result[${i}]`);
+                              break;
                             }
                           }
                         }
-                        if (potentialApps.length > 0) {
-                          console.log(`[DEBUG] Found ${potentialApps.length} apps using result[2] indices`);
-                          // Collect all apps using all indices
-                          fetchedApps = [];
-                          for (let i = 0; i < indices.length; i++) {
+
+                        // If still not found, check if result[2] numbers are indices pointing to apps
+                        if (fetchedApps.length === 0 && Array.isArray(result[2]) && result[2].length > 0) {
+                          console.log("[DEBUG] Checking if result[2] numbers are indices to app objects...");
+                          const indices = result[2];
+                          const potentialApps = [];
+                          for (let i = 0; i < Math.min(indices.length, 10); i++) {
                             const idx = indices[i];
                             if (typeof idx === "number" && idx < result.length) {
                               const elem = result[idx];
@@ -2138,969 +1807,785 @@ try {
                                 !Array.isArray(elem) &&
                                 (elem.packageName || elem.appName)
                               ) {
-                                fetchedApps.push(elem);
+                                potentialApps.push(elem);
+                              }
+                            }
+                          }
+                          if (potentialApps.length > 0) {
+                            console.log(`[DEBUG] Found ${potentialApps.length} apps using result[2] indices`);
+                            // Collect all apps using all indices
+                            fetchedApps = [];
+                            for (let i = 0; i < indices.length; i++) {
+                              const idx = indices[i];
+                              if (typeof idx === "number" && idx < result.length) {
+                                const elem = result[idx];
+                                if (
+                                  elem &&
+                                  typeof elem === "object" &&
+                                  !Array.isArray(elem) &&
+                                  (elem.packageName || elem.appName)
+                                ) {
+                                  fetchedApps.push(elem);
+                                }
                               }
                             }
                           }
                         }
                       }
                     }
-                  }
-                  // Check if result is directly the apps array
-                  else if (Array.isArray(result) && result.length > 0) {
-                    const firstItem = result[0];
-                    if (firstItem && typeof firstItem === "object" && (firstItem.packageName || firstItem.appName)) {
-                      fetchedApps = result;
-                      console.log("[DEBUG] Result is directly apps array, count:", fetchedApps.length);
+                    // Check if result is directly the apps array
+                    else if (Array.isArray(result) && result.length > 0) {
+                      const firstItem = result[0];
+                      if (firstItem && typeof firstItem === "object" && (firstItem.packageName || firstItem.appName)) {
+                        fetchedApps = result;
+                        console.log("[DEBUG] Result is directly apps array, count:", fetchedApps.length);
+                      }
                     }
-                  }
-                  // Check if result.data is the apps array
-                  else if (result?.data && Array.isArray(result.data)) {
-                    const firstItem = result.data[0];
-                    if (firstItem && typeof firstItem === "object" && (firstItem.packageName || firstItem.appName)) {
-                      fetchedApps = result.data;
-                      console.log("[DEBUG] Found apps in result.data (array), count:", fetchedApps.length);
+                    // Check if result.data is the apps array
+                    else if (result?.data && Array.isArray(result.data)) {
+                      const firstItem = result.data[0];
+                      if (firstItem && typeof firstItem === "object" && (firstItem.packageName || firstItem.appName)) {
+                        fetchedApps = result.data;
+                        console.log("[DEBUG] Found apps in result.data (array), count:", fetchedApps.length);
+                      }
                     }
-                  }
 
-                  if (fetchedApps.length === 0) {
-                    console.error("[DEBUG] Could not find apps array in result", {
-                      resultType: typeof result,
-                      isArray: Array.isArray(result),
-                      resultLength: Array.isArray(result) ? result.length : null,
-                      resultKeys:
-                        result && typeof result === "object" && !Array.isArray(result) ? Object.keys(result) : [],
-                      firstFewElements: Array.isArray(result) ? result.slice(0, 5) : null,
-                      resultSample: result ? JSON.stringify(result).substring(0, 2000) : null
-                    });
-                  }
+                    if (fetchedApps.length === 0) {
+                      console.error("[DEBUG] Could not find apps array in result", {
+                        resultType: typeof result,
+                        isArray: Array.isArray(result),
+                        resultLength: Array.isArray(result) ? result.length : null,
+                        resultKeys:
+                          result && typeof result === "object" && !Array.isArray(result) ? Object.keys(result) : [],
+                        firstFewElements: Array.isArray(result) ? result.slice(0, 5) : null,
+                        resultSample: result ? JSON.stringify(result).substring(0, 2000) : null
+                      });
+                    }
 
-                  // Log first app structure to see what we're getting
-                  if (fetchedApps.length > 0) {
-                    console.log("[DEBUG] First app structure:", {
-                      app: fetchedApps[0],
-                      appType: typeof fetchedApps[0],
-                      hasPackageName: !!fetchedApps[0]?.packageName,
-                      packageNameType: typeof fetchedApps[0]?.packageName,
-                      packageNameValue: fetchedApps[0]?.packageName,
-                      allKeys: fetchedApps[0] ? Object.keys(fetchedApps[0]) : []
-                    });
-                  }
+                    // Log first app structure to see what we're getting
+                    if (fetchedApps.length > 0) {
+                      console.log("[DEBUG] First app structure:", {
+                        app: fetchedApps[0],
+                        appType: typeof fetchedApps[0],
+                        hasPackageName: !!fetchedApps[0]?.packageName,
+                        packageNameType: typeof fetchedApps[0]?.packageName,
+                        packageNameValue: fetchedApps[0]?.packageName,
+                        allKeys: fetchedApps[0] ? Object.keys(fetchedApps[0]) : []
+                      });
+                    }
 
-                  // Update installed apps - filter out null/undefined values
-                  this.installedApps = (fetchedApps || []).filter(
-                    (app: any) => app && (app.packageName || app.appName)
-                  );
-
-                  console.log("[DEBUG] After filtering, installedApps count:", this.installedApps.length);
-
-                  // Log first few apps to see structure
-                  this.installedApps.slice(0, 5).forEach((app, index) => {
-                    console.log(`[DEBUG] App ${index} full object:`, app);
-                    console.log(`[DEBUG] App ${index} details:`, {
-                      app: app,
-                      appType: typeof app,
-                      isArray: Array.isArray(app),
-                      isObject: typeof app === "object" && app !== null,
-                      packageName: app?.packageName,
-                      packageNameType: typeof app?.packageName,
-                      packageNameValue: app?.packageName,
-                      appName: app?.appName,
-                      allKeys: app && typeof app === "object" ? Object.keys(app) : "not an object"
-                    });
-                  });
-
-                  // Update appsList to mark which available apps are now installed
-                  // This updates the installed status of apps that were already loaded by loadAvailableApps()
-                  // IMPORTANT: Installed apps should NOT appear in availableApps (they're filtered out by the getter)
-                  if (this.appsList && Object.keys(this.appsList).length > 0) {
-                    console.log("[DEBUG] Updating installed status in appsList...");
-                    const updatedAppsList = { ...this.appsList };
-                    let installedCount = 0;
-                    Object.keys(updatedAppsList).forEach((packageName) => {
-                      // Check if this package is in the installedApps array
-                      const isInstalled = this.installedApps.some(
-                        (installedApp: { packageName: string }) =>
-                          installedApp &&
-                          installedApp.packageName &&
-                          installedApp.packageName.trim() === packageName.trim()
-                      );
-                      updatedAppsList[packageName].installed = isInstalled;
-                      if (isInstalled) {
-                        installedCount++;
-                      }
-                    });
-                    this.appsList = updatedAppsList;
-                    console.log(
-                      `[DEBUG] Updated ${Object.keys(this.appsList).length} apps in appsList: ${installedCount} installed, ${Object.keys(this.appsList).length - installedCount} available`
+                    // Update installed apps - filter out null/undefined values
+                    this.installedApps = (fetchedApps || []).filter(
+                      (app: any) => app && (app.packageName || app.appName)
                     );
-                  } else {
-                    // If appsList is empty, load available apps first, then update installed status
-                    console.log("[DEBUG] appsList is empty, loading available apps first...");
-                    this.loadAvailableApps();
-                    // Update installed status after loading
-                    const updatedAppsList = { ...this.appsList };
-                    let installedCount = 0;
-                    Object.keys(updatedAppsList).forEach((packageName) => {
-                      const isInstalled = this.installedApps.some(
-                        (installedApp: { packageName: string }) =>
-                          installedApp &&
-                          installedApp.packageName &&
-                          installedApp.packageName.trim() === packageName.trim()
-                      );
-                      updatedAppsList[packageName].installed = isInstalled;
-                      if (isInstalled) {
-                        installedCount++;
-                      }
+
+                    console.log("[DEBUG] After filtering, installedApps count:", this.installedApps.length);
+
+                    // Log first few apps to see structure
+                    this.installedApps.slice(0, 5).forEach((app, index) => {
+                      console.log(`[DEBUG] App ${index} full object:`, app);
+                      console.log(`[DEBUG] App ${index} details:`, {
+                        app: app,
+                        appType: typeof app,
+                        isArray: Array.isArray(app),
+                        isObject: typeof app === "object" && app !== null,
+                        packageName: app?.packageName,
+                        packageNameType: typeof app?.packageName,
+                        packageNameValue: app?.packageName,
+                        appName: app?.appName,
+                        allKeys: app && typeof app === "object" ? Object.keys(app) : "not an object"
+                      });
                     });
-                    this.appsList = updatedAppsList;
-                    console.log(
-                      `[DEBUG] Loaded and updated ${Object.keys(this.appsList).length} apps: ${installedCount} installed, ${Object.keys(this.appsList).length - installedCount} available`
-                    );
-                  }
 
-                  this.isAppsLoaded = true;
-                  // Update cached total apps count after loading
-                  this.updateCachedTotalApps();
-                } catch (error) {
-                  console.error("Error getting installed apps:", error);
-                  this.showErrorToast("Failed to load installed apps. Please try again.");
-                } finally {
-                  this.isAppsLoading = false;
-                }
-              },
-
-              showSuccessToast(message: string) {
-                updateUnreachableAlpineState({
-                  sourceDataElement: document.documentElement,
-                  key: "toastMessage",
-                  value: message
-                });
-              },
-
-              showErrorToast(message: string) {
-                updateUnreachableAlpineState({
-                  sourceDataElement: document.documentElement,
-                  key: "toastErrorMessage",
-                  value: message
-                });
-              },
-
-              cancelEdit() {
-                this.deviceName = this.originalDeviceName;
-                this.devicePhone = this.originalDevicePhone;
-                this.isEditing = false;
-              },
-
-              async completeSetup() {
-                if (
-                  confirm(
-                    "Completing the setup will close the Portal and remove 'Setup' from your Wisephone II's home screen. Continue?"
-                  )
-                ) {
-                  try {
-                    // Ensure device model is cached before assigning groups
-                    await this.cacheDeviceModel();
-
-                    // Get current features to check subscription status
-                    await this.getFeatures();
-
-                    // Check if device is subscribed but doesn't have any subscription group
-                    if (this.isSubscribed) {
-                      const hasSubscribedGroup =
-                        this.features.includes(KNOX_USER_GROUPS.SUBSCRIBED) ||
-                        this.features.includes(KNOX_USER_GROUPS.A16_SUBSCRIBED);
-                      if (!hasSubscribedGroup) {
-                        // Assign appropriate subscription group based on device model
-                        await this.assignSubscriptionGroupByDeviceModel();
-                      }
+                    // Update appsList to mark which available apps are now installed
+                    // This updates the installed status of apps that were already loaded by loadAvailableApps()
+                    // IMPORTANT: Installed apps should NOT appear in availableApps (they're filtered out by the getter)
+                    if (this.appsList && Object.keys(this.appsList).length > 0) {
+                      console.log("[DEBUG] Updating installed status in appsList...");
+                      const updatedAppsList = { ...this.appsList };
+                      let installedCount = 0;
+                      Object.keys(updatedAppsList).forEach((packageName) => {
+                        // Check if this package is in the installedApps array
+                        const isInstalled = this.installedApps.some(
+                          (installedApp: { packageName: string }) =>
+                            installedApp &&
+                            installedApp.packageName &&
+                            installedApp.packageName.trim() === packageName.trim()
+                        );
+                        updatedAppsList[packageName].installed = isInstalled;
+                        if (isInstalled) {
+                          installedCount++;
+                        }
+                      });
+                      this.appsList = updatedAppsList;
+                      console.log(
+                        `[DEBUG] Updated ${Object.keys(this.appsList).length} apps in appsList: ${installedCount} installed, ${Object.keys(this.appsList).length - installedCount} available`
+                      );
                     } else {
-                      // If not subscribed, ensure device has unpaid group
-                      const hasUnpaidGroup =
-                        this.features.includes(KNOX_USER_GROUPS.UNPAID) ||
-                        this.features.includes(KNOX_USER_GROUPS.A16_UNPAID);
-                      if (!hasUnpaidGroup) {
-                        // Assign appropriate unpaid group based on device model
-                        await this.assignUnpaidGroupByDeviceModel();
-                      }
+                      // If appsList is empty, load available apps first, then update installed status
+                      console.log("[DEBUG] appsList is empty, loading available apps first...");
+                      this.loadAvailableApps();
+                      // Update installed status after loading
+                      const updatedAppsList = { ...this.appsList };
+                      let installedCount = 0;
+                      Object.keys(updatedAppsList).forEach((packageName) => {
+                        const isInstalled = this.installedApps.some(
+                          (installedApp: { packageName: string }) =>
+                            installedApp &&
+                            installedApp.packageName &&
+                            installedApp.packageName.trim() === packageName.trim()
+                        );
+                        updatedAppsList[packageName].installed = isInstalled;
+                        if (isInstalled) {
+                          installedCount++;
+                        }
+                      });
+                      this.appsList = updatedAppsList;
+                      console.log(
+                        `[DEBUG] Loaded and updated ${Object.keys(this.appsList).length} apps: ${installedCount} installed, ${Object.keys(this.appsList).length - installedCount} available`
+                      );
                     }
 
-                    // Ensure no conflicting groups exist
-                    await this.removeExclusiveGroups(this.features);
+                    this.isAppsLoaded = true;
+                    // Update cached total apps count after loading
+                    this.updateCachedTotalApps();
+                  } catch (error) {
+                    console.error("Error getting installed apps:", error);
+                    this.showErrorToast("Failed to load installed apps. Please try again.");
+                  } finally {
+                    this.isAppsLoading = false;
+                  }
+                },
 
+                showSuccessToast(message: string) {
+                  updateUnreachableAlpineState({
+                    sourceDataElement: document.documentElement,
+                    key: "toastMessage",
+                    value: message
+                  });
+                },
+
+                showErrorToast(message: string) {
+                  updateUnreachableAlpineState({
+                    sourceDataElement: document.documentElement,
+                    key: "toastErrorMessage",
+                    value: message
+                  });
+                },
+
+                cancelEdit() {
+                  this.deviceName = this.originalDeviceName;
+                  this.devicePhone = this.originalDevicePhone;
+                  this.isEditing = false;
+                },
+
+                completeSetup() {
+                  if (
+                    confirm(
+                      "Completing the setup will close the Portal and remove 'Setup' from your Wisephone II's home screen. Continue?"
+                    )
+                  ) {
                     this.isPhoneSetUp = true;
                     this.$nextTick(() => {
                       window.location.href = this.completeSetupUrl;
                     });
-                  } catch (error) {
-                    console.error("Error during complete setup:", error);
-                    this.showErrorToast("Failed to complete setup. Please try again.");
                   }
-                }
-              },
+                },
 
-              formatPhoneNumber(event: Event) {
-                const input = event.target as HTMLInputElement;
-                const cursorPosition = input.selectionStart || 0;
-                let value = input.value.replace(/\D/g, ""); // Remove all non-digits (accepts both formats)
+                formatPhoneNumber(event: Event) {
+                  const input = event.target as HTMLInputElement;
+                  const cursorPosition = input.selectionStart || 0;
+                  let value = input.value.replace(/\D/g, ""); // Remove all non-digits (accepts both formats)
 
-                // Limit to 10 digits
-                if (value.length > 10) {
-                  value = value.slice(0, 10);
-                }
-
-                // Format as XXX-XXX-XXXX
-                let formatted = "";
-                if (value.length > 6) {
-                  formatted = value.slice(0, 3) + "-" + value.slice(3, 6) + "-" + value.slice(6, 10);
-                } else if (value.length > 3) {
-                  formatted = value.slice(0, 3) + "-" + value.slice(3);
-                } else {
-                  formatted = value;
-                }
-
-                this.editPhoneNumber = formatted;
-
-                // Restore cursor position after formatting
-                // Adjust cursor position based on added dashes
-                let newCursorPosition = cursorPosition;
-                const beforeCursor = input.value.substring(0, cursorPosition);
-                const digitsBeforeCursor = beforeCursor.replace(/\D/g, "").length;
-
-                // Calculate new position accounting for dashes
-                if (digitsBeforeCursor > 6) {
-                  newCursorPosition = digitsBeforeCursor + 2; // Two dashes before
-                } else if (digitsBeforeCursor > 3) {
-                  newCursorPosition = digitsBeforeCursor + 1; // One dash before
-                } else {
-                  newCursorPosition = digitsBeforeCursor;
-                }
-
-                // Ensure cursor doesn't exceed formatted length
-                newCursorPosition = Math.min(newCursorPosition, formatted.length);
-
-                // Use setTimeout to ensure DOM is updated before setting cursor
-                setTimeout(() => {
-                  input.setSelectionRange(newCursorPosition, newCursorPosition);
-                }, 0);
-              },
-
-              openEditModal() {
-                this.editName = this.deviceName;
-                this.editImei = this.imei;
-                // Format phone number when opening modal
-                const phoneDigits = this.devicePhone.replace(/\D/g, "");
-                if (phoneDigits.length === 10) {
-                  this.editPhoneNumber = `${phoneDigits.slice(0, 3)}-${phoneDigits.slice(3, 6)}-${phoneDigits.slice(6)}`;
-                } else {
-                  this.editPhoneNumber = this.devicePhone;
-                }
-                this.showEditModal = true;
-              },
-
-              closeEditModal() {
-                this.showEditModal = false;
-                // Reset form fields
-                this.editName = "";
-                this.editImei = "";
-                this.editPhoneNumber = "";
-              },
-
-              async saveDeviceDetails() {
-                try {
-                  // Clean phone number (remove dashes, keep only digits)
-                  const cleanedPhoneNumber = this.editPhoneNumber.replace(/\D/g, "");
-
-                  // Validate phone number format (should be 10 digits)
-                  if (cleanedPhoneNumber.length !== 10 && cleanedPhoneNumber.length > 0) {
-                    this.showErrorToast("Phone number must be 10 digits");
-                    return;
+                  // Limit to 10 digits
+                  if (value.length > 10) {
+                    value = value.slice(0, 10);
                   }
 
-                  // Format phone number for API (must be in format 123-456-7890 for validation)
-                  const formattedPhoneNumber =
-                    cleanedPhoneNumber.length === 10
-                      ? `${cleanedPhoneNumber.slice(0, 3)}-${cleanedPhoneNumber.slice(3, 6)}-${cleanedPhoneNumber.slice(6)}`
-                      : this.editPhoneNumber;
+                  // Format as XXX-XXX-XXXX
+                  let formatted = "";
+                  if (value.length > 6) {
+                    formatted = value.slice(0, 3) + "-" + value.slice(3, 6) + "-" + value.slice(6, 10);
+                  } else if (value.length > 3) {
+                    formatted = value.slice(0, 3) + "-" + value.slice(3);
+                  } else {
+                    formatted = value;
+                  }
 
-                  // Create form data for submission
-                  const formData = new FormData();
-                  formData.append("imei", this.imei);
-                  formData.append("nickname", this.editName.trim() || "Device");
-                  formData.append("phoneNumber", formattedPhoneNumber);
+                  this.editPhoneNumber = formatted;
 
-                  // Submit via fetch to the update action
-                  const response = await fetch("/_actions/wisephones.updateWisephone", {
-                    method: "POST",
-                    body: formData
-                  });
+                  // Restore cursor position after formatting
+                  // Adjust cursor position based on added dashes
+                  let newCursorPosition = cursorPosition;
+                  const beforeCursor = input.value.substring(0, cursorPosition);
+                  const digitsBeforeCursor = beforeCursor.replace(/\D/g, "").length;
 
-                  if (response.ok) {
-                    // Format phone number for display
-                    const formattedPhone =
+                  // Calculate new position accounting for dashes
+                  if (digitsBeforeCursor > 6) {
+                    newCursorPosition = digitsBeforeCursor + 2; // Two dashes before
+                  } else if (digitsBeforeCursor > 3) {
+                    newCursorPosition = digitsBeforeCursor + 1; // One dash before
+                  } else {
+                    newCursorPosition = digitsBeforeCursor;
+                  }
+
+                  // Ensure cursor doesn't exceed formatted length
+                  newCursorPosition = Math.min(newCursorPosition, formatted.length);
+
+                  // Use setTimeout to ensure DOM is updated before setting cursor
+                  setTimeout(() => {
+                    input.setSelectionRange(newCursorPosition, newCursorPosition);
+                  }, 0);
+                },
+
+                openEditModal() {
+                  this.editName = this.deviceName;
+                  this.editImei = this.imei;
+                  // Format phone number when opening modal
+                  const phoneDigits = this.devicePhone.replace(/\D/g, "");
+                  if (phoneDigits.length === 10) {
+                    this.editPhoneNumber = `${phoneDigits.slice(0, 3)}-${phoneDigits.slice(3, 6)}-${phoneDigits.slice(6)}`;
+                  } else {
+                    this.editPhoneNumber = this.devicePhone;
+                  }
+                  this.showEditModal = true;
+                },
+
+                closeEditModal() {
+                  this.showEditModal = false;
+                  // Reset form fields
+                  this.editName = "";
+                  this.editImei = "";
+                  this.editPhoneNumber = "";
+                },
+
+                async saveDeviceDetails() {
+                  try {
+                    // Clean phone number (remove dashes, keep only digits)
+                    const cleanedPhoneNumber = this.editPhoneNumber.replace(/\D/g, "");
+
+                    // Validate phone number format (should be 10 digits)
+                    if (cleanedPhoneNumber.length !== 10 && cleanedPhoneNumber.length > 0) {
+                      this.showErrorToast("Phone number must be 10 digits");
+                      return;
+                    }
+
+                    // Format phone number for API (must be in format 123-456-7890 for validation)
+                    const formattedPhoneNumber =
                       cleanedPhoneNumber.length === 10
                         ? `${cleanedPhoneNumber.slice(0, 3)}-${cleanedPhoneNumber.slice(3, 6)}-${cleanedPhoneNumber.slice(6)}`
                         : this.editPhoneNumber;
 
-                    // Update local state
-                    this.deviceName = this.editName.trim() || "Device";
-                    this.devicePhone = formattedPhone;
-                    this.originalDeviceName = this.deviceName;
-                    this.originalDevicePhone = this.devicePhone;
+                    // Create form data for submission
+                    const formData = new FormData();
+                    formData.append("imei", this.imei);
+                    formData.append("nickname", this.editName.trim() || "Device");
+                    formData.append("phoneNumber", formattedPhoneNumber);
 
-                    // Close modal
-                    this.closeEditModal();
-
-                    // Re-check subscription status with new phone number (reusing same logic as page load)
-                    // The page load checks: 1) bypassTechlessSubscription, 2) validateIsSubscribed
-                    // We use the validateIsUserSubscribed action which calls validateIsSubscribed
-                    console.log("[DEBUG] Re-checking subscription after phone number update", {
-                      imei: this.imei,
-                      phoneNumber: formattedPhoneNumber
+                    // Submit via fetch to the update action
+                    const response = await fetch("/_actions/wisephones.updateWisephone", {
+                      method: "POST",
+                      body: formData
                     });
 
-                    try {
-                      // Use the existing action that mirrors the page load subscription check
-                      // This action calls validateIsSubscribed (same as page load logic)
-                      const subscriptionResult = await actions.wisephones.validateIsUserSubscribed.orThrow({
+                    if (response.ok) {
+                      // Format phone number for display
+                      const formattedPhone =
+                        cleanedPhoneNumber.length === 10
+                          ? `${cleanedPhoneNumber.slice(0, 3)}-${cleanedPhoneNumber.slice(3, 6)}-${cleanedPhoneNumber.slice(6)}`
+                          : this.editPhoneNumber;
+
+                      // Update local state
+                      this.deviceName = this.editName.trim() || "Device";
+                      this.devicePhone = formattedPhone;
+                      this.originalDeviceName = this.deviceName;
+                      this.originalDevicePhone = this.devicePhone;
+
+                      // Close modal
+                      this.closeEditModal();
+
+                      // Re-check subscription status with new phone number (reusing same logic as page load)
+                      // The page load checks: 1) bypassTechlessSubscription, 2) validateIsSubscribed
+                      // We use the validateIsUserSubscribed action which calls validateIsSubscribed
+                      console.log("[DEBUG] Re-checking subscription after phone number update", {
                         imei: this.imei,
                         phoneNumber: formattedPhoneNumber
                       });
 
-                      const hasSubscription = subscriptionResult?.isSubscribed === true;
+                      try {
+                        // Use the existing action that mirrors the page load subscription check
+                        // This action calls validateIsSubscribed (same as page load logic)
+                        const subscriptionResult = await actions.wisephones.validateIsUserSubscribed.orThrow({
+                          imei: this.imei,
+                          phoneNumber: formattedPhoneNumber
+                        });
 
-                      console.log("[DEBUG] Subscription check result:", {
-                        isSubscribed: hasSubscription,
-                        subscriptionResult
-                      });
+                        const hasSubscription = subscriptionResult?.isSubscribed === true;
 
-                      if (!hasSubscription) {
-                        // No subscription found, close manage page and redirect to dashboard immediately
-                        // The dashboard will show "Activate Plan" button for this device
-                        window.location.href = "/dashboard";
-                        return;
-                      } else {
-                        // Subscription found, update local state
-                        this.isSubscribed = true;
+                        console.log("[DEBUG] Subscription check result:", {
+                          isSubscribed: hasSubscription,
+                          subscriptionResult
+                        });
+
+                        if (!hasSubscription) {
+                          // No subscription found, close manage page and redirect to dashboard immediately
+                          // The dashboard will show "Activate Plan" button for this device
+                          window.location.href = "/dashboard";
+                          return;
+                        } else {
+                          // Subscription found, update local state
+                          this.isSubscribed = true;
+                          this.showSuccessToast("Device details updated successfully");
+                        }
+                      } catch (subscriptionError) {
+                        console.error("[DEBUG] Error checking subscription:", subscriptionError);
+                        // Continue anyway, subscription check failed but device was updated
                         this.showSuccessToast("Device details updated successfully");
                       }
-                    } catch (subscriptionError) {
-                      console.error("[DEBUG] Error checking subscription:", subscriptionError);
-                      // Continue anyway, subscription check failed but device was updated
-                      this.showSuccessToast("Device details updated successfully");
+                    } else {
+                      console.error("Failed to update device");
+                      this.showErrorToast("Failed to update device. Please try again.");
                     }
-                  } else {
-                    console.error("Failed to update device");
-                    this.showErrorToast("Failed to update device. Please try again.");
+                  } catch (error) {
+                    console.error("Error updating device:", error);
+                    this.showErrorToast("An error occurred while updating the device.");
                   }
-                } catch (error) {
-                  console.error("Error updating device:", error);
-                  this.showErrorToast("An error occurred while updating the device.");
-                }
-              },
+                },
 
-              async toggleFeature(feature: Feature) {
-                try {
-                  if (!this.isSubscribed) {
-                    throw new Error("Active subscription required");
+                async toggleFeature(feature: Feature) {
+                  try {
+                    if (!this.isSubscribed) {
+                      throw new Error("Active subscription required");
+                    }
+
+                    // Use isFeatureEnabled to properly handle inverse features
+                    const currentEnabled = this.isFeatureEnabled(feature.knoxManageId, feature.isInverse || false);
+                    const updatedValue = !currentEnabled;
+
+                    // Store the pending feature change
+                    this.pendingFeature = feature;
+                    this.pendingFeatureEnabled = updatedValue;
+
+                    // Set the confirmation message based on whether we're enabling or disabling
+                    this.confirmationMessage = currentEnabled ? feature.disableMessage : feature.enableMessage;
+
+                    // Show the confirmation modal
+                    this.showConfirmModal = true;
+                  } catch (error) {
+                    console.error("Feature toggle failed:", error);
+                    this.showErrorToast(error instanceof Error ? error.message : "Feature update failed");
                   }
+                },
 
-                  if (!feature?.knoxManageId) {
-                    throw new Error("Invalid feature configuration");
-                  }
+                async confirmFeatureToggle() {
+                  try {
+                    const feature = this.pendingFeature;
+                    const updatedValue = this.pendingFeatureEnabled;
 
-                  // Use isFeatureEnabled to properly handle inverse features and A16 device groups
-                  const currentEnabled = this.isFeatureEnabled(feature, feature.isInverse || false);
-                  const updatedValue = !currentEnabled;
+                    // Safety check
+                    if (!feature) {
+                      console.error("No pending feature found");
+                      this.showConfirmModal = false;
+                      return;
+                    }
 
-                  // Store the pending feature change
-                  this.pendingFeature = feature;
-                  this.pendingFeatureEnabled = updatedValue;
-
-                  // Set the confirmation message based on whether we're enabling or disabling
-                  this.confirmationMessage = currentEnabled ? feature.disableMessage : feature.enableMessage;
-
-                  // Show the confirmation modal
-                  this.showConfirmModal = true;
-                } catch (error) {
-                  console.error("Feature toggle failed:", error);
-                  this.showErrorToast(error instanceof Error ? error.message : "Feature update failed");
-                }
-              },
-
-              async confirmFeatureToggle() {
-                try {
-                  const feature = this.pendingFeature;
-                  const updatedValue = this.pendingFeatureEnabled;
-
-                  // Safety check
-                  if (!feature) {
-                    console.error("No pending feature found");
+                    // Close modal
                     this.showConfirmModal = false;
-                    return;
-                  }
 
-                  // Close modal
-                  this.showConfirmModal = false;
-
-                  // Ensure device model is cached
-                  await this.cacheDeviceModel();
-
-                  // Get the appropriate group ID based on device model
-                  const groupIdForDevice = this.getGroupIdForFeature(feature);
-                  const regularGroupId = feature.knoxManageId;
-                  const a16GroupId = feature.a16KnoxManageId;
-
-                  // Use the device-appropriate group ID for the API call
-                  const featureToToggle = {
-                    ...feature,
-                    knoxManageId: groupIdForDevice
-                  };
-
-                  await featureManagement.toggleFeature({
-                    imei: this.imei,
-                    feature: featureToToggle,
-                    enabled: updatedValue
-                  });
-
-                  // Update features list - remove both regular and A16 versions, then add the correct one
-                  const groupsToRemove = [regularGroupId];
-                  if (a16GroupId) {
-                    groupsToRemove.push(a16GroupId);
-                  }
-                  this.features = this.features.filter((id) => !groupsToRemove.includes(id));
-                  if (updatedValue) {
-                    this.features.push(groupIdForDevice);
-                  }
-
-                  this.showSuccessToast(
-                    updatedValue
-                      ? `Your device is being updated. ${feature.name} will be enabled shortly.`
-                      : `Your device is being updated. ${feature.name} will be disabled shortly.`
-                  );
-
-                  // Reset pending feature
-                  this.pendingFeature = null;
-                  this.pendingFeatureEnabled = false;
-                } catch (error) {
-                  console.error("Feature toggle failed:", error);
-                  this.showErrorToast(error instanceof Error ? error.message : "Feature update failed");
-                  // Reset pending feature
-                  this.pendingFeature = null;
-                  this.pendingFeatureEnabled = false;
-                }
-              },
-
-              cancelFeatureToggle() {
-                this.showConfirmModal = false;
-                this.pendingFeature = null;
-                this.pendingFeatureEnabled = false;
-                this.confirmationMessage = "";
-              },
-
-              async installApp(packageName: string) {
-                try {
-                  if (!packageName) {
-                    throw new Error("Invalid app selected");
-                  }
-
-                  // Store pending app info
-                  this.pendingAppToInstall = packageName;
-                  this.pendingAppName = this.appsList[packageName]?.name || packageName;
-
-                  // Show confirmation modal
-                  this.showAppInstallModal = true;
-                } catch (error) {
-                  console.error("Failed to show install confirmation:", error);
-                  this.showErrorToast("Failed to show install confirmation");
-                }
-              },
-
-              async confirmAppInstall() {
-                try {
-                  const packageName = this.pendingAppToInstall;
-
-                  console.log("[DEBUG] confirmAppInstall called", {
-                    packageName,
-                    imei: this.imei,
-                    imeiType: typeof this.imei,
-                    imeiLength: this.imei?.length,
-                    pendingAppToInstall: this.pendingAppToInstall,
-                    appsListHasApp: packageName ? !!this.appsList[packageName] : false
-                  });
-
-                  if (!packageName) {
-                    console.error("[DEBUG] No pending app to install");
-                    this.showAppInstallModal = false;
-                    return;
-                  }
-
-                  if (!this.imei) {
-                    console.error("[DEBUG] IMEI is not set!", {
+                    await featureManagement.toggleFeature({
                       imei: this.imei,
-                      imeiType: typeof this.imei
+                      feature,
+                      enabled: updatedValue
                     });
-                    this.showErrorToast("IMEI is not set. Please refresh the page.");
-                    this.showAppInstallModal = false;
-                    return;
+
+                    if (!updatedValue) {
+                      this.features = this.features.filter((id) => id !== feature.knoxManageId);
+                    } else {
+                      this.features.push(feature.knoxManageId);
+                    }
+
+                    this.showSuccessToast(
+                      updatedValue
+                        ? `Your device is being updated. ${feature.name} will be enabled shortly.`
+                        : `Your device is being updated. ${feature.name} will be disabled shortly.`
+                    );
+
+                    // Reset pending feature
+                    this.pendingFeature = null;
+                    this.pendingFeatureEnabled = false;
+                  } catch (error) {
+                    console.error("Feature toggle failed:", error);
+                    this.showErrorToast(error instanceof Error ? error.message : "Feature update failed");
+                    // Reset pending feature
+                    this.pendingFeature = null;
+                    this.pendingFeatureEnabled = false;
                   }
+                },
 
-                  // Close modal
-                  this.showAppInstallModal = false;
+                cancelFeatureToggle() {
+                  this.showConfirmModal = false;
+                  this.pendingFeature = null;
+                  this.pendingFeatureEnabled = false;
+                  this.confirmationMessage = "";
+                },
 
-                  // If app is not in appsList yet, add it
-                  if (!this.appsList[packageName]) {
-                    console.log("[DEBUG] App not in appsList, adding it:", packageName);
-                    this.appsList[packageName] = {
-                      source: "Tool Drawer",
-                      installed: false,
-                      name: packageName
-                    };
+                async installApp(packageName: string) {
+                  try {
+                    if (!packageName) {
+                      throw new Error("Invalid app selected");
+                    }
+
+                    // Store pending app info
+                    this.pendingAppToInstall = packageName;
+                    this.pendingAppName = this.appsList[packageName]?.name || packageName;
+
+                    // Show confirmation modal
+                    this.showAppInstallModal = true;
+                  } catch (error) {
+                    console.error("Failed to show install confirmation:", error);
+                    this.showErrorToast("Failed to show install confirmation");
                   }
+                },
 
-                  console.log("[DEBUG] Calling appManagement.installApp", {
-                    imei: this.imei,
-                    packageName: packageName
-                  });
+                async confirmAppInstall() {
+                  try {
+                    const packageName = this.pendingAppToInstall;
 
-                  await appManagement.installApp(this.imei, packageName);
-
-                  console.log("[DEBUG] appManagement.installApp completed successfully");
-
-                  this.appsList[packageName].installed = true;
-
-                  // Add to installedApps array if not already there
-                  if (!this.installedApps.some((app) => app.packageName === packageName)) {
-                    this.installedApps.push({
+                    console.log("[DEBUG] confirmAppInstall called", {
                       packageName,
-                      appName: this.appsList[packageName].name,
-                      isGoogleManaged: "Y"
+                      imei: this.imei,
+                      imeiType: typeof this.imei,
+                      imeiLength: this.imei?.length,
+                      pendingAppToInstall: this.pendingAppToInstall,
+                      appsListHasApp: packageName ? !!this.appsList[packageName] : false
                     });
+
+                    if (!packageName) {
+                      console.error("[DEBUG] No pending app to install");
+                      this.showAppInstallModal = false;
+                      return;
+                    }
+
+                    if (!this.imei) {
+                      console.error("[DEBUG] IMEI is not set!", {
+                        imei: this.imei,
+                        imeiType: typeof this.imei
+                      });
+                      this.showErrorToast("IMEI is not set. Please refresh the page.");
+                      this.showAppInstallModal = false;
+                      return;
+                    }
+
+                    // Close modal
+                    this.showAppInstallModal = false;
+
+                    // If app is not in appsList yet, add it
+                    if (!this.appsList[packageName]) {
+                      console.log("[DEBUG] App not in appsList, adding it:", packageName);
+                      this.appsList[packageName] = {
+                        source: "Tool Drawer",
+                        installed: false,
+                        name: packageName
+                      };
+                    }
+
+                    console.log("[DEBUG] Calling appManagement.installApp", {
+                      imei: this.imei,
+                      packageName: packageName
+                    });
+
+                    await appManagement.installApp(this.imei, packageName);
+
+                    console.log("[DEBUG] appManagement.installApp completed successfully");
+
+                    this.appsList[packageName].installed = true;
+
+                    // Add to installedApps array if not already there
+                    if (!this.installedApps.some((app) => app.packageName === packageName)) {
+                      this.installedApps.push({
+                        packageName,
+                        appName: this.appsList[packageName].name,
+                        isGoogleManaged: "Y"
+                      });
+                    }
+
+                    // Update cached total apps count
+                    this.updateCachedTotalApps();
+
+                    this.showSuccessToast(`${this.appsList[packageName].name} will be installed shortly`);
+
+                    // Clear pending app
+                    this.pendingAppToInstall = null;
+                    this.pendingAppName = "";
+                  } catch (error) {
+                    console.error("[DEBUG] App installation failed:", {
+                      error,
+                      errorMessage: error instanceof Error ? error.message : String(error),
+                      errorStack: error instanceof Error ? error.stack : undefined,
+                      imei: this.imei,
+                      packageName: this.pendingAppToInstall
+                    });
+                    this.showErrorToast("Failed to install app");
                   }
+                },
 
-                  // Update cached total apps count
-                  this.updateCachedTotalApps();
-
-                  this.showSuccessToast(`${this.appsList[packageName].name} will be installed shortly`);
-
-                  // Clear pending app
+                cancelAppInstall() {
+                  this.showAppInstallModal = false;
                   this.pendingAppToInstall = null;
                   this.pendingAppName = "";
-                } catch (error) {
-                  console.error("[DEBUG] App installation failed:", {
-                    error,
-                    errorMessage: error instanceof Error ? error.message : String(error),
-                    errorStack: error instanceof Error ? error.stack : undefined,
-                    imei: this.imei,
-                    packageName: this.pendingAppToInstall
-                  });
-                  this.showErrorToast("Failed to install app");
-                }
-              },
+                },
 
-              cancelAppInstall() {
-                this.showAppInstallModal = false;
-                this.pendingAppToInstall = null;
-                this.pendingAppName = "";
-              },
+                async uninstallApp(packageName: string) {
+                  try {
+                    if (!packageName) {
+                      throw new Error("Invalid app selected");
+                    }
 
-              async uninstallApp(packageName: string) {
-                try {
-                  if (!packageName) {
-                    throw new Error("Invalid app selected");
+                    // Get the app name
+                    const appName =
+                      this.appsList[packageName]?.name ||
+                      this.installedApps.find((app) => app.packageName === packageName)?.appName ||
+                      packageName;
+
+                    // Store pending app info
+                    this.pendingAppToUninstall = packageName;
+                    this.pendingAppToUninstallName = appName;
+
+                    // Show confirmation modal
+                    this.showAppUninstallModal = true;
+                  } catch (error) {
+                    console.error("Failed to show uninstall confirmation:", error);
+                    this.showErrorToast("Failed to show uninstall confirmation");
                   }
+                },
 
-                  // Get the app name
-                  const appName =
-                    this.appsList[packageName]?.name ||
-                    this.installedApps.find((app) => app.packageName === packageName)?.appName ||
-                    packageName;
+                async confirmAppUninstall() {
+                  try {
+                    const packageName = this.pendingAppToUninstall;
 
-                  // Store pending app info
-                  this.pendingAppToUninstall = packageName;
-                  this.pendingAppToUninstallName = appName;
+                    if (!packageName) {
+                      console.error("No pending app to uninstall");
+                      this.showAppUninstallModal = false;
+                      return;
+                    }
 
-                  // Show confirmation modal
-                  this.showAppUninstallModal = true;
-                } catch (error) {
-                  console.error("Failed to show uninstall confirmation:", error);
-                  this.showErrorToast("Failed to show uninstall confirmation");
-                }
-              },
-
-              async confirmAppUninstall() {
-                try {
-                  const packageName = this.pendingAppToUninstall;
-
-                  if (!packageName) {
-                    console.error("No pending app to uninstall");
+                    // Close modal
                     this.showAppUninstallModal = false;
+
+                    await appManagement.uninstallApp(this.imei, packageName);
+                    if (this.appsList[packageName]) {
+                      this.appsList[packageName].installed = false;
+                    }
+                    // Update installedApps array
+                    this.installedApps = this.installedApps.filter((app) => app.packageName !== packageName);
+
+                    // Update cached total apps count
+                    this.updateCachedTotalApps();
+
+                    this.showSuccessToast(`App will be uninstalled shortly`);
+
+                    // Clear pending app
+                    this.pendingAppToUninstall = null;
+                    this.pendingAppToUninstallName = "";
+                  } catch (error) {
+                    console.error("App uninstallation failed:", error);
+                    this.showErrorToast("Failed to uninstall app");
+                  }
+                },
+
+                cancelAppUninstall() {
+                  this.showAppUninstallModal = false;
+                  this.pendingAppToUninstall = null;
+                  this.pendingAppToUninstallName = "";
+                },
+
+                // Load Tool Drawer apps from API (similar to device/[imei].astro)
+                async loadToolDrawer() {
+                  if (this.isToolDrawerLoaded || this.isToolDrawerLoading) {
                     return;
                   }
 
-                  // Close modal
-                  this.showAppUninstallModal = false;
-
-                  await appManagement.uninstallApp(this.imei, packageName);
-                  if (this.appsList[packageName]) {
-                    this.appsList[packageName].installed = false;
-                  }
-                  // Update installedApps array
-                  this.installedApps = this.installedApps.filter((app) => app.packageName !== packageName);
-
-                  // Update cached total apps count
-                  this.updateCachedTotalApps();
-
-                  this.showSuccessToast(`App will be uninstalled shortly`);
-
-                  // Clear pending app
-                  this.pendingAppToUninstall = null;
-                  this.pendingAppToUninstallName = "";
-                } catch (error) {
-                  console.error("App uninstallation failed:", error);
-                  this.showErrorToast("Failed to uninstall app");
-                }
-              },
-
-              cancelAppUninstall() {
-                this.showAppUninstallModal = false;
-                this.pendingAppToUninstall = null;
-                this.pendingAppToUninstallName = "";
-              },
-
-              // Load Tool Drawer apps from API (similar to device/[imei].astro)
-              async loadToolDrawer() {
-                if (this.isToolDrawerLoaded || this.isToolDrawerLoading) {
-                  return;
-                }
-
-                try {
-                  this.isToolDrawerLoading = true;
-                  const response = await fetch("/api/ottogrid.json");
-
-                  if (!response.ok) {
-                    throw new Error("Failed to load Tool Drawer data");
-                  }
-
-                  const data = await response.json();
-
-                  // Process the data and update the appsList
-                  if (data && data.rows && data.rows.length) {
-                    const updatedAppsList = { ...this.appsList };
-
-                    data.rows
-                      .filter((row: any) => row && row.cells && row.cells["Tool Drawer"] === "Yes")
-                      .forEach((row: any) => {
-                        try {
-                          const packageName = getPackageNameFromPlayStoreUrl(row.cells["Play Store URL"]);
-                          if (!packageName) return;
-
-                          // If the app is already in the list, preserve the installed status
-                          const isInstalled = this.installedApps.some((app) => app.packageName === packageName);
-
-                          updatedAppsList[packageName] = {
-                            source: "Tool Drawer",
-                            installed: isInstalled,
-                            name: row.cells["Tool Name"] || "Unknown App"
-                          };
-                        } catch (error) {
-                          console.error("Error processing app row:", error);
-                        }
-                      });
-
-                    this.appsList = updatedAppsList;
-                    this.isToolDrawerLoaded = true;
-                  }
-                } catch (error) {
-                  console.error("Error loading Tool Drawer:", error);
-                  this.showErrorToast("Failed to load Tool Drawer apps");
-                } finally {
-                  this.isToolDrawerLoading = false;
-                }
-              },
-
-              get completeSetupUrl() {
-                // Clean phone number (remove dashes) for the deeplink
-                const cleanedPhone = this.devicePhone.replace(/\D/g, "");
-                return `http://localhost?imei=${this.imei}&phone=${cleanedPhone}&subscription=done`;
-              },
-
-              get isToolDrawerEnabled() {
-                return (
-                  this.isSubscribed &&
-                  Array.isArray(this.features) &&
-                  this.features.includes(KNOX_USER_GROUPS.ADD_ON_TOOL_DRAWER)
-                );
-              },
-              get isFaithToolsEnabled() {
-                return this.isSubscribed && this.features.includes(KNOX_USER_GROUPS.ADD_ON_FAITH_TOOLS);
-              },
-
-              isFeatureEnabled(feature: Feature, isInverse = false) {
-                // Ensure device model is cached (synchronous check, will use cached value)
-                if (this.cachedDeviceModel === null && !this.isA16Device) {
-                  // If not cached yet, trigger async cache (but don't wait)
-                  this.cacheDeviceModel();
-                }
-
-                // Get the appropriate group ID based on device model
-                const groupId = this.getGroupIdForFeature(feature);
-                const regularGroupId = feature.knoxManageId;
-                const a16GroupId = feature.a16KnoxManageId;
-
-                // Check both regular and A16 groups if applicable
-                const isRegularEnabled = this.features.includes(regularGroupId);
-                const isA16Enabled = a16GroupId ? this.features.includes(a16GroupId) : false;
-                const isEnabled = isRegularEnabled || isA16Enabled;
-
-                return isInverse ? !isEnabled : isEnabled;
-              },
-
-              /**
-               * Ensures a device has the correct Knox user group configuration by managing exclusive group memberships.
-               * This prevents conflicts between incompatible feature combinations.
-               * @param userGroups - Array of Knox user group IDs currently assigned to the device
-               */
-              async removeExclusiveGroups(userGroups: string[]) {
-                const exclusiveGroups = this.getExclusiveGroups(userGroups);
-                if (!this.hasMultipleExclusiveGroups(exclusiveGroups)) {
-                  await this.ensureBaseGroup(userGroups);
-                } else {
-                  await this.removeIncompatibleFeatures(userGroups);
-                }
-              },
-
-              /**
-               * Gets the list of exclusive groups from the user's current groups
-               */
-              getExclusiveGroups(userGroups: string[]): string[] {
-                // Unpaid, Subscribed, A16_Unpaid, and A16_Subscribed are exclusive
-                return userGroups.filter(
-                  (group) =>
-                    group === KNOX_USER_GROUPS.UNPAID ||
-                    group === KNOX_USER_GROUPS.SUBSCRIBED ||
-                    group === KNOX_USER_GROUPS.A16_SUBSCRIBED ||
-                    group === KNOX_USER_GROUPS.A16_UNPAID
-                );
-              },
-
-              /**
-               * Checks if the device has more than one exclusive group assigned
-               */
-              hasMultipleExclusiveGroups(exclusiveGroups: string[]): boolean {
-                return exclusiveGroups.length > 1;
-              },
-
-              /**
-               * Ensures the device has at least one base group (Subscribed or Unpaid)
-               * based on subscription status and device model
-               */
-              async ensureBaseGroup(userGroups: string[]) {
-                const hasBaseGroup = userGroups.some(
-                  (group) =>
-                    group === KNOX_USER_GROUPS.UNPAID ||
-                    group === KNOX_USER_GROUPS.SUBSCRIBED ||
-                    group === KNOX_USER_GROUPS.A16_SUBSCRIBED ||
-                    group === KNOX_USER_GROUPS.A16_UNPAID
-                );
-                if (!hasBaseGroup) {
-                  if (this.isSubscribed) {
-                    // Assign appropriate subscription group based on device model
-                    await this.assignSubscriptionGroupByDeviceModel();
-                  } else {
-                    // Assign appropriate unpaid group based on device model
-                    await this.assignUnpaidGroupByDeviceModel();
-                  }
-                }
-              },
-
-              /**
-               * Removes incompatible feature combinations from the device
-               */
-              async removeIncompatibleFeatures(userGroups: string[]) {
-                const featuresToRemove = this.getIncompatibleFeatures(userGroups);
-                for (const knoxManageId of featuresToRemove) {
-                  await this.removeFeatureFromDevice(knoxManageId);
-                }
-                window.location.reload();
-              },
-
-              /**
-               * Determines which features need to be removed to resolve conflicts
-               */
-              getIncompatibleFeatures(userGroups: string[]): string[] {
-                const featuresToRemove: string[] = [];
-
-                // Remove UNPAID if present with any subscription group
-                if (userGroups.includes(KNOX_USER_GROUPS.UNPAID)) {
-                  if (
-                    userGroups.includes(KNOX_USER_GROUPS.SUBSCRIBED) ||
-                    userGroups.includes(KNOX_USER_GROUPS.A16_SUBSCRIBED)
-                  ) {
-                    featuresToRemove.push(KNOX_USER_GROUPS.UNPAID);
-                  }
-                }
-
-                // Remove A16_UNPAID if present with any subscription group
-                if (userGroups.includes(KNOX_USER_GROUPS.A16_UNPAID)) {
-                  if (
-                    userGroups.includes(KNOX_USER_GROUPS.SUBSCRIBED) ||
-                    userGroups.includes(KNOX_USER_GROUPS.A16_SUBSCRIBED)
-                  ) {
-                    featuresToRemove.push(KNOX_USER_GROUPS.A16_UNPAID);
-                  }
-                }
-
-                // Remove SUBSCRIBED if A16_SUBSCRIBED is present (they shouldn't have both)
-                if (
-                  userGroups.includes(KNOX_USER_GROUPS.SUBSCRIBED) &&
-                  userGroups.includes(KNOX_USER_GROUPS.A16_SUBSCRIBED)
-                ) {
-                  featuresToRemove.push(KNOX_USER_GROUPS.SUBSCRIBED);
-                }
-
-                // Remove UNPAID if A16_UNPAID is present (they shouldn't have both)
-                if (
-                  userGroups.includes(KNOX_USER_GROUPS.UNPAID) &&
-                  userGroups.includes(KNOX_USER_GROUPS.A16_UNPAID)
-                ) {
-                  featuresToRemove.push(KNOX_USER_GROUPS.UNPAID);
-                }
-
-                return featuresToRemove;
-              },
-
-              async init() {
-                // Load cached total apps count on initialization
-                this.loadCachedTotalApps();
-
-                // Watch for IMEI to be set before fetching features (same pattern as device/[imei].astro)
-                this.$watch("imei", async (value) => {
                   try {
-                    if (this.imei) {
-                      // Cache device model on page load
-                      await this.cacheDeviceModel();
-                      // Reload cached total apps when IMEI changes
-                      this.loadCachedTotalApps();
+                    this.isToolDrawerLoading = true;
+                    const response = await fetch("/api/ottogrid.json");
+
+                    if (!response.ok) {
+                      throw new Error("Failed to load Tool Drawer data");
+                    }
+
+                    const data = await response.json();
+
+                    // Process the data and update the appsList
+                    if (data && data.rows && data.rows.length) {
+                      const updatedAppsList = { ...this.appsList };
+
+                      data.rows
+                        .filter((row: any) => row && row.cells && row.cells["Tool Drawer"] === "Yes")
+                        .forEach((row: any) => {
+                          try {
+                            const packageName = getPackageNameFromPlayStoreUrl(row.cells["Play Store URL"]);
+                            if (!packageName) return;
+
+                            // If the app is already in the list, preserve the installed status
+                            const isInstalled = this.installedApps.some((app) => app.packageName === packageName);
+
+                            updatedAppsList[packageName] = {
+                              source: "Tool Drawer",
+                              installed: isInstalled,
+                              name: row.cells["Tool Name"] || "Unknown App"
+                            };
+                          } catch (error) {
+                            console.error("Error processing app row:", error);
+                          }
+                        });
+
+                      this.appsList = updatedAppsList;
+                      this.isToolDrawerLoaded = true;
+                    }
+                  } catch (error) {
+                    console.error("Error loading Tool Drawer:", error);
+                    this.showErrorToast("Failed to load Tool Drawer apps");
+                  } finally {
+                    this.isToolDrawerLoading = false;
+                  }
+                },
+
+                get completeSetupUrl() {
+                  // Clean phone number (remove dashes) for the deeplink
+                  const cleanedPhone = this.devicePhone.replace(/\D/g, "");
+                  return `http://localhost?imei=${this.imei}&phone=${cleanedPhone}&subscription=done`;
+                },
+
+                get isToolDrawerEnabled() {
+                  return (
+                    this.isSubscribed &&
+                    Array.isArray(this.features) &&
+                    this.features.includes(KNOX_USER_GROUPS.ADD_ON_TOOL_DRAWER)
+                  );
+                },
+                get isFaithToolsEnabled() {
+                  return this.isSubscribed && this.features.includes(KNOX_USER_GROUPS.ADD_ON_FAITH_TOOLS);
+                },
+
+                isFeatureEnabled(knoxManageId: string, isInverse = false) {
+                  const isEnabled = this.features.includes(knoxManageId);
+                  return isInverse ? !isEnabled : isEnabled;
+                },
+
+                async init() {
+                  // Load cached total apps count on initialization
+                  this.loadCachedTotalApps();
+
+                  // Watch for IMEI to be set before fetching features (same pattern as device/[imei].astro)
+                  this.$watch("imei", async (value) => {
+                    try {
+                      if (this.imei) {
+                        // Reload cached total apps when IMEI changes
+                        this.loadCachedTotalApps();
+                        await this.getFeatures();
+                      }
+                    } catch (error) {
+                      console.error("Failed to load features:", error);
+                      this.isLoading = false;
+                    }
+                  });
+
+                  // Watch for currentTab changes - load apps when App Management tab is clicked
+                  this.$watch("currentTab", async (newTab) => {
+                    if (newTab === "app-management") {
+                      // Load available apps immediately (fast, no API call)
+                      if (!this.isAvailableAppsLoaded) {
+                        this.loadAvailableApps();
+                      }
+                      // Fetch installed apps from API (slow, async)
+                      if (!this.isAppsLoaded && !this.isAppsLoading) {
+                        await this.getInstalledApps();
+                      }
+                    }
+                  });
+
+                  // Watch for features changes to load Tool Drawer when enabled
+                  this.$watch("features", async (userGroups: string[]) => {
+                    // Load Tool Drawer data client-side when Tool Drawer feature is enabled
+                    if (this.isToolDrawerEnabled && !this.isToolDrawerLoaded) {
+                      this.loadToolDrawer();
+                    }
+                  });
+
+                  // Watch for installedApps changes
+                  this.$watch("installedApps", (apps) => {
+                    this.logGoogleManagedApps();
+                  });
+
+                  // If IMEI is already set, fetch features immediately (but not apps - wait for tab click)
+                  // This is the main blocking operation - keep loading until it completes
+                  if (this.imei) {
+                    try {
+                      // getFeatures() will set isLoading = false when done
                       await this.getFeatures();
+                    } catch (error) {
+                      console.error("Failed to load features:", error);
+                      this.isLoading = false;
                     }
-                  } catch (error) {
-                    console.error("Failed to load features:", error);
+                  } else {
+                    // If no IMEI, don't show loading
                     this.isLoading = false;
                   }
-                });
 
-                // Watch for features changes to automatically assign groups
-                this.$watch("features", async (userGroups: string[]) => {
-                  // Check if device is subscribed but doesn't have any subscription group
-                  if (this.isSubscribed) {
-                    const hasSubscribedGroup =
-                      userGroups.includes(KNOX_USER_GROUPS.SUBSCRIBED) ||
-                      userGroups.includes(KNOX_USER_GROUPS.A16_SUBSCRIBED);
-                    if (!hasSubscribedGroup) {
-                      // Assign appropriate subscription group based on device model
-                      await this.assignSubscriptionGroupByDeviceModel();
-                    }
-                  }
-
-                  await this.removeExclusiveGroups(userGroups);
-                });
-
-                // Watch for currentTab changes - load apps when App Management tab is clicked
-                this.$watch("currentTab", async (newTab) => {
-                  if (newTab === "app-management") {
-                    // Load available apps immediately (fast, no API call)
-                    if (!this.isAvailableAppsLoaded) {
-                      this.loadAvailableApps();
-                    }
-                    // Fetch installed apps from API (slow, async)
-                    if (!this.isAppsLoaded && !this.isAppsLoading) {
-                      await this.getInstalledApps();
-                    }
-                  }
-                });
-
-                // Watch for features changes to load Tool Drawer when enabled
-                this.$watch("features", async (userGroups: string[]) => {
-                  // Load Tool Drawer data client-side when Tool Drawer feature is enabled
-                  if (this.isToolDrawerEnabled && !this.isToolDrawerLoaded) {
-                    this.loadToolDrawer();
-                  }
-                });
-
-                // Watch for installedApps changes
-                this.$watch("installedApps", (apps) => {
+                  // Log all Google-managed apps excluding system apps
                   this.logGoogleManagedApps();
-                });
+                },
 
-                // If IMEI is already set, fetch features immediately (but not apps - wait for tab click)
-                // This is the main blocking operation - keep loading until it completes
-                if (this.imei) {
-                  try {
-                    // getFeatures() will set isLoading = false when done
-                    await this.getFeatures();
-                  } catch (error) {
-                    console.error("Failed to load features:", error);
-                    this.isLoading = false;
+                logGoogleManagedApps() {
+                  // Logging removed - function kept for compatibility
+                }
+              };
+            });
+
+            // Stripe subscription handler for "I have a data plan with my own carrier" button
+            Alpine.data("stripeSubscription", function () {
+              return {
+                customerEmail: "",
+                deviceIMEI: "",
+                isStripeLoaded: false,
+                isEmbedded: false,
+                stripeInstance: undefined as Stripe | undefined,
+                sessionClientSecret: undefined as string | undefined,
+                async handleStripeClick() {
+                  if (!this.sessionClientSecret) {
+                    const data = await actions.stripe.createSubscriptionPage.orThrow({
+                      customerEmail: this.customerEmail,
+                      deviceIMEI: this.deviceIMEI
+                    });
+                    this.sessionClientSecret = data.session.client_secret as string;
                   }
-                } else {
-                  // If no IMEI, don't show loading
-                  this.isLoading = false;
+
+                  if (!this.isEmbedded) {
+                    const checkout = await this.stripeInstance?.initEmbeddedCheckout({
+                      clientSecret: this.sessionClientSecret
+                    });
+                    checkout?.mount("#stripe-subscription-element");
+                    this.isEmbedded = true;
+                  }
+
+                  (this.$refs.stripeDialog as HTMLDialogElement).showModal();
+                },
+                async initializeStripe() {
+                  const stripe = await loadStripe(STRIPE_PUBLIC_KEY);
+                  if (!stripe) {
+                    throw new Error("Stripe is not loaded");
+                  }
+
+                  this.stripeInstance = stripe;
+                  this.isStripeLoaded = true;
+                },
+                init() {
+                  this.initializeStripe();
                 }
-
-                // Log all Google-managed apps excluding system apps
-                this.logGoogleManagedApps();
-              },
-
-              logGoogleManagedApps() {
-                // Logging removed - function kept for compatibility
-              }
-            };
-          });
-
-          // Stripe subscription handler for "I have a data plan with my own carrier" button
-          Alpine.data("stripeSubscription", function () {
-            return {
-              customerEmail: "",
-              deviceIMEI: "",
-              isStripeLoaded: false,
-              isEmbedded: false,
-              stripeInstance: undefined as Stripe | undefined,
-              sessionClientSecret: undefined as string | undefined,
-              async handleStripeClick() {
-                if (!this.sessionClientSecret) {
-                  const data = await actions.stripe.createSubscriptionPage.orThrow({
-                    customerEmail: this.customerEmail,
-                    deviceIMEI: this.deviceIMEI
-                  });
-                  this.sessionClientSecret = data.session.client_secret as string;
-                }
-
-                if (!this.isEmbedded) {
-                  const checkout = await this.stripeInstance?.initEmbeddedCheckout({
-                    clientSecret: this.sessionClientSecret
-                  });
-                  checkout?.mount("#stripe-subscription-element");
-                  this.isEmbedded = true;
-                }
-
-                (this.$refs.stripeDialog as HTMLDialogElement).showModal();
-              },
-              async initializeStripe() {
-                const stripe = await loadStripe(STRIPE_PUBLIC_KEY);
-                if (!stripe) {
-                  throw new Error("Stripe is not loaded");
-                }
-
-                this.stripeInstance = stripe;
-                this.isStripeLoaded = true;
-              },
-              init() {
-                this.initializeStripe();
-              }
-            };
-          });
-        </script>
+              };
+            });
+          </script>
+        </div>
       </div>
     </main>
   </div>

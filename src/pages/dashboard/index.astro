@@ -350,7 +350,7 @@ const actionResult = Astro.getActionResult(actions.wisephones.createWisephone);
   }
 </style>
 
-<div class="dashboard-container flex h-screen w-full min-w-[360px] bg-[#f7f6f2] relative" x-data="dashboard" @activate-modal.window="openActivateModal($event.detail?.imei || $event.detail)">
+<div class="dashboard-container flex h-screen w-full min-w-[360px] bg-[#f7f6f2] relative" x-data={`dashboard(${JSON.stringify({ userEmail: user?.primaryEmailAddress?.emailAddress || "" })})`} @activate-modal.window="openActivateModal($event.detail?.imei || $event.detail)">
   <progress
     x-show="isLoading"
     x-cloak
@@ -427,7 +427,11 @@ const actionResult = Astro.getActionResult(actions.wisephones.createWisephone);
               .toUpperCase()
               .slice(0, 2);
             const imeiString = wisephone.imei.toString().padEnd(15, "0");
-            const deviceData = { imei: imeiString, isSubscribed: Boolean(wisephone.isSubscribed) };
+            const deviceData = {
+              imei: imeiString,
+              isSubscribed: Boolean(wisephone.isSubscribed),
+              phoneNumber: wisephone.phoneNumber || ''
+            };
             console.log(`Device card data for ${imeiString}:`, deviceData, `isSubscribed type: ${typeof wisephone.isSubscribed}, value: ${wisephone.isSubscribed}`);
 
             return (
@@ -694,8 +698,7 @@ const actionResult = Astro.getActionResult(actions.wisephones.createWisephone);
               href="https://plans.techless.com/"
               target="_blank"
               rel="noopener noreferrer"
-              @click="handleActivatePlan('carrier')"
-              class="flex items-center justify-center gap-1 w-full px-4 py-2 bg-[#C07F53] text-white rounded-md text-sm font-medium hover:bg-[#A06F43] transition-colors"
+              class="flex items-center justify-center gap-1 w-full px-4 py-2 bg-[#C07F53] text-white rounded-md text-sm font-medium hover:bg-[#A06F43] transition-colors cursor-pointer"
             >
               Activate Carrier Plan
               <Icon name="lucide:external-link" class="w-4 h-4" />
@@ -719,16 +722,13 @@ const actionResult = Astro.getActionResult(actions.wisephones.createWisephone);
                 Learn more
               </a>
             </p>
-            <a
-              href="https://getwisephone.com/my-subscription"
-              target="_blank"
-              rel="noopener noreferrer"
-              @click="handleActivatePlan('wiseos')"
-              class="flex items-center justify-center gap-1 w-full px-4 py-2 bg-[#C07F53] text-white rounded-md text-sm font-medium hover:bg-[#A06F43] transition-colors"
+            <button
+              @click="handleStripeCheckout()"
+              :disabled="!isStripeLoaded || !activeDeviceImei"
+              class="flex items-center justify-center gap-1 w-full px-4 py-2 bg-[#C07F53] text-white rounded-md text-sm font-medium hover:bg-[#A06F43] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Activate WiseOS Subscription
-              <Icon name="lucide:external-link" class="w-4 h-4" />
-            </a>
+            </button>
           </div>
         </div>
 
@@ -752,22 +752,44 @@ const actionResult = Astro.getActionResult(actions.wisephones.createWisephone);
     </div>
   </div>
 
+  <!-- Stripe Checkout Dialog -->
+  <dialog x-ref="stripeDialog" class="modal">
+    <div style="background-color: rgb(247, 246, 242)" class="modal-box max-w-2xl">
+      <div id="stripe-subscription-element"></div>
+    </div>
+    <form method="dialog" class="modal-backdrop">
+      <button>close</button>
+    </form>
+  </dialog>
+
 </main>
 
 </div>
 
 <script>
   import Alpine from "alpinejs";
-  import { isValidIMEI } from "@/libs/utils";
+  import { isValidIMEI, STRIPE_PUBLIC_KEY } from "@/libs/utils";
+  import { actions } from "astro:actions";
+  import { loadStripe, type Stripe } from "@stripe/stripe-js";
 
   document.addEventListener("alpine:init", () => {
-    Alpine.data("dashboard", () => ({
+    Alpine.data("dashboard", (initialData?: { userEmail?: string }) => ({
       showForm: false,
       isLoading: false,
       mobileMenuOpen: false,
       showAccountMenu: false,
       showActivateModal: false,
       activeDeviceImei: null as string | null,
+      activeDevicePhoneNumber: null as string | null,
+      pollingSubscription: false,
+      pollingInterval: null as ReturnType<typeof setTimeout> | null,
+      shouldStartPolling: false,
+      pollingImei: null as string | null,
+      isStripeLoaded: false,
+      isStripeEmbedded: false,
+      stripeInstance: undefined as Stripe | undefined,
+      sessionClientSecret: undefined as string | undefined,
+      customerEmail: initialData?.userEmail || "",
       imei1: "",
       imei2: "",
       phoneNumber: "",
@@ -804,22 +826,177 @@ const actionResult = Astro.getActionResult(actions.wisephones.createWisephone);
         this.hasBlurredImeiVerification = false;
         this.isImeiValid = true;
       },
-      openActivateModal(imei: string | { imei?: string }) {
+      openActivateModal(imei: string | { imei?: string; phoneNumber?: string }) {
         // Handle both direct call and event detail
         const imeiValue = typeof imei === 'string' ? imei : (imei?.imei || '');
-        console.log("Opening activate modal for IMEI:", imeiValue);
+        const phoneNumber = typeof imei === 'object' ? (imei?.phoneNumber || null) : null;
+        console.log("Opening activate modal for IMEI:", imeiValue, "Phone:", phoneNumber);
         this.activeDeviceImei = imeiValue;
+        this.activeDevicePhoneNumber = phoneNumber;
         this.showActivateModal = true;
       },
       closeActivateModal() {
         this.showActivateModal = false;
-        this.activeDeviceImei = null;
+        // Don't clear activeDeviceImei if we're polling (user might have clicked X during activation)
+        if (!this.pollingSubscription) {
+          this.activeDeviceImei = null;
+          this.activeDevicePhoneNumber = null;
+        }
       },
-      handleActivatePlan(type: string) {
-        // Close modal immediately
-        this.closeActivateModal();
-        // The link will open in a new tab, user will be redirected there
-        // After they complete activation, they can refresh the page to see updated status
+      async initializeStripe() {
+        try {
+          const stripe = await loadStripe(STRIPE_PUBLIC_KEY);
+          if (!stripe) {
+            throw new Error("Stripe is not loaded");
+          }
+          this.stripeInstance = stripe;
+          this.isStripeLoaded = true;
+        } catch (error) {
+          console.error("Error initializing Stripe:", error);
+        }
+      },
+      async handleStripeCheckout() {
+        if (!this.activeDeviceImei || !this.customerEmail) {
+          console.error("Missing device IMEI or customer email");
+          return;
+        }
+
+        try {
+          // Create Stripe session if not already created
+          if (!this.sessionClientSecret) {
+            const imeiString = this.activeDeviceImei.replace(/[^0-9]/g, '').padEnd(15, '0');
+
+            const data = await actions.stripe.createSubscriptionPage.orThrow({
+              customerEmail: this.customerEmail,
+              deviceIMEI: imeiString
+            });
+            this.sessionClientSecret = data.session.client_secret as string;
+          }
+
+          // Initialize embedded checkout if not already done
+          if (!this.isStripeEmbedded && this.stripeInstance) {
+            const checkout = await this.stripeInstance.initEmbeddedCheckout({
+              clientSecret: this.sessionClientSecret
+            });
+            checkout?.mount("#stripe-subscription-element");
+            this.isStripeEmbedded = true;
+          }
+
+          // Show the dialog
+          (this.$refs.stripeDialog as HTMLDialogElement)?.showModal();
+        } catch (error) {
+          console.error("Error opening Stripe checkout:", error);
+          alert("Failed to open checkout. Please try again.");
+        }
+      },
+      async checkSubscriptionStatus(imei: string, phoneNumber?: string | null): Promise<boolean> {
+        try {
+          let devicePhoneNumber = phoneNumber || this.activeDevicePhoneNumber;
+
+          // If no phone number provided, try to find it from device cards
+          if (!devicePhoneNumber) {
+            const deviceCards = document.querySelectorAll('[x-data*="deviceCard"]');
+            for (const card of Array.from(deviceCards)) {
+              const cardData = (window as any).Alpine?.$data?.(card);
+              if (cardData && cardData.imei === imei) {
+                const phoneElement = card.querySelector('p.text-gray-500');
+                if (phoneElement) {
+                  const phoneText = phoneElement.textContent || '';
+                  const phoneMatch = phoneText.match(/(\d{3})[-\s]?(\d{3})[-\s]?(\d{4})/);
+                  if (phoneMatch) {
+                    devicePhoneNumber = `${phoneMatch[1]}-${phoneMatch[2]}-${phoneMatch[3]}`;
+                    break;
+                  }
+                }
+              }
+            }
+          }
+
+          if (!devicePhoneNumber) {
+            console.error("Could not find phone number for device");
+            return false;
+          }
+
+          // Call the subscription validation action
+          const result = await actions.wisephones.validateIsUserSubscribed.orThrow({
+            imei: imei.replace(/[^0-9]/g, ''),
+            phoneNumber: devicePhoneNumber
+          });
+
+          return result?.isSubscribed === true;
+        } catch (error) {
+          console.error("Error checking subscription status:", error);
+          return false;
+        }
+      },
+      async startSubscriptionPolling(imei: string, phoneNumber?: string | null) {
+        if (this.pollingSubscription) {
+          return; // Already polling
+        }
+
+        this.pollingSubscription = true;
+        this.isLoading = true; // Show loading bar
+        const maxAttempts = 20; // Poll for up to 60 seconds (20 * 3s)
+        let attempts = 0;
+
+        const poll = async () => {
+          attempts++;
+          console.log(`Polling subscription status (attempt ${attempts}/${maxAttempts})...`);
+
+          const isSubscribed = await this.checkSubscriptionStatus(imei, phoneNumber);
+
+          if (isSubscribed) {
+            console.log("Subscription detected! Checking for auto-complete setup...");
+            this.stopSubscriptionPolling();
+            // Keep loading bar visible during redirect
+
+            // Auto-complete setup flow (mobile only)
+            const isMobile = window.innerWidth < 640; // Tailwind sm breakpoint
+            const isPhoneSetUpKey = `isPhoneSetUp_${imei.replace(/[^0-9]/g, '')}`;
+            const isPhoneSetUp = localStorage.getItem(isPhoneSetUpKey) === 'true';
+
+            if (isMobile && !isPhoneSetUp && phoneNumber) {
+              console.log("Auto-completing setup on mobile...");
+              // Set isPhoneSetUp = true in localStorage
+              localStorage.setItem(isPhoneSetUpKey, 'true');
+              // Construct deeplink
+              const cleanedPhone = phoneNumber.replace(/\D/g, '');
+              const imeiString = imei.replace(/[^0-9]/g, '').padEnd(15, '0');
+              const deeplink = `http://localhost?imei=${imeiString}&phone=${cleanedPhone}&subscription=done`;
+              console.log("Redirecting to deeplink:", deeplink);
+              window.location.href = deeplink;
+              return;
+            }
+
+            // Normal redirect to device info page
+            const imeiString = imei.replace(/[^0-9]/g, '').padEnd(15, '0');
+            window.location.href = `/manage/${imeiString}`;
+            return;
+          }
+
+          if (attempts >= maxAttempts) {
+            console.log("Polling timeout reached. Device will show 'Activate Plan' button.");
+            this.stopSubscriptionPolling();
+            // Keep loading bar visible during reload
+            // Refresh page to show updated status
+            window.location.reload();
+            return;
+          }
+
+          // Continue polling
+          this.pollingInterval = setTimeout(poll, 3000);
+        };
+
+        // Start polling immediately (no delay for first check)
+        poll();
+      },
+      stopSubscriptionPolling() {
+        if (this.pollingInterval !== null) {
+          clearTimeout(this.pollingInterval);
+          this.pollingInterval = null;
+        }
+        this.pollingSubscription = false;
+        // Don't set isLoading to false here - let it stay true during redirect/reload
       },
       handleRemoveDevice(event: Event) {
         const form = event.target as HTMLFormElement;
@@ -836,14 +1013,104 @@ const actionResult = Astro.getActionResult(actions.wisephones.createWisephone);
           }
           form.submit();
         }
+      },
+      async init() {
+        // Initialize Stripe
+        await this.initializeStripe();
+
+        // Handle activation redirect on component initialization
+        const urlParams = new URLSearchParams(window.location.search);
+        const activated = urlParams.get('activated');
+        const imei = urlParams.get('imei');
+        const sessionId = urlParams.get('session_id');
+
+        if (activated === 'true' && imei) {
+          // Show loading bar immediately
+          this.isLoading = true;
+
+          // If we have a session_id, validate the Stripe subscription first
+          if (sessionId) {
+            try {
+              const imeiString = imei.replace(/[^0-9]/g, '').padEnd(15, '0');
+              const validationResult = await actions.stripe.validateSubscription.orThrow({
+                sessionId: sessionId,
+                imei: imeiString
+              });
+
+              if (validationResult?.isSubscribed) {
+                // Subscription is valid, redirect to device info page
+                window.location.href = `/manage/${imeiString}`;
+                return;
+              }
+            } catch (error) {
+              console.error("Error validating Stripe session:", error);
+              // Continue with polling if validation fails
+            }
+          }
+
+          // Clean up URL parameters
+          const cleanUrl = new URL(window.location.href);
+          cleanUrl.searchParams.delete('activated');
+          cleanUrl.searchParams.delete('imei');
+          cleanUrl.searchParams.delete('session_id');
+          window.history.replaceState({}, '', cleanUrl.toString());
+
+          this.pollingImei = imei;
+
+          // Try to get phone number from sessionStorage or device data
+          const storedImei = sessionStorage.getItem('activatingDeviceImei');
+          let phoneNumber = null;
+
+          // Wait a bit for Alpine to initialize all device cards
+          await new Promise(resolve => setTimeout(resolve, 100));
+
+          // Try to find phone number from device cards
+          const deviceCards = document.querySelectorAll('[x-data*="deviceCard"]');
+          for (const card of Array.from(deviceCards)) {
+            const cardData = (window as any).Alpine?.$data?.(card);
+            if (cardData && cardData.imei === imei) {
+              // Use phoneNumber from card data if available
+              if (cardData.phoneNumber) {
+                phoneNumber = cardData.phoneNumber;
+                break;
+              }
+              // Fallback: try to extract from DOM
+              const phoneElement = card.querySelector('p.text-gray-500');
+              if (phoneElement) {
+                const phoneText = phoneElement.textContent || '';
+                const phoneMatch = phoneText.match(/(\d{3})[-\s]?(\d{3})[-\s]?(\d{4})/);
+                if (phoneMatch) {
+                  phoneNumber = `${phoneMatch[1]}-${phoneMatch[2]}-${phoneMatch[3]}`;
+                  break;
+                }
+              }
+            }
+          }
+
+          // Clean up sessionStorage
+          if (storedImei) {
+            sessionStorage.removeItem('activatingDeviceImei');
+            sessionStorage.removeItem('activationType');
+          }
+
+          // Start polling - loading bar will stay visible until redirect/reload
+          await this.startSubscriptionPolling(imei, phoneNumber);
+        }
       }
     }));
 
-    Alpine.data("deviceCard", (deviceData: { imei: string; isSubscribed: boolean }) => ({
+    Alpine.data("deviceCard", (deviceData: { imei: string; isSubscribed: boolean; phoneNumber?: string }) => ({
       imei: deviceData.imei,
       isSubscribed: deviceData.isSubscribed,
+      phoneNumber: deviceData.phoneNumber || '',
       init() {
-        console.log("Device card initialized:", { imei: this.imei, isSubscribed: this.isSubscribed });
+        console.log("Device card initialized:", { imei: this.imei, isSubscribed: this.isSubscribed, phoneNumber: this.phoneNumber });
+        // Update subscription status if it changed
+        this.$watch('isSubscribed', (value) => {
+          if (value) {
+            console.log(`Device ${this.imei} is now subscribed`);
+          }
+        });
       },
       openActivateModal() {
         console.log("Device card openActivateModal called for IMEI:", this.imei, "isSubscribed:", this.isSubscribed);
@@ -854,23 +1121,70 @@ const actionResult = Astro.getActionResult(actions.wisephones.createWisephone);
           const dashboardData = (window as any).Alpine?.$data?.(dashboardEl);
           if (dashboardData && typeof dashboardData.openActivateModal === 'function') {
             console.log("Found dashboard, calling openActivateModal");
-            dashboardData.openActivateModal(this.imei);
+            dashboardData.openActivateModal({ imei: this.imei, phoneNumber: this.phoneNumber });
             return;
           }
         }
         // Fallback: dispatch event
         console.log("Dispatching activate-modal event");
-        (this as any).$dispatch('activate-modal', { imei: this.imei });
+        (this as any).$dispatch('activate-modal', { imei: this.imei, phoneNumber: this.phoneNumber });
       },
       async checkSubscriptionStatus() {
         // This can be called after user returns from activation
-        // For now, we'll rely on page refresh, but this allows for future dynamic updates
         try {
-          // Could call an API endpoint here to check subscription status
-          // For now, we'll just refresh the page
-          window.location.reload();
+          // Get phone number from device card
+          const phoneElement = this.$el.querySelector('p.text-gray-500');
+          let phoneNumber = '';
+          if (phoneElement) {
+            const phoneText = phoneElement.textContent || '';
+            const phoneMatch = phoneText.match(/(\d{3})[-\s]?(\d{3})[-\s]?(\d{4})/);
+            if (phoneMatch) {
+              phoneNumber = `${phoneMatch[1]}-${phoneMatch[2]}-${phoneMatch[3]}`;
+            }
+          }
+
+          if (!phoneNumber) {
+            console.error("Could not find phone number");
+            window.location.reload();
+            return;
+          }
+
+          const result = await actions.wisephones.validateIsUserSubscribed.orThrow({
+            imei: this.imei.replace(/[^0-9]/g, ''),
+            phoneNumber: phoneNumber
+          });
+
+          if (result?.isSubscribed === true) {
+            this.isSubscribed = true;
+
+            // Auto-complete setup flow (mobile only)
+            const isMobile = window.innerWidth < 640; // Tailwind sm breakpoint
+            // Use Alpine's persist key format: alpine:persist:manageDevice:isPhoneSetUp
+            const isPhoneSetUpKey = 'alpine:persist:manageDevice:isPhoneSetUp';
+            const isPhoneSetUp = localStorage.getItem(isPhoneSetUpKey) === 'true';
+
+            if (isMobile && !isPhoneSetUp && phoneNumber) {
+              console.log("Auto-completing setup on mobile...");
+              // Set isPhoneSetUp = true in localStorage using Alpine's persist key format
+              localStorage.setItem(isPhoneSetUpKey, 'true');
+              // Construct deeplink
+              const cleanedPhone = phoneNumber.replace(/\D/g, '');
+              const imeiString = this.imei.replace(/[^0-9]/g, '').padEnd(15, '0');
+              const deeplink = `http://localhost?imei=${imeiString}&phone=${cleanedPhone}&subscription=done`;
+              console.log("Redirecting to deeplink:", deeplink);
+              window.location.href = deeplink;
+              return;
+            }
+
+            // Normal redirect to device info page
+            window.location.href = `/manage/${this.imei}`;
+          } else {
+            // Refresh to show updated status
+            window.location.reload();
+          }
         } catch (error) {
           console.error("Error checking subscription:", error);
+          window.location.reload();
         }
       }
     }));
