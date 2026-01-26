@@ -8,9 +8,12 @@ const stripeInstance = new Stripe(STRIPE_SECRET_KEY || STRIPE_SECRET_KEY, {
   typescript: true
 });
 
-const TECHLESS_SUBSCRIPTION_PRICE_ID = import.meta.env.PROD
-  ? "price_1Q0nXWATGtdZ0VDDDU27pLKx"
-  : "price_1Q1BZYATGtdZ0VDD72eOr0Cm";
+// Detect Stripe mode from the secret key (test keys start with sk_test_, live keys start with sk_live_)
+const isStripeTestMode = STRIPE_SECRET_KEY?.startsWith("sk_test_") ?? !import.meta.env.PROD;
+
+const TECHLESS_SUBSCRIPTION_PRICE_ID = isStripeTestMode
+  ? "price_1Q1BZYATGtdZ0VDD72eOr0Cm"
+  : "price_1Q0nXWATGtdZ0VDDDU27pLKx";
 
 export const stripe = {
   createSubscriptionPage: defineAction({
@@ -19,8 +22,8 @@ export const stripe = {
       deviceIMEI: z.string()
     }),
     handler: async (input, context) => {
-      const returnUrl = new URL("/dashboard/device/" + input.deviceIMEI, context.url.origin);
-
+      const returnUrl = new URL("/manage/" + input.deviceIMEI, context.url.origin);
+      // const returnUrl = new URL("/dashboard/device/" + input.deviceIMEI, context.url.origin);
       const session = await stripeInstance.checkout.sessions.create({
         ui_mode: "embedded",
         line_items: [

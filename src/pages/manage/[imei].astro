@@ -565,9 +565,9 @@ try {
                       <div class="subscription-container mb-6 pb-6 border-b border-gray-200 max-w-[26rem]">
                         <hr class="border-gray-200 mb-4" />
                         <h4 class="text-sm font-semibold text-gray-900 mb-4">Manage My Subscription</h4>
-                        <div class="flex gap-3">
+                        <div class="flex flex-col md:flex-row gap-3">
                           <a
-                            href="https://getwisephone.com/my-subscription"
+                            href="https://plans.techless.com"
                             target="_blank"
                             rel="noopener noreferrer"
                             class="px-3 py-1.5 border border-black rounded-lg text-xs font-medium text-gray-700 hover:bg-gray-50 w-fit inline-flex items-center gap-1"
@@ -575,16 +575,31 @@ try {
                             I have a Wisephone data plan
                             <Icon name="lucide:external-link" class="w-3 h-3" />
                           </a>
-                          <a
-                            href="https://plans.techless.com/"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            class="px-3 py-1.5 border border-black rounded-lg text-xs font-medium text-gray-700 hover:bg-gray-50 w-fit inline-flex items-center gap-1"
+                          <div
+                            x-data="stripeSubscription"
+                            x-init={`
+                              customerEmail = \`${user?.emailAddresses?.[0]?.emailAddress || ""}\`;
+                              deviceIMEI = \`${wisephone?.imei || ""}\`;
+                            `}
                           >
-                            I have a data plan with my own carrier
-
-                            <Icon name="lucide:external-link" class="w-3 h-3" />
-                          </a>
+                            <button
+                              type="button"
+                              :disabled="!isStripeLoaded"
+                              @click="handleStripeClick"
+                              class="px-3 py-1.5 border border-black rounded-lg text-xs font-medium text-gray-700 hover:bg-gray-50 w-fit inline-flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              I have a data plan with my own carrier
+                              <Icon name="lucide:external-link" class="w-3 h-3" />
+                            </button>
+                            <dialog x-ref="stripeDialog" id="stripe-subscription-dialog" class="modal">
+                              <div style="background-color: rgb(247, 246, 242)" class="modal-box">
+                                <div id="stripe-subscription-element"></div>
+                              </div>
+                              <form method="dialog" class="modal-backdrop">
+                                <button>close</button>
+                              </form>
+                            </dialog>
+                          </div>
                         </div>
                       </div>
 
@@ -872,41 +887,6 @@ try {
                           <p class="text-xs text-gray-500">Loading apps...</p>
                         </div>
                       </div>
-                      <!-- System Applications -->
-                      <template x-for="app in systemApps" :key="app.packageName">
-                        <div class="flex items-center gap-4 p-3 border border-gray-300 rounded-lg bg-white">
-                          <div class="flex items-center gap-2 flex-1 min-w-0 overflow-hidden">
-                            <div
-                              class="w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0 overflow-hidden"
-                              :class="app.iconUrl ? 'bg-transparent' : 'bg-blue-600'"
-                            >
-                              <img
-                                x-show="app.iconUrl"
-                                :src="app.iconUrl"
-                                :alt="app.name"
-                                class="w-8 h-8 object-cover"
-                              />
-                              <Icon x-show="!app.iconUrl" name="lucide:smartphone" class="w-4 h-4 text-white" />
-                            </div>
-                            <span class="text-sm text-gray-900 truncate" x-text="app.name"></span>
-                          </div>
-                          <div class="flex-shrink-0">
-                            <span
-                              class="px-3 py-1.5 bg-gray-100 border border-gray-200 rounded-md text-xs font-medium text-gray-600 whitespace-nowrap"
-                            >
-                              System App
-                            </span>
-                          </div>
-                        </div>
-                      </template>
-
-                      <!-- Divider -->
-                      <div x-show="systemApps.length > 0 && installedFilteredApps.length > 0" class="relative py-2">
-                        <div class="absolute inset-0 flex items-center">
-                          <div class="w-full border-t border-gray-300"></div>
-                        </div>
-                      </div>
-
                       <!-- Regular Installed Apps -->
                       <template x-for="app in installedFilteredApps" :key="app.packageName">
                         <div class="flex items-center gap-4 p-3 border border-gray-300 rounded-lg bg-white">
@@ -939,6 +919,41 @@ try {
                               <Icon name="lucide:trash-2" class="w-3.5 h-3.5" />
                               Uninstall
                             </button>
+                          </div>
+                        </div>
+                      </template>
+
+                      <!-- Divider -->
+                      <div x-show="systemApps.length > 0 && installedFilteredApps.length > 0" class="relative py-2">
+                        <div class="absolute inset-0 flex items-center">
+                          <div class="w-full border-t border-gray-300"></div>
+                        </div>
+                      </div>
+
+                      <!-- System Applications -->
+                      <template x-for="app in systemApps" :key="app.packageName">
+                        <div class="flex items-center gap-4 p-3 border border-gray-300 rounded-lg bg-white">
+                          <div class="flex items-center gap-2 flex-1 min-w-0 overflow-hidden">
+                            <div
+                              class="w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0 overflow-hidden"
+                              :class="app.iconUrl ? 'bg-transparent' : 'bg-blue-600'"
+                            >
+                              <img
+                                x-show="app.iconUrl"
+                                :src="app.iconUrl"
+                                :alt="app.name"
+                                class="w-8 h-8 object-cover"
+                              />
+                              <Icon x-show="!app.iconUrl" name="lucide:smartphone" class="w-4 h-4 text-white" />
+                            </div>
+                            <span class="text-sm text-gray-900 truncate" x-text="app.name"></span>
+                          </div>
+                          <div class="flex-shrink-0">
+                            <span
+                              class="px-3 py-1.5 bg-gray-100 border border-gray-200 rounded-md text-xs font-medium text-gray-600 whitespace-nowrap"
+                            >
+                              System App
+                            </span>
                           </div>
                         </div>
                       </template>
@@ -993,37 +1008,6 @@ try {
                             <p class="text-xs text-gray-500">Loading apps...</p>
                           </div>
                         </div>
-                        <!-- System Applications -->
-                        <template x-for="app in systemApps" :key="app.packageName">
-                          <div class="flex items-center justify-between p-3 border border-gray-300 rounded-lg bg-white">
-                            <div class="flex items-center gap-2 flex-1 min-w-0">
-                              <div
-                                class="w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0 overflow-hidden"
-                                :class="app.iconUrl ? 'bg-transparent' : 'bg-blue-600'"
-                              >
-                                <img
-                                  x-show="app.iconUrl"
-                                  :src="app.iconUrl"
-                                  :alt="app.name"
-                                  class="w-8 h-8 object-cover"
-                                />
-                                <Icon x-show="!app.iconUrl" name="lucide:smartphone" class="w-4 h-4 text-white" />
-                              </div>
-                              <div class="flex flex-col min-w-0">
-                                <span class="text-sm text-gray-900 truncate" x-text="app.name"></span>
-                                <span class="text-xs text-gray-500">System App</span>
-                              </div>
-                            </div>
-                          </div>
-                        </template>
-
-                        <!-- Divider -->
-                        <div x-show="systemApps.length > 0 && installedFilteredApps.length > 0" class="relative py-1">
-                          <div class="absolute inset-0 flex items-center">
-                            <div class="w-full border-t border-gray-300"></div>
-                          </div>
-                        </div>
-
                         <!-- Regular Installed Apps -->
                         <template x-for="app in installedFilteredApps" :key="app.packageName">
                           <div class="flex items-center justify-between p-3 border border-gray-300 rounded-lg bg-white">
@@ -1049,6 +1033,37 @@ try {
                               <Icon name="lucide:trash-2" class="w-3.5 h-3.5" />
                               Uninstall
                             </button>
+                          </div>
+                        </template>
+
+                        <!-- Divider -->
+                        <div x-show="systemApps.length > 0 && installedFilteredApps.length > 0" class="relative py-1">
+                          <div class="absolute inset-0 flex items-center">
+                            <div class="w-full border-t border-gray-300"></div>
+                          </div>
+                        </div>
+
+                        <!-- System Applications -->
+                        <template x-for="app in systemApps" :key="app.packageName">
+                          <div class="flex items-center justify-between p-3 border border-gray-300 rounded-lg bg-white">
+                            <div class="flex items-center gap-2 flex-1 min-w-0">
+                              <div
+                                class="w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0 overflow-hidden"
+                                :class="app.iconUrl ? 'bg-transparent' : 'bg-blue-600'"
+                              >
+                                <img
+                                  x-show="app.iconUrl"
+                                  :src="app.iconUrl"
+                                  :alt="app.name"
+                                  class="w-8 h-8 object-cover"
+                                />
+                                <Icon x-show="!app.iconUrl" name="lucide:smartphone" class="w-4 h-4 text-white" />
+                              </div>
+                              <div class="flex flex-col min-w-0">
+                                <span class="text-sm text-gray-900 truncate" x-text="app.name"></span>
+                                <span class="text-xs text-gray-500">System App</span>
+                              </div>
+                            </div>
                           </div>
                         </template>
                       </div>
@@ -1365,8 +1380,10 @@ try {
             KNOX_USER_GROUPS,
             updateUnreachableAlpineState,
             getPackageNameFromPlayStoreUrl,
+            STRIPE_PUBLIC_KEY,
             type Feature
           } from "@/libs/utils";
+          import { loadStripe, type Stripe } from "@stripe/stripe-js";
           import { AppManagementService } from "@/services/AppManagementService";
           import { FeatureManagementService } from "@/services/FeatureManagementService";
           import type { AppEntry } from "@/types/apps";
@@ -2492,19 +2509,8 @@ try {
                     throw new Error("Invalid feature configuration");
                   }
 
-                  // Ensure device model is cached
-                  await this.cacheDeviceModel();
-
-                  // Get the appropriate group ID based on device model
-                  const groupIdForDevice = this.getGroupIdForFeature(feature);
-                  const regularGroupId = feature.knoxManageId;
-                  const a16GroupId = feature.a16KnoxManageId;
-
-                  // Check if feature is enabled (check both regular and A16 groups if applicable)
-                  const isRegularEnabled = this.features.includes(regularGroupId);
-                  const isA16Enabled = a16GroupId ? this.features.includes(a16GroupId) : false;
-                  const currentEnabled = isRegularEnabled || isA16Enabled;
-
+                  // Use isFeatureEnabled to properly handle inverse features and A16 device groups
+                  const currentEnabled = this.isFeatureEnabled(feature, feature.isInverse || false);
                   const updatedValue = !currentEnabled;
 
                   // Store the pending feature change
@@ -3048,6 +3054,49 @@ try {
 
               logGoogleManagedApps() {
                 // Logging removed - function kept for compatibility
+              }
+            };
+          });
+
+          // Stripe subscription handler for "I have a data plan with my own carrier" button
+          Alpine.data("stripeSubscription", function () {
+            return {
+              customerEmail: "",
+              deviceIMEI: "",
+              isStripeLoaded: false,
+              isEmbedded: false,
+              stripeInstance: undefined as Stripe | undefined,
+              sessionClientSecret: undefined as string | undefined,
+              async handleStripeClick() {
+                if (!this.sessionClientSecret) {
+                  const data = await actions.stripe.createSubscriptionPage.orThrow({
+                    customerEmail: this.customerEmail,
+                    deviceIMEI: this.deviceIMEI
+                  });
+                  this.sessionClientSecret = data.session.client_secret as string;
+                }
+
+                if (!this.isEmbedded) {
+                  const checkout = await this.stripeInstance?.initEmbeddedCheckout({
+                    clientSecret: this.sessionClientSecret
+                  });
+                  checkout?.mount("#stripe-subscription-element");
+                  this.isEmbedded = true;
+                }
+
+                (this.$refs.stripeDialog as HTMLDialogElement).showModal();
+              },
+              async initializeStripe() {
+                const stripe = await loadStripe(STRIPE_PUBLIC_KEY);
+                if (!stripe) {
+                  throw new Error("Stripe is not loaded");
+                }
+
+                this.stripeInstance = stripe;
+                this.isStripeLoaded = true;
+              },
+              init() {
+                this.initializeStripe();
               }
             };
           });
