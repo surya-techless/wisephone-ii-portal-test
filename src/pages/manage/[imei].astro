@@ -572,9 +572,25 @@ try {
                             x-init={`
                               customerEmail = \`${user?.emailAddresses?.[0]?.emailAddress || ""}\`;
                               deviceIMEI = \`${wisephone?.imei || ""}\`;
+                              isSubscribed = ${Boolean(isSubscribed)};
                             `}
                           >
+                            <!-- Show link when subscribed -->
+                            <a
+                              x-show="isSubscribed"
+                              x-cloak
+                              href="https://getwisephone.com/my-subscription"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              class="px-3 py-1.5 border border-black rounded-lg text-xs font-medium text-gray-700 hover:bg-gray-50 w-fit inline-flex items-center gap-1"
+                            >
+                              I have a data plan with my own carrier
+                              <Icon name="lucide:external-link" class="w-3 h-3" />
+                            </a>
+                            <!-- Show button when not subscribed -->
                             <button
+                              x-show="!isSubscribed"
+                              x-cloak
                               type="button"
                               :disabled="!isStripeLoaded"
                               @click="handleStripeClick"
@@ -583,7 +599,13 @@ try {
                               I have a data plan with my own carrier
                               <Icon name="lucide:external-link" class="w-3 h-3" />
                             </button>
-                            <dialog x-ref="stripeDialog" id="stripe-subscription-dialog" class="modal">
+                            <!-- Modal only shown when not subscribed -->
+                            <dialog
+                              x-show="!isSubscribed"
+                              x-ref="stripeDialog"
+                              id="stripe-subscription-dialog"
+                              class="modal"
+                            >
                               <div style="background-color: rgb(247, 246, 242)" class="modal-box">
                                 <div id="stripe-subscription-element"></div>
                               </div>
@@ -791,7 +813,7 @@ try {
                         <input
                           type="checkbox"
                           class="sr-only peer"
-                          :checked="isFeatureEnabled(feature.knoxManageId, feature.isInverse || false)"
+                          :checked="isFeatureEnabledForFeature(feature)"
                           @click.prevent="toggleFeature(feature)"
                         />
                         <div
@@ -809,7 +831,6 @@ try {
                 x-show="currentTab === 'app-management'"
                 x-cloak
                 class="flex flex-col h-[calc(100vh-280px)] max-h-[calc(100vh-280px)]"
-                x-data="{ installedOpen: false }"
               >
                 <!-- Header Text -->
                 <div class="mb-4 flex-shrink-0 md:max-w-[500px]">
@@ -871,6 +892,13 @@ try {
                       >
                         No apps found matching your search.
                       </div>
+                    </div>
+                  </div>
+
+                  <!-- Horizontal Divider -->
+                  <div class="relative py-4 md:max-w-[500px]">
+                    <div class="absolute inset-0 flex items-center">
+                      <div class="w-full border-t border-gray-300"></div>
                     </div>
                   </div>
 
@@ -1282,6 +1310,7 @@ try {
                 editPhoneNumber: "",
                 showRemoveModal: false,
                 cachedTotalApps: 0,
+                installedOpen: false,
                 // @ts-ignore
                 isPhoneSetUp: this.$persist(false),
                 // TODO :  Not a todo, but note to the future dev : all apps are embedded inside apps.json file,
@@ -2158,8 +2187,8 @@ try {
                       throw new Error("Active subscription required");
                     }
 
-                    // Use isFeatureEnabled to properly handle inverse features
-                    const currentEnabled = this.isFeatureEnabled(feature.knoxManageId, feature.isInverse || false);
+                    // Use isFeatureEnabledForFeature to properly handle inverse features and A16 devices
+                    const currentEnabled = this.isFeatureEnabledForFeature(feature);
                     const updatedValue = !currentEnabled;
 
                     // Store the pending feature change
@@ -2192,16 +2221,51 @@ try {
                     // Close modal
                     this.showConfirmModal = false;
 
+                    // For inverse features, we need to invert the enabled value when calling the API
+                    // because the knoxManageId represents a "disable" group
+                    // - To enable the feature (allow hotspot/reset), we remove the disable group (enabled: false)
+                    // - To disable the feature (block hotspot/reset), we add the disable group (enabled: true)
+                    const isInverse = feature.isInverse || false;
+                    const apiEnabled = isInverse ? !updatedValue : updatedValue;
+
                     await featureManagement.toggleFeature({
                       imei: this.imei,
                       feature,
-                      enabled: updatedValue
+                      enabled: apiEnabled
                     });
 
-                    if (!updatedValue) {
-                      this.features = this.features.filter((id) => id !== feature.knoxManageId);
+                    // Update local features array
+                    // For inverse features: when enabling, remove from array; when disabling, add to array
+                    // For normal features: when enabling, add to array; when disabling, remove from array
+                    // Handle both regular and A16 IDs to support both device types
+                    if (isInverse) {
+                      if (updatedValue) {
+                        // Enabling: remove both regular and A16 disable groups from the array
+                        this.features = this.features.filter(
+                          (id) => id !== feature.knoxManageId && id !== feature.a16KnoxManageId
+                        );
+                      } else {
+                        // Disabling: add the disable group to the array
+                        // The backend will determine which ID to use based on device type
+                        // For now, we'll add the regular ID and let the backend handle A16
+                        if (!this.features.includes(feature.knoxManageId)) {
+                          this.features.push(feature.knoxManageId);
+                        }
+                      }
                     } else {
-                      this.features.push(feature.knoxManageId);
+                      // Normal feature logic
+                      if (!updatedValue) {
+                        // Disabling: remove both regular and A16 IDs from the array
+                        this.features = this.features.filter(
+                          (id) => id !== feature.knoxManageId && id !== feature.a16KnoxManageId
+                        );
+                      } else {
+                        // Enabling: add the feature to the array
+                        // The backend will determine which ID to use based on device type
+                        if (!this.features.includes(feature.knoxManageId)) {
+                          this.features.push(feature.knoxManageId);
+                        }
+                      }
                     }
 
                     this.showSuccessToast(
@@ -2472,6 +2536,14 @@ try {
                   return isInverse ? !isEnabled : isEnabled;
                 },
 
+                isFeatureEnabledForFeature(feature: Feature) {
+                  // Check both regular and A16 IDs to support both device types
+                  const hasRegularId = this.features.includes(feature.knoxManageId);
+                  const hasA16Id = feature.a16KnoxManageId ? this.features.includes(feature.a16KnoxManageId) : false;
+                  const isEnabled = hasRegularId || hasA16Id;
+                  return feature.isInverse ? !isEnabled : isEnabled;
+                },
+
                 async init() {
                   // Load cached total apps count on initialization
                   this.loadCachedTotalApps();
@@ -2493,6 +2565,8 @@ try {
                   // Watch for currentTab changes - load apps when App Management tab is clicked
                   this.$watch("currentTab", async (newTab) => {
                     if (newTab === "app-management") {
+                      // Open installed apps section by default when entering this tab
+                      this.installedOpen = true;
                       // Load available apps immediately (fast, no API call)
                       if (!this.isAvailableAppsLoaded) {
                         this.loadAvailableApps();
@@ -2501,6 +2575,17 @@ try {
                       if (!this.isAppsLoaded && !this.isAppsLoading) {
                         await this.getInstalledApps();
                       }
+                    }
+                  });
+
+                  // Watch for appSearchQuery changes - collapse/expand installed apps section
+                  this.$watch("appSearchQuery", (query) => {
+                    if (query && query.trim().length > 0) {
+                      // User is searching - collapse installed apps section
+                      this.installedOpen = false;
+                    } else {
+                      // Search is cleared - reopen installed apps section
+                      this.installedOpen = true;
                     }
                   });
 
@@ -2547,6 +2632,7 @@ try {
               return {
                 customerEmail: "",
                 deviceIMEI: "",
+                isSubscribed: false,
                 isStripeLoaded: false,
                 isEmbedded: false,
                 stripeInstance: undefined as Stripe | undefined,
