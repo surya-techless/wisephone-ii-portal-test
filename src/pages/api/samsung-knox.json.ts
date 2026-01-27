@@ -26,8 +26,20 @@ export const GET: APIRoute = async (props) => {
           throw new Error("IMEI parameter required");
         }
 
-        const groups = await SamsungKnoxService.getGroupsForDevice(imei);
-        return new Response(JSON.stringify(groups), { status: 200 });
+        // Fetch both groups and device info in parallel
+        const [groups, deviceInfo] = await Promise.all([
+          SamsungKnoxService.getGroupsForDevice(imei),
+          SamsungKnoxService.getDeviceFromImei(imei)
+        ]);
+
+        // Return both groups and device info
+        return new Response(
+          JSON.stringify({
+            groups,
+            deviceInfo
+          }),
+          { status: 200 }
+        );
 
       default:
         return new Response(

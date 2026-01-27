@@ -739,7 +739,8 @@ const userLink = user?.id
           return (
             this.isSubscribed &&
             Array.isArray(this.features) &&
-            this.features.includes(KNOX_USER_GROUPS.ADD_ON_TOOL_DRAWER)
+            (this.features.includes(KNOX_USER_GROUPS.ADD_ON_TOOL_DRAWER) ||
+             this.features.includes(KNOX_USER_GROUPS.A16_ADD_ON_TOOL_DRAWER))
           );
         },
         get isFaithToolsEnabled() {

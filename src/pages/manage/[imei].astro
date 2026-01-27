@@ -1280,6 +1280,7 @@ try {
                 userPhone: "",
                 userEmail: "",
                 enableScreenTime: false,
+                deviceInfo: null as { resultValue?: { [key: string]: any } } | null,
 
                 isEditing: false,
                 devicePhone: "",
@@ -1479,8 +1480,18 @@ try {
                       throw new Error(`Failed to fetch features: ${res.status} ${res.statusText}`);
                     }
 
-                    const features = await res.json();
-                    this.features = features;
+                    const data = await res.json();
+
+                    // Handle both old format (array) and new format (object with groups and deviceInfo)
+                    if (Array.isArray(data)) {
+                      // Old format - backward compatibility
+                      this.features = data;
+                      this.deviceInfo = null;
+                    } else {
+                      // New format - includes device info
+                      this.features = data.groups || [];
+                      this.deviceInfo = data.deviceInfo || null;
+                    }
                   } catch (error) {
                     console.error("Error fetching features:", error);
                     this.showErrorToast("Failed to load device features. Please try again.");
@@ -1488,6 +1499,29 @@ try {
                     // Set loading to false after all operations complete
                     this.isLoading = false;
                   }
+                },
+
+                getDeviceModel(): string {
+                  if (!this.deviceInfo?.resultValue) return "";
+
+                  // Try different possible field names for device model
+                  const resultValue = this.deviceInfo.resultValue;
+                  return (
+                    resultValue.modelName ||
+                    resultValue.deviceModel ||
+                    resultValue.model ||
+                    resultValue.deviceName ||
+                    resultValue.modelNumber ||
+                    ""
+                  );
+                },
+
+                isA16Device(): boolean {
+                  const model = this.getDeviceModel();
+                  if (!model) return false;
+
+                  // Check if model contains "A16" (case insensitive)
+                  return model.toUpperCase().includes("A16");
                 },
 
                 // Load available apps from apps.json - both Tool Drawer and Faith Tools
@@ -2228,16 +2262,23 @@ try {
                     const isInverse = feature.isInverse || false;
                     const apiEnabled = isInverse ? !updatedValue : updatedValue;
 
+                    // Determine device type and use appropriate group ID
+                    const isA16 = this.isA16Device();
+
                     await featureManagement.toggleFeature({
                       imei: this.imei,
                       feature,
-                      enabled: apiEnabled
+                      enabled: apiEnabled,
+                      isA16Device: isA16
                     });
 
                     // Update local features array
                     // For inverse features: when enabling, remove from array; when disabling, add to array
                     // For normal features: when enabling, add to array; when disabling, remove from array
-                    // Handle both regular and A16 IDs to support both device types
+                    // Use the correct group ID based on device type (A16 or A15)
+                    const correctGroupId =
+                      isA16 && feature.a16KnoxManageId ? feature.a16KnoxManageId : feature.knoxManageId;
+
                     if (isInverse) {
                       if (updatedValue) {
                         // Enabling: remove both regular and A16 disable groups from the array
@@ -2245,11 +2286,9 @@ try {
                           (id) => id !== feature.knoxManageId && id !== feature.a16KnoxManageId
                         );
                       } else {
-                        // Disabling: add the disable group to the array
-                        // The backend will determine which ID to use based on device type
-                        // For now, we'll add the regular ID and let the backend handle A16
-                        if (!this.features.includes(feature.knoxManageId)) {
-                          this.features.push(feature.knoxManageId);
+                        // Disabling: add the correct disable group to the array based on device type
+                        if (!this.features.includes(correctGroupId)) {
+                          this.features.push(correctGroupId);
                         }
                       }
                     } else {
@@ -2260,10 +2299,9 @@ try {
                           (id) => id !== feature.knoxManageId && id !== feature.a16KnoxManageId
                         );
                       } else {
-                        // Enabling: add the feature to the array
-                        // The backend will determine which ID to use based on device type
-                        if (!this.features.includes(feature.knoxManageId)) {
-                          this.features.push(feature.knoxManageId);
+                        // Enabling: add the correct feature group to the array based on device type
+                        if (!this.features.includes(correctGroupId)) {
+                          this.features.push(correctGroupId);
                         }
                       }
                     }
@@ -2524,7 +2562,8 @@ try {
                   return (
                     this.isSubscribed &&
                     Array.isArray(this.features) &&
-                    this.features.includes(KNOX_USER_GROUPS.ADD_ON_TOOL_DRAWER)
+                    (this.features.includes(KNOX_USER_GROUPS.ADD_ON_TOOL_DRAWER) ||
+                      this.features.includes(KNOX_USER_GROUPS.A16_ADD_ON_TOOL_DRAWER))
                   );
                 },
                 get isFaithToolsEnabled() {
