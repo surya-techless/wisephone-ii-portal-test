@@ -45,10 +45,10 @@ try {
     return Astro.redirect("/dashboard?error=" + encodeURIComponent("A Wisephone II with that IMEI was not found."));
   }
 
+  // Check if device was just deleted - must happen before any device lookup
   const resultDelete = Astro.getActionResult(actions.wisephones.deleteWisephone);
-  const resultDeleteMessage = resultDelete?.data?.success || "";
-  if (resultDeleteMessage) {
-    return Astro.redirect("/dashboard?message=" + encodeURIComponent(resultDeleteMessage));
+  if (resultDelete && !resultDelete.error) {
+    return Astro.redirect("/dashboard?message=" + encodeURIComponent(resultDelete.data?.success || "Wisephone successfully removed from account."));
   }
 
   const userId = Astro.locals.auth().userId;
@@ -75,6 +75,11 @@ try {
   }
 
   if (!wisephones || !wisephones.length) {
+    // If we just tried to delete but didn't get a success message,
+    // check if there was an error in the delete action
+    if (resultDelete?.error) {
+      return Astro.redirect("/dashboard?error=" + encodeURIComponent(resultDelete.error.message || "Failed to delete device"));
+    }
     return Astro.redirect("/dashboard?error=" + encodeURIComponent("Device not found"));
   }
 
@@ -398,27 +403,45 @@ const userLink = user?.id
             </p>
 
             <div class="grid sm:grid-cols-2 max-sm:grid-cols-1 gap-4 mt-6">
-              <div class="card rounded-xl border border-[var(--surface-tertiary)] text-slate-800">
-                <div class="card-body p-6">
-                  <h3 class="text-lg font-bold !m-0">Wisephone Carrier Plan <span class='font-normal text-slate-500'>(Includes WiseOS Subscription)</span></h3>
-                  <p class="m-0 mt-2">
-                    Get all-in-one connectivity with our Wisephone Carrier Plan, which bundles your data, talk, and text with your WiseOS Subscription for a complete experience.
+              <div class="card rounded-xl border border-[var(--surface-tertiary)] text-slate-800 h-full">
+                <div class="card-body p-6 flex flex-col h-full">
+                  <h3 class="text-lg font-bold !m-0">WiseOS With data</h3>
+                  <p class="text-sm text-slate-500 m-0 mt-1 mb-2">(All-in-One Subscription)</p>
+                  <p class="m-0 mt-2 mb-3">
+                    Get everything in one place, WiseOS, talk, text, and data bundled together for a seamless, hassle-free experience.
                     <a class="link underline-offset-2 text-slate-500" href="https://wisephone.com/pages/plans" target="_blank">Learn more</a>
                   </p>
-                  <a href="https://plans.techless.com" target="_blank" class="flex items-center gap-1 btn btn-primary mt-4">
-                    Activate Carrier Plan*
+                  <div class="text-sm text-slate-600 mb-3">
+                    <p class="font-semibold mb-1">Includes:</p>
+                    <ul class="list-disc list-inside space-y-1">
+                      <li>WiseOS Subscription</li>
+                      <li>Carrier Service (Data, Talk, and Text)</li>
+                    </ul>
+                  </div>
+                  <a href="https://plans.techless.com" target="_blank" class="flex items-center gap-1 btn btn-primary mt-auto">
+                    Activate All‑In‑One Plan
                     <Icon name="lucide:external-link" class="w-4 h-4" />
                   </a>
                 </div>
               </div>
-              <div class="card rounded-xl border border-[var(--surface-tertiary)] text-slate-800">
-                <div class="card-body p-6">
-                  <h3 class="text-lg font-bold !m-0">Bring Your Own Carrier <span class='font-normal text-slate-500'>(WiseOS Subscription Required)</span></h3>
-                  <p class="m-0 mt-2">Continue using your existing carrier and unlock your Wisephone's features by activating your WiseOS Subscription. <a class="link underline-offset-2 text-slate-500" href="https://wisephone.com/pages/plans" target="_blank">Learn more</a></p>
-                  <TechlessSubscriptionButton
-                    deviceIMEI={wisephone?.imei || ""}
-                    customerEmail={user?.emailAddresses[0]?.emailAddress || ""}
-                  />
+              <div class="card rounded-xl border border-[var(--surface-tertiary)] text-slate-800 h-full">
+                <div class="card-body p-6 flex flex-col h-full">
+                  <h3 class="text-lg font-bold !m-0">Bring Your Own Carrier</h3>
+                  <p class="text-sm text-slate-500 m-0 mt-1 mb-2">(WiseOS Subscription - no data included)</p>
+                  <p class="m-0 mt-2 mb-3">Perfect if you already have a carrier you love. Enjoy all the features of WiseOS while keeping your existing mobile plan. <a class="link underline-offset-2 text-slate-500" href="https://wisephone.com/pages/plans" target="_blank">Learn more</a></p>
+                  <div class="text-sm text-slate-600 mb-3">
+                    <p class="font-semibold mb-1">Includes:</p>
+                    <ul class="list-disc list-inside space-y-1">
+                      <li>WiseOS Subscription</li>
+                      <li>No carrier service included — bring your own plan</li>
+                    </ul>
+                  </div>
+                  <div class="mt-auto">
+                    <TechlessSubscriptionButton
+                      deviceIMEI={wisephone?.imei || ""}
+                      customerEmail={user?.emailAddresses[0]?.emailAddress || ""}
+                    />
+                  </div>
                 </div>
               </div>
             </div>

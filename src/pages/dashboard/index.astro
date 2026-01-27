@@ -677,14 +677,14 @@ const actionResult = Astro.getActionResult(actions.wisephones.createWisephone);
         </p>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-          <!-- Wisephone Carrier Plan -->
-          <div class="border border-gray-300 rounded-lg p-4 md:p-6 flex flex-col">
+          <!-- WiseOS With data -->
+          <div class="border border-gray-300 rounded-lg p-4 md:p-6 flex flex-col h-full">
             <h3 class="text-base md:text-lg font-semibold text-gray-900 mb-1">
-              Wisephone Carrier Plan
-              <span class="font-normal text-gray-500 text-sm">(Includes WiseOS Subscription)</span>
+              WiseOS With data
             </h3>
-            <p class="text-sm md:text-base text-gray-700 mb-4 leading-snug flex-grow">
-              Get all-in-one connectivity with our Wisephone Carrier Plan, which bundles your data, talk, and text with your WiseOS Subscription for a complete experience.
+            <p class="text-xs md:text-sm text-gray-500 mb-2">(All-in-One Subscription)</p>
+            <p class="text-sm md:text-base text-gray-700 mb-3 leading-snug">
+              Get everything in one place, WiseOS, talk, text, and data bundled together for a seamless, hassle-free experience.
               <a
                 class="text-blue-600 underline text-xs md:text-sm"
                 href="https://wisephone.com/pages/plans"
@@ -694,25 +694,32 @@ const actionResult = Astro.getActionResult(actions.wisephones.createWisephone);
                 Learn more
               </a>
             </p>
+            <div class="text-xs md:text-sm text-gray-600 mb-4">
+              <p class="font-semibold mb-1">Includes:</p>
+              <ul class="list-disc list-inside space-y-1">
+                <li>WiseOS Subscription</li>
+                <li>Carrier Service (Data, Talk, and Text)</li>
+              </ul>
+            </div>
             <a
               href="https://plans.techless.com/"
               target="_blank"
               rel="noopener noreferrer"
-              class="flex items-center justify-center gap-1 w-full px-4 py-2 bg-[#C07F53] text-white rounded-md text-sm font-medium hover:bg-[#A06F43] transition-colors cursor-pointer"
+              class="flex items-center justify-center gap-1 w-full px-4 py-2 bg-[#C07F53] text-white rounded-md text-sm font-medium hover:bg-[#A06F43] transition-colors cursor-pointer mt-auto"
             >
-              Activate Carrier Plan
+              Activate All‑In‑One Plan
               <Icon name="lucide:external-link" class="w-4 h-4" />
             </a>
           </div>
 
           <!-- Bring Your Own Carrier -->
-          <div class="border border-gray-300 rounded-lg p-4 md:p-6 flex flex-col">
+          <div class="border border-gray-300 rounded-lg p-4 md:p-6 flex flex-col h-full">
             <h3 class="text-base md:text-lg font-semibold text-gray-900 mb-1">
               Bring Your Own Carrier
-              <span class="font-normal text-gray-500 text-sm">(WiseOS Subscription Required)</span>
             </h3>
-            <p class="text-sm md:text-base text-gray-700 mb-4 leading-snug flex-grow">
-              Continue using your existing carrier and unlock your Wisephone's features by activating your WiseOS Subscription.
+            <p class="text-xs md:text-sm text-gray-500 mb-2">(WiseOS Subscription - no data included)</p>
+            <p class="text-sm md:text-base text-gray-700 mb-3 leading-snug">
+              Perfect if you already have a carrier you love. Enjoy all the features of WiseOS while keeping your existing mobile plan.
               <a
                 class="text-blue-600 underline text-xs md:text-sm"
                 href="https://wisephone.com/pages/plans"
@@ -722,18 +729,25 @@ const actionResult = Astro.getActionResult(actions.wisephones.createWisephone);
                 Learn more
               </a>
             </p>
+            <div class="text-xs md:text-sm text-gray-600 mb-4">
+              <p class="font-semibold mb-1">Includes:</p>
+              <ul class="list-disc list-inside space-y-1">
+                <li>WiseOS Subscription</li>
+                <li>No carrier service included — bring your own plan</li>
+              </ul>
+            </div>
             <button
               @click="handleStripeCheckout()"
               :disabled="!isStripeLoaded || !activeDeviceImei"
-              class="flex items-center justify-center gap-1 w-full px-4 py-2 bg-[#C07F53] text-white rounded-md text-sm font-medium hover:bg-[#A06F43] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              class="flex items-center justify-center gap-1 w-full px-4 py-2 bg-[#C07F53] text-white rounded-md text-sm font-medium hover:bg-[#A06F43] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed mt-auto"
             >
-              Activate WiseOS Subscription
+              Activate BYOC plan
             </button>
           </div>
         </div>
 
         <!-- Remove Device Button -->
-        <div class="border-t border-gray-200 p-4 md:p-6">
+        <div class="p-4 md:p-6">
           <form
             method="POST"
             action={actions.wisephones.deleteWisephone}
