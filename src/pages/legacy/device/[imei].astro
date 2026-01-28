@@ -42,13 +42,13 @@ if (!user) {
 
   try {
     if (!imei || !isValidIMEI(imei)) {
-      return Astro.redirect("/legacy?error=" + encodeURIComponent("A Wisephone II with that IMEI was not found."));
+      return Astro.redirect("/legacy/admin?error=" + encodeURIComponent("A Wisephone II with that IMEI was not found."));
     }
 
   const resultDelete = Astro.getActionResult(actions.wisephones.deleteWisephone);
   const resultDeleteMessage = resultDelete?.data?.success || "";
   if (resultDeleteMessage) {
-    return Astro.redirect("/legacy?message=" + encodeURIComponent(resultDeleteMessage));
+    return Astro.redirect("/legacy/admin?message=" + encodeURIComponent(resultDeleteMessage));
   }
 
   const userId = Astro.locals.auth().userId;
@@ -75,7 +75,7 @@ if (!user) {
   }
 
   if (!wisephones || !wisephones.length) {
-    return Astro.redirect("/legacy?error=" + encodeURIComponent("Device not found"));
+    return Astro.redirect("/legacy/admin?error=" + encodeURIComponent("Device not found"));
   }
 
   wisephone = wisephones[0];
@@ -136,9 +136,9 @@ if (!user) {
     }
   }
 
-  // Safety check - if wisephone is null or undefined, redirect to legacy dashboard with error
+  // Safety check - if wisephone is null or undefined, redirect to legacy admin with error
   if (!wisephone) {
-    return Astro.redirect("/legacy?error=" + encodeURIComponent("Device information could not be loaded"));
+    return Astro.redirect("/legacy/admin?error=" + encodeURIComponent("Device information could not be loaded"));
   }
 
   const result = Astro.getActionResult(actions.wisephones.updateWisephone);
@@ -279,9 +279,9 @@ const userLink = user?.id
     <main class="flex flex-col gap-12 py-12">
       <section class="flex flex-col gap-6 not-prose">
         <div>
-          <a href="/legacy" class="p-0 no-underline w-fit btn btn-link text-slate-500">
+          <a href="/legacy/admin" class="p-0 no-underline w-fit btn btn-link text-slate-500">
             <Icon name="lucide:arrow-left" class="w-4 h-4" />
-            Devices
+            Admin
           </a>
 
           <div class="sm:grid sm:grid-cols-[1fr_auto] max-sm:flex max-sm:flex-col sm:items-center gap-2">
