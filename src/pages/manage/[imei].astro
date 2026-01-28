@@ -487,32 +487,48 @@ try {
             <!-- Left Column: Tabs and Tab Content -->
             <div class="mb-6" :class="currentTab === 'app-management' ? 'lg:col-span-2' : ''">
               <!-- Tabs -->
-              <div
-                class="flex flex-nowrap gap-2 md:gap-10 mb-6 border-b-[2px] border-gray-300 pr-2 md:pr-0 md:max-w-[500px]"
-              >
-                <button
-                  @click="currentTab = 'device-info'"
-                  class="px-6 py-3 text-sm font-medium transition-all relative"
-                  :class="currentTab === 'device-info' ? 'bg-[#DBD5CD] text-gray-900 border-b-[3px] border-[#C07F53] -mb-[3px]' : 'bg-transparent text-gray-600 border-transparent hover:text-gray-900'"
+              <div class="relative mb-6 -ml-2">
+                <!-- Tabs container - no border -->
+                <div class="flex flex-nowrap gap-0">
+                  <button
+                    @click="currentTab = 'device-info'"
+                    class="px-6 py-3 text-sm font-medium transition-colors relative bg-pink-200"
+                    :class="currentTab === 'device-info' ? 'bg-[#DBD5CD] text-gray-900' : 'text-gray-600 hover:text-gray-900'"
+                  >
+                    Device Info
+                    <span
+                      x-show="currentTab === 'device-info'"
+                      class="absolute bottom-0 left-0 right-0 h-0.5 bg-[#C07F53] -mb-[2px]"></span>
+                  </button>
+                  <button
+                    @click="currentTab = 'features'"
+                    class="px-6 py-3 text-sm font-medium transition-colors relative bg-pink-200"
+                    :class="currentTab === 'features' ? 'bg-[#DBD5CD] text-gray-900' : 'text-gray-600 hover:text-gray-900'"
+                  >
+                    Features
+                    <span
+                      x-show="currentTab === 'features'"
+                      class="absolute bottom-0 left-0 right-0 h-0.5 bg-[#C07F53] -mb-[2px]"></span>
+                  </button>
+                  <button
+                    x-show="isSubscribed && isToolDrawerEnabled"
+                    x-cloak
+                    @click="currentTab = 'app-management'"
+                    class="px-6 py-3 text-sm font-medium transition-colors relative bg-pink-200"
+                    :class="currentTab === 'app-management' ? 'bg-[#DBD5CD] text-gray-900' : 'text-gray-600 hover:text-gray-900'"
+                  >
+                    Tool Management
+                    <span
+                      x-show="currentTab === 'app-management'"
+                      class="absolute bottom-0 left-0 right-0 h-0.5 bg-[#C07F53] -mb-[2px]"></span>
+                  </button>
+                </div>
+                <!-- Blue border line - ends at text of last visible tab -->
+                <div
+                  class="absolute bottom-0 left-0 h-0.5 bg-blue-300 transition-all"
+                  :style="(isSubscribed && isToolDrawerEnabled) ? 'width: 391px;' : 'width: 227px;'"
                 >
-                  Device Info
-                </button>
-                <button
-                  @click="currentTab = 'features'"
-                  class="px-6 py-3 text-sm font-medium transition-all relative"
-                  :class="currentTab === 'features' ? 'bg-[#DBD5CD] text-gray-900 border-b-[3px] border-[#C07F53] -mb-[3px]' : 'bg-transparent text-gray-600 border-transparent hover:text-gray-900'"
-                >
-                  Features
-                </button>
-                <button
-                  x-show="isSubscribed && isToolDrawerEnabled"
-                  x-cloak
-                  @click="currentTab = 'app-management'"
-                  class="px-4 py-3 text-sm font-medium transition-all relative"
-                  :class="currentTab === 'app-management' ? 'bg-[#DBD5CD] text-gray-900 border-b-[3px] border-[#C07F53] -mb-[3px]' : 'bg-transparent text-gray-600 border-transparent hover:text-gray-900'"
-                >
-                  Tool Management
-                </button>
+                </div>
               </div>
               <!-- Device Info Tab -->
               <div x-show="currentTab === 'device-info'" x-cloak>
