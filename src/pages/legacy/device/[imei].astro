@@ -1,0 +1,1369 @@
+---
+import { BypassTechlessSubscription, Wisephone, sql, and, eq, db } from "astro:db";
+import { getUser } from "@/libs/clerk";
+import type { UserResource } from "@clerk/types";
+import type { User } from "@clerk/astro/server";
+import { actions, type ActionInputError } from "astro:actions";
+import Icon from "astro-iconify";
+import { validateIsSubscribed } from "@/libs/stripe";
+import { SamsungKnoxService } from "@/libs/samsung-knox-service";
+import Layout from "@/layouts/Layout.astro";
+import Header from "@/components/Header.astro";
+import Footer from "@/components/Footer.astro";
+import TechlessSubscriptionButton from "@/components/TechlessSubscriptionButton.astro";
+import { FEATURES, FAITH_TOOLS_APPS, getPackageNameFromPlayStoreUrl, isValidIMEI } from "@/libs/utils";
+import { isAdmin } from "@/lib/auth/permissions";
+import type { AppsList } from "@/types/apps";
+
+// Initialize variables with default values
+let imei: string | undefined = Astro.params.imei;
+let wisephone: any = null;
+let features = Object.values(FEATURES);
+let isSubscribed = false;
+let error = "";
+let success = "";
+let installedApps: any[] = [];
+let appsList: AppsList = {};
+let sortedAppsList = {};
+let wisephones: (typeof Wisephone.$inferSelect)[] = [];
+let userIsAdmin = false;
+let isMyDevice = false;
+let user: UserResource | User | null = null;
+let wisephoneUsesSecondaryImeiAndShouldBeBlocked = false;
+if (!Astro.locals.auth().userId) {
+  return Astro.redirect("/");
+}
+
+user = await Astro.locals.currentUser();
+
+if (!user) {
+  return Astro.redirect("/");
+}
+
+  try {
+    if (!imei || !isValidIMEI(imei)) {
+      return Astro.redirect("/legacy?error=" + encodeURIComponent("A Wisephone II with that IMEI was not found."));
+    }
+
+  const resultDelete = Astro.getActionResult(actions.wisephones.deleteWisephone);
+  const resultDeleteMessage = resultDelete?.data?.success || "";
+  if (resultDeleteMessage) {
+    return Astro.redirect("/legacy?message=" + encodeURIComponent(resultDeleteMessage));
+  }
+
+  const userId = Astro.locals.auth().userId;
+
+  if (userId && user) {
+    userIsAdmin = await isAdmin(user.id);
+  }
+
+  if (userIsAdmin) {
+    wisephones = await db
+      .select()
+      .from(Wisephone)
+      .where(sql`${Wisephone.imei} = ${imei}`)
+      .limit(1);
+  } else {
+    features = features.filter((feature) => !feature.isAdminOnly);
+
+    // Admin users can see all devices
+    wisephones = await db
+      .select()
+      .from(Wisephone)
+      .where(and(sql`${Wisephone.imei} = ${imei}`, eq(Wisephone.userId, user.id)))
+      .limit(1);
+  }
+
+  if (!wisephones || !wisephones.length) {
+    return Astro.redirect("/legacy?error=" + encodeURIComponent("Device not found"));
+  }
+
+  wisephone = wisephones[0];
+
+  if (wisephone?.userId === userId) {
+    isMyDevice = true;
+  }
+
+  const knoxDevice = await SamsungKnoxService.getDeviceFromImei(imei);
+
+  // If the Wisephone is set up with IMEI slot 2, then that means
+  // the wrong IMEI was used to setup this device. It most likely
+  // is a kid who found a way around the system. Props to the kid who
+  // told us about this workaround.
+  wisephoneUsesSecondaryImeiAndShouldBeBlocked = Boolean(knoxDevice?.resultValue?.secondaryImei === imei);
+
+  // Check for bypass subscription first
+  const bypassTechlessSubscription = await db
+    .select()
+    .from(BypassTechlessSubscription)
+    .where(eq(BypassTechlessSubscription.imei, Number(imei)))
+    .limit(1);
+
+  isSubscribed = bypassTechlessSubscription.length > 0;
+  console.log(`[Device Page] Bypass subscription check: ${isSubscribed}`);
+
+  if (!isSubscribed && wisephone?.phoneNumber) {
+    try {
+      const imeiForCheck = String(wisephone?.imei || "");
+      const phoneForCheck = `${wisephone?.phoneNumber?.replace(/[^0-9+]/g, "") || ""}`;
+      console.log(`[Device Page] Checking subscription - IMEI: ${imeiForCheck}, Phone: ${phoneForCheck}`);
+
+      isSubscribed = await validateIsSubscribed({
+        imei: imeiForCheck,
+        phoneNumber: phoneForCheck
+      });
+      console.log(`[Device Page] Subscription check result: ${isSubscribed}`);
+    } catch (subscriptionError) {
+      console.error("[Device Page] Error checking subscription status:", subscriptionError);
+      // Continue with isSubscribed = false instead of crashing
+    }
+  }
+
+  console.log(`[Device Page] Final isSubscribed value being passed to client: ${isSubscribed}`);
+
+  // Retrieve admin user data with proper error handling
+  if (userIsAdmin) {
+    try {
+      // Only attempt to get user if we have a valid userId
+      if (wisephone?.userId && typeof wisephone.userId === "string") {
+        user = await getUser(wisephone.userId);
+      } else {
+        console.warn("No valid userId found for wisephone:", wisephone);
+      }
+    } catch (userError) {
+      console.error("Error retrieving user data:", userError);
+      // Keep user = current user as fallback
+    }
+  }
+
+  // Safety check - if wisephone is null or undefined, redirect to legacy dashboard with error
+  if (!wisephone) {
+    return Astro.redirect("/legacy?error=" + encodeURIComponent("Device information could not be loaded"));
+  }
+
+  const result = Astro.getActionResult(actions.wisephones.updateWisephone);
+  const installAppResult = Astro.getActionResult(actions.wisephones.installApp);
+  const uninstallAppResult = Astro.getActionResult(actions.wisephones.uninstallApp);
+
+  error = [
+    result?.error as ActionInputError<typeof actions.wisephones.updateWisephone>,
+    installAppResult?.error as ActionInputError<typeof actions.wisephones.installApp>,
+    uninstallAppResult?.error as ActionInputError<typeof actions.wisephones.uninstallApp>
+  ]
+    .filter(Boolean)
+    .flatMap((err) => err.issues.map((issue) => issue.message))
+    .join("\n");
+
+  success = [
+    result?.data?.success as string,
+    installAppResult?.data?.success as string,
+    uninstallAppResult?.data?.success as string
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  // Get the latest installed apps list
+  const formData = new FormData();
+  formData.append("imei", String(wisephone?.imei || ""));
+
+  try {
+    const getInstalledAppsResult = await Astro.callAction(actions.wisephones.getInstalledApps, formData);
+    installedApps = getInstalledAppsResult?.data?.apps || [];
+  } catch (appsError) {
+    console.error("Error getting installed apps:", appsError);
+    // Continue with empty installedApps array instead of crashing
+  }
+
+  // Create apps list with type safety
+  appsList = {};
+
+  // Process Faith Tools apps with similar protection
+  try {
+    FAITH_TOOLS_APPS.forEach((app) => {
+      try {
+        const packageName = getPackageNameFromPlayStoreUrl(app["Play Store URL"]);
+        if (!packageName) return;
+
+        appsList[packageName] = {
+          source: "faith.tools",
+          installed: installedApps.some((app) => app.packageName === packageName),
+          name: app.Name || "Unknown App"
+        };
+      } catch (appError) {
+        console.error("Error processing Faith Tools app:", appError);
+        // Continue with next app instead of crashing
+      }
+    });
+  } catch (faithToolsError) {
+    console.error("Error processing Faith Tools apps:", faithToolsError);
+  }
+
+  // Sort apps by name
+  sortedAppsList = Object.fromEntries(Object.entries(appsList).sort(([, a], [, b]) => a.name.localeCompare(b.name)));
+} catch (error) {
+  console.error("Unexpected error in device page:", error);
+  return Astro.redirect(
+    "/dashboard?error=" + encodeURIComponent("An unexpected error occurred while loading the device. Please try again.")
+  );
+}
+
+const userLink = user?.id
+  ? `https://dashboard.clerk.com/apps/app_2rgOMLhYVKnV7kDDmTmy5elyOoW/instances/${import.meta.env.PROD ? "ins_2sRMEF9vIDPPQfI3z5DxjoeNrft" : "ins_2rgOMRgBb9ZJsjjQM3Cd8OpuycZ"}/users/${user.id}`
+  : "#";
+---
+
+<Layout title="Device Features" description="Manage the features of your Wisephone II device.">
+  <div
+    class="container p-6 mx-auto prose"
+    x-data="device"
+    x-init={`
+      installedApps = ${JSON.stringify(installedApps || [])};
+      appsList = ${JSON.stringify(sortedAppsList || {})};
+      imei = \`${imei || ""}\`;
+      isSubscribed = ${Boolean(isSubscribed)};
+      nickname = \`${(wisephone?.nickname || "").replace(/`/g, "'")}\`;
+      phoneNumber = \`${(wisephone?.phoneNumber || "").replace(/`/g, "'")}\`;
+      originalNickname = \`${(wisephone?.nickname || "").replace(/`/g, "'")}\`;
+      originalPhoneNumber = \`${(wisephone?.phoneNumber || "").replace(/`/g, "'")}\`;
+      toastErrorMessage = \`${(error || "").replace(/"/g, '\\"')}\`;
+      toastMessage = \`${(success || "").replace(/"/g, '\\"')}\`;
+    `}
+  >
+    <progress
+      x-show="isLoading || isToolDrawerLoading"
+      x-cloak
+      x-transition
+      class="fixed top-0 left-0 right-0 z-50 w-full progress"
+      style="--progress-color: var(--evergreen);"></progress>
+
+    <Header activeTab="page" isProjectPublished={false} projectSlug={""} />
+
+    {
+      userIsAdmin && !isMyDevice && (
+        <div class="mt-12 alert bg-slate-200 border-slate-300 text-slate-800">
+          <Icon name="lucide:shield-check" class="w-5 h-5" />
+
+          <div>
+            <p class="font-semibold m-0">You are an admin looking at a device that is not yours.</p>
+            <p class="m-0">
+              You may update the features of this device, but please be mindful that any changes made will result in a
+              notification being sent to the device owner that an update was made.
+            </p>
+
+            <br />
+
+            <p class="m-0">This Wisephone is managed by:</p>
+
+            <ul class="my-0">
+              {user?.id && (
+                <li>
+                  <a href={userLink} target="_blank" class="flex items-center gap-1 m-0 font-medium underline-offset-4">
+                    {user?.firstName || "Unknown"} {user?.lastName || "User"}
+                    <Icon name="lucide:external-link" class="w-4 h-4" />
+                  </a>
+                </li>
+              )}
+              {user?.emailAddresses && user.emailAddresses[0]?.emailAddress ? (
+                <li class="select-all">{user.emailAddresses[0].emailAddress}</li>
+              ) : null}
+              {user?.phoneNumbers && user.phoneNumbers[0]?.phoneNumber ? (
+                <li class="select-all">{user.phoneNumbers[0].phoneNumber}</li>
+              ) : null}
+              {!user?.id && <li class="text-gray-500">User information unavailable</li>}
+            </ul>
+          </div>
+        </div>
+      )
+    }
+
+    <main class="flex flex-col gap-12 py-12">
+      <section class="flex flex-col gap-6 not-prose">
+        <div>
+          <a href="/legacy" class="p-0 no-underline w-fit btn btn-link text-slate-500">
+            <Icon name="lucide:arrow-left" class="w-4 h-4" />
+            Devices
+          </a>
+
+          <div class="sm:grid sm:grid-cols-[1fr_auto] max-sm:flex max-sm:flex-col sm:items-center gap-2">
+            <h1 class="flex items-center gap-2 !m-0 text-3xl font-bold">
+              <span>Features</span>
+              <button
+                @click="alert('Use this page to manage the features of your Wisephone II. Make sure the device is connected to the internet before updating any features.')"
+              >
+                <Icon name="lucide:circle-help" class="w-4 h-4 text-slate-500" />
+              </button>
+            </h1>
+
+            <button
+              x-cloak
+              class="sm:hidden btn btn-sm btn-primary"
+              x-show="!isPhoneSetUp && isSubscribed"
+              @click="completeSetup()"
+            >
+              Complete Setup
+            </button>
+          </div>
+
+          <div class="inline-flex flex-wrap items-baseline w-full gap-2 sm:mt-2 max-sm:mt-4 text-slate-500">
+            <div x-show="!isEditing">
+              <div class="flex gap-2 max-sm:flex-col max-sm:items-start sm:items-center">
+                <span
+                  class="hover:underline hover:cursor-pointer underline-offset-4 line-clamp-1 max-w-[200px] overflow-hidden text-ellipsis"
+                  @click="isEditing = true"
+                  x-text="nickname">{wisephone?.nickname || ""}</span
+                >
+                <span class="max-sm:hidden">•</span>
+                <div class="flex items-center gap-2">
+                  <span
+                    class="hover:underline hover:cursor-pointer underline-offset-4"
+                    @click="isEditing = true"
+                    x-text="phoneNumber">{wisephone?.phoneNumber || ""}</span
+                  >
+                  <button class="btn btn-sm btn-ghost btn-circle" @click="isEditing = true">
+                    <Icon name="lucide:pencil" class="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div x-cloak x-show="isEditing" class="w-full" x-collapse>
+              <form
+                method="POST"
+                class="[&>*]:max-sm:w-full flex flex-wrap max-sm:flex-col w-full items-baseline gap-2"
+                action={actions.wisephones.updateWisephone}
+              >
+                <input
+                  placeholder="Device Nickname"
+                  type="text"
+                  name="nickname"
+                  x-model="nickname"
+                  class="input input-bordered"
+                  maxlength="50"
+                  required
+                />
+                <input
+                  type="text"
+                  name="phoneNumber"
+                  placeholder="123-456-7890"
+                  x-model="phoneNumber"
+                  x-mask="999-999-9999"
+                  class="input input-bordered"
+                  maxlength="12"
+                  required
+                />
+                <input type="hidden" name="imei" :value="imei" />
+                <div class="flex gap-1">
+                  <button type="submit" class="btn btn-primary btn-circle">
+                    <Icon name="lucide:check" class="w-4 h-4" />
+                  </button>
+                  <button type="button" @click="isEditing = false" class="btn hover:!bg-slate-50 btn-ghost btn-circle">
+                    <Icon name="lucide:x" class="w-4 h-4" />
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+
+        {
+          wisephoneUsesSecondaryImeiAndShouldBeBlocked && (
+            <div class="alert bg-slate-200 border-slate-300 text-slate-800">
+              <Icon name="lucide:triangle-alert" class="w-5 h-5" />
+
+              <div>
+                <p class="font-semibold m-0">This device was set up using IMEI slot 2</p>
+                <p class="m-0">
+                  For security and proper device management, only primary IMEI registration is supported. If you believe
+                  this is an error, please contact support.
+                </p>
+                <form
+                  class="mt-2"
+                  method="POST"
+                  action={actions.wisephones.deleteWisephone}
+                  onsubmit="return confirm('Are you sure you want to remove this Wisephone from your devices? This action cannot be undone.')"
+                >
+                  <input type="hidden" name="imei" :value="imei" />
+                  <button type="submit" class="text-red-800 btn btn-ghost btn-sm hover:bg-red-700">
+                    <Icon name="lucide:trash-2" class="w-4 h-4" />
+                    Remove Wisephone from My Devices
+                  </button>
+                </form>
+              </div>
+            </div>
+          )
+        }
+
+        <div
+          x-show={`!isSubscribed && ${!wisephoneUsesSecondaryImeiAndShouldBeBlocked}`}
+          x-cloak
+          x-transition
+          class="flex flex-col items-start justify-center w-full p-6 bg-white shadow rounded-2xl"
+        >
+          <div>
+            <h3 class="text-xl font-bold !m-0">Activate Your Wisephone</h3>
+            <p class="mb-2 text-slate-500">
+              To unlock your Wisephone's full potential, a WiseOS Subscription is required. Choose your preferred connectivity option below.
+            </p>
+
+            <div class="grid sm:grid-cols-2 max-sm:grid-cols-1 gap-4 mt-6">
+              <div class="card rounded-xl border border-[var(--surface-tertiary)] text-slate-800">
+                <div class="card-body p-6">
+                  <h3 class="text-lg font-bold !m-0">Wisephone Carrier Plan <span class='font-normal text-slate-500'>(Includes WiseOS Subscription)</span></h3>
+                  <p class="m-0 mt-2">
+                    Get all-in-one connectivity with our Wisephone Carrier Plan, which bundles your data, talk, and text with your WiseOS Subscription for a complete experience.
+                    <a class="link underline-offset-2 text-slate-500" href="https://wisephone.com/pages/plans" target="_blank">Learn more</a>
+                  </p>
+                  <a href="https://plans.techless.com" target="_blank" class="flex items-center gap-1 btn btn-primary mt-4">
+                    Activate Carrier Plan*
+                    <Icon name="lucide:external-link" class="w-4 h-4" />
+                  </a>
+                </div>
+              </div>
+              <div class="card rounded-xl border border-[var(--surface-tertiary)] text-slate-800">
+                <div class="card-body p-6">
+                  <h3 class="text-lg font-bold !m-0">Bring Your Own Carrier <span class='font-normal text-slate-500'>(WiseOS Subscription Required)</span></h3>
+                  <p class="m-0 mt-2">Continue using your existing carrier and unlock your Wisephone's features by activating your WiseOS Subscription. <a class="link underline-offset-2 text-slate-500" href="https://wisephone.com/pages/plans" target="_blank">Learn more</a></p>
+                  <TechlessSubscriptionButton
+                    deviceIMEI={wisephone?.imei || ""}
+                    customerEmail={user?.emailAddresses[0]?.emailAddress || ""}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <p class="italic m-0 mt-2 text-sm text-slate-500">
+              *This requires a separate account than this Portal to manage your carrier plan. You'll need to register
+              an account there when asked.
+            </p>
+
+            <details
+              class="w-full mt-6 transition-all duration-150 ease-in-out"
+              x-data="{ isOpen: false }"
+              @toggle="isOpen = $event.target.open"
+              x-bind:class="{ 'p-6 pt-4 bg-[var(--surface-tertiary)] rounded-xl': isOpen }"
+            >
+              <summary
+                class="w-full font-medium transition cursor-pointer text-slate-500 hover:text-slate-800 hover:underline"
+              >
+                Already have a subscription?
+              </summary>
+              <ol class="mt-3 list-decimal list-inside">
+                <li>
+                  Make sure the phone number is correct: <code
+                    class="px-2 py-1 font-sans font-medium rounded-md select-all bg-[var(--surface-primary)]"
+                    x-text="phoneNumber"></code>
+                  <ul class="mt-1 ml-8">
+                    <li class="list-disc">If the phone number is incorrect, update it.</li>
+                  </ul>
+                </li>
+                <li class="mt-3">
+                  Make sure the device's IMEI is correct: <code
+                    class="px-2 py-1 font-sans font-medium rounded-md select-all bg-[var(--surface-primary)]"
+                    x-text="imei"></code>
+                  <ul class="mt-1 ml-8">
+                    <li class="list-disc">If the IMEI is incorrect, remove this device and start over.</li>
+                  </ul>
+                </li>
+              </ol>
+            </details>
+          </div>
+        </div>
+
+        <ul class="list-item-container">
+          {
+            features.map((feature) => (
+              <li
+                class="w-full shadow list-item"
+                role="button"
+                x-bind:class="{ 'pointer-events-none': isLoading, 'opacity-50': !isSubscribed }"
+                @click="handleToggle()"
+                x-data={`{
+                    getSwitchElement() {
+                      return this.$refs.switch;
+                    },
+                    handleToggle() {
+                      toggleFeature(this.feature, this.getSwitchElement());
+                    },
+                    feature: ${JSON.stringify(feature, null, 2)},
+                  }`}
+              >
+                <div class="w-full grid grid-cols-[1fr_auto] items-center justify-between gap-6">
+                  <div class="flex flex-col gap-1">
+                    <div class="inline-flex flex-wrap items-center gap-2">
+                      <p>{feature.name}</p>
+                      {feature.disclosure && (
+                        <button @click.stop="alert('Disclosure: ' + feature.disclosure)" class="text-xs text-gray-500">
+                          <Icon name="lucide:info" class="w-4 h-4" />
+                        </button>
+                      )}
+                      {feature.isBeta && <span class="text-xs text-gray-500">(beta)</span>}
+                      {feature?.isAdminOnly && <span class="text-xs text-gray-500">(only admins can see this)</span>}
+                    </div>
+                    <p class="text-sm text-gray-500">{feature.description}</p>
+                  </div>
+                  <div class="relative h-[24px]">
+                    <input
+                      x-show="!isLoading"
+                      x-ref="switch"
+                      type="checkbox"
+                      class="pointer-events-none toggle"
+                      x-bind:checked="isFeatureEnabled(feature, feature.isInverse || false)"
+                    />
+                    {/* Makes loading all start at disabled */}
+                    <input disabled x-cloak class="pointer-events-none toggle" x-show="isLoading" type="checkbox" />
+                    <div
+                      x-show="isLoading"
+                      x-transition
+                      class="loading loading-spinner loading-sm absolute top-0 left-0 bottom-0 right-0 ms-0.5 my-auto flex items-center justify-center"
+                    />
+                  </div>
+                </div>
+              </li>
+            ))
+          }
+        </ul>
+      </section>
+
+      {/* @TODO: Can this install apps with Play Store hidden? */}
+      {/* @TODO: Make search do imperfect matching */}
+      <section x-show="isSubscribed && (isToolDrawerEnabled || isFaithToolsEnabled)" x-cloak x-collapse>
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-2xl font-bold">
+            Manage Apps <span class="text-sm font-normal text-slate-500">(beta)</span>
+          </h2>
+        </div>
+
+        <div class="shadow rounded-2xl not-prose">
+          <div
+            class="w-full grid rounded-t-2xl grid-rows-2 gap-3 top-0 z-10 bg-white bg-[var(--surface-secondary)] transition-transform py-6 pb-4 px-6 text-base border-b border-[var(--surface-tertiary)]"
+          >
+            <input
+              type="text"
+              class="w-full input input-bordered"
+              x-model.debounce.200ms="appSearchQuery"
+              placeholder="Search for an app"
+            />
+            <div role="tablist" class="max-sm:hidden bg-slate-100 tabs tabs-boxed h-fit">
+              <a
+                role="tab"
+                class="tab"
+                x-show="isToolDrawerEnabled"
+                x-cloak
+                x-bind:class="{ 'tab-active !bg-[var(--evergreen)] !text-white': currentView === 'tool-drawer' }"
+                @click="currentView = 'tool-drawer'"
+              >
+                Tool Drawer
+              </a>
+              <a
+                role="tab"
+                class="tab"
+                x-show="isFaithToolsEnabled"
+                x-cloak
+                x-bind:class="{ 'tab-active !bg-[var(--evergreen)] !text-white': currentView === 'faith-tools' }"
+                @click="currentView = 'faith-tools'"
+              >
+                Extra Tools
+              </a>
+              <a
+                role="tab"
+                class="tab"
+                x-bind:class="{ 'tab-active !bg-[var(--evergreen)] !text-white': currentView === 'installed' }"
+                @click="currentView = 'installed'"
+              >
+                Installed
+              </a>
+            </div>
+
+            {/* Make a select input for the tabs on mobile */}
+            <select
+              @change="currentView = $event.target.value"
+              class="sm:hidden w-full border-2 !border-[var(--surface-tertiary)] select select-bordered"
+              x-model="currentView"
+            >
+              <option value="tool-drawer">Tool Drawer</option>
+              <option value="faith-tools">Extra Tools</option>
+              <option value="installed">Installed</option>
+            </select>
+          </div>
+
+          <ul class="list-item-container !rounded-none max-h-[425px] overflow-y-auto">
+            <template x-for="app in filteredApps">
+              <li class="list-item !grid !bg-white grid-cols-[1fr_auto] items-center justify-between gap-2">
+                <div class="flex flex-col gap-1">
+                  {/* I don't want people to click on the link and get distracted on mobile. */}
+                  <a
+                    class="no-underline max-sm:pointer-events-none underline-offset-4 hover:underline"
+                    x-bind:href="'https://play.google.com/store/apps/details?id=' + app.packageName"
+                    target="_blank"
+                  >
+                    <p x-text="app.name" class="line-clamp-2"></p>
+                  </a>
+                  <p
+                    x-cloak
+                    x-show="app.installed"
+                    x-text="`Ran ${getAppOpenCount(app.packageName) > 0 ? getAppOpenCount(app.packageName).toLocaleString() : '0'} times`"
+                    class="text-xs text-slate-500"
+                  >-</p>
+                </div>
+
+                <div class="grid" style="grid-template-areas: 'stack'">
+                  <button
+                    x-data={`{
+                      isInstalling: false,
+                      async handleClick() {
+                        isLoading = true;
+                        if (confirm('Are you sure you want to install ' + app.name + '?')) {
+                          this.isInstalling = true;
+                          await installApp(app.packageName);
+                        }
+                        this.isInstalling = false;
+                        isLoading = false;
+                      }
+                    }`}
+                    x-show="!app.installed"
+                    @click="handleClick()"
+                    class="relative btn btn-sm btn-outline rounded-full border-slate-200 border-2 hover:border-slate-300 hover:bg-slate-100 hover:text-slate-800 disabled:cursor-not-allowed"
+                    style="grid-area: stack"
+                  >
+                    <Icon name="lucide:download" class="w-5 h-5" />
+                    Install App
+                    <span
+                      x-transition
+                      x-show="isInstalling"
+                      class="absolute top-auto bottom-auto left-auto right-auto loading loading-spinner loading-sm"
+                    ></span>
+                  </button>
+
+                  <button
+                    x-data={`{
+                      isUninstalling: false,
+                      async handleClick() {
+                        isLoading = true;
+                        if (confirm('Are you sure you want to uninstall ' + app.name + '?')) {
+                          this.isUninstalling = true;
+                          await uninstallApp(app.packageName)
+                        }
+                        this.isUninstalling = false;
+                        isLoading = false;
+                      }
+                    }`}
+                    x-show="app.installed"
+                    x-cloak
+                    @click="handleClick()"
+                    class="relative btn btn-outline btn-sm rounded-full text-red-800 border-slate-200 border-2 hover:border-slate-300 hover:bg-slate-100 hover:text-red-800 disabled:cursor-not-allowed"
+                    style="grid-area: stack"
+                  >
+                    <Icon name="lucide:trash-2" class="w-5 h-5 text-red-800" />
+                    Uninstall App
+                    <span
+                      x-transition
+                      x-show="isUninstalling"
+                      class="absolute top-auto bottom-auto left-auto right-auto loading loading-spinner loading-sm"
+                    ></span>
+                  </button>
+                </div>
+              </li>
+            </template>
+
+            <li
+              class="bg-white bg-[var(--surface-secondary)] transition-transform py-4 px-6 text-base border-b border-[var(--surface-tertiary)] text-slate-500"
+              x-transition
+              x-show="!filteredApps.length && appSearchQuery"
+              x-cloak
+            >
+              <p>
+                No apps found for "<span x-text="appSearchQuery"></span>"
+              </p>
+              <p class="mt-3" x-show="!isFaithToolsEnabled && appSearchQuery.toLowerCase().includes('bible')">
+                Looking for a Bible? Turn on faith.tools integration.
+              </p>
+              <a class="mt-4 btn btn-primary" href="https://getwisephone.com/request-app" target="_blank">
+                Request an app
+              </a>
+            </li>
+          </ul>
+        </div>
+      </section>
+      <form
+        method="POST"
+        action={actions.wisephones.deleteWisephone}
+        onsubmit="return confirm('Are you sure you want to delete this device? This action cannot be undone.')"
+      >
+        <input type="hidden" name="imei" :value="imei" />
+        <button type="submit" class="text-red-800 btn btn-ghost btn-sm hover:bg-red-700">
+          <Icon name="lucide:trash-2" class="w-4 h-4" />
+          Remove Wisephone from My Devices
+        </button>
+      </form>
+    </main>
+  </div>
+
+  <div class="mb-12">
+    <Footer showLogo={false} />
+  </div>
+
+  <script>
+    import Alpine from "alpinejs";
+    import { actions } from "astro:actions";
+    import JSConfetti from "js-confetti";
+    import {
+      type Feature,
+      FEATURES,
+      updateUnreachableAlpineState,
+      KNOX_USER_GROUPS,
+      getPackageNameFromPlayStoreUrl
+    } from "@/libs/utils";
+    import { AppManagementService } from "@/services/AppManagementService";
+    import { FeatureManagementService } from "@/services/FeatureManagementService";
+    import type { AppEntry, AppsList, CurrentView } from "@/types/apps";
+
+    // Create service instances
+    const appManagement = new AppManagementService();
+    const featureManagement = new FeatureManagementService();
+
+    Alpine.data("device", function () {
+      return {
+        appsList: {} as AppsList,
+        installedApps: [] as { packageName: string; appName: string; isGoogleManaged: "Y" | "N", runningCount: string }[],
+        currentView: "installed" as CurrentView,
+        appSearchQuery: "",
+        features: [] as string[],
+        isSubscribed: false,
+        isAiEnabled: false,
+        isEditing: false,
+        nickname: "",
+        phoneNumber: "",
+        originalNickname: "",
+        originalPhoneNumber: "",
+        imei: "",
+        isLoading: true,
+        isToolDrawerLoading: false,
+        isToolDrawerLoaded: false,
+        // @ts-ignore
+        isPhoneSetUp: this.$persist(false),
+        cachedDeviceModel: null as string | null,
+        isA16Device: false,
+
+        // Computed properties
+        get isToolDrawerEnabled() {
+          const toolDrawerFeature = FEATURES.TOOL_DRAWER;
+          const toolDrawerGroup = this.getGroupIdForFeature(toolDrawerFeature);
+          return (
+            this.isSubscribed &&
+            Array.isArray(this.features) &&
+            this.features.includes(toolDrawerGroup)
+          );
+        },
+        get isFaithToolsEnabled() {
+          // Note: FAITH_TOOLS doesn't have an A16 version yet, so use regular group
+          return this.isSubscribed && this.features.includes(KNOX_USER_GROUPS.ADD_ON_FAITH_TOOLS);
+        },
+        get completeSetupUrl() {
+          return `http://localhost?imei=${this.imei}&phone=${this.phoneNumber}&subscription=done`;
+        },
+
+        // Memoized filtered apps computation
+        get filteredApps(): AppEntry[] {
+          return this.computeFilteredApps();
+        },
+
+        getAppOpenCount(packageName: string): number {
+          const app = this.installedApps.find((installedApp) => installedApp.packageName === packageName);
+          return app ? parseInt(app.runningCount) : 0;
+        },
+
+        // Methods
+        computeFilteredApps(): AppEntry[] {
+          if (!Object.keys(this.appsList).length) return [];
+
+          const baseApps = !this.isFaithToolsEnabled
+            ? Object.entries(this.appsList).filter(([, app]) => app.source !== "faith.tools")
+            : Object.entries(this.appsList);
+
+          const viewFiltered = this.filterAppsByView(baseApps);
+          const mappedApps = this.mapAppsToEntries(viewFiltered);
+
+          return this.appSearchQuery ? this.filterAppsBySearch(mappedApps) : mappedApps;
+        },
+
+        filterAppsByView(apps: [string, Omit<AppEntry, "packageName">][]): [string, Omit<AppEntry, "packageName">][] {
+          const view = this.currentView;
+          switch (view) {
+            case "installed":
+              const installedApps = this.installedApps
+                .filter((app) => app.isGoogleManaged === "Y")
+                .map((app) => [app.packageName || app.appName, { installed: true, name: app.appName, source: "Tool Drawer" }] as [string, Omit<AppEntry, "packageName">])
+                .sort((a, b) => a[1].name.localeCompare(b[1].name));
+              return installedApps;
+            case "faith-tools":
+              return apps.filter(([, app]) => app.source === "faith.tools");
+            case "tool-drawer":
+              return apps.filter(([, app]) => app.source === "Tool Drawer");
+            default:
+              return apps;
+          }
+        },
+
+        mapAppsToEntries(apps: [string, Omit<AppEntry, "packageName">][]): AppEntry[] {
+          return apps.map(([packageName, { installed, name, source }]) => ({
+            packageName,
+            installed,
+            name,
+            source
+          }));
+        },
+
+        filterAppsBySearch(apps: AppEntry[]): AppEntry[] {
+          const searchQuery = this.appSearchQuery.toLowerCase();
+          return apps.filter((app) => app.name.toLowerCase().includes(searchQuery));
+        },
+
+        isFeatureEnabled(feature: Feature, isInverse = false) {
+          // Get the appropriate group ID based on device model
+          const groupId = this.getGroupIdForFeature(feature);
+          const isEnabled = this.features.includes(groupId);
+          return isInverse ? !isEnabled : isEnabled;
+        },
+
+        showSuccessToast(message: string) {
+          updateUnreachableAlpineState({
+            sourceDataElement: document.documentElement,
+            key: "toastMessage",
+            value: message
+          });
+        },
+
+        showErrorToast(message: string) {
+          updateUnreachableAlpineState({
+            sourceDataElement: document.documentElement,
+            key: "toastErrorMessage",
+            value: message
+          });
+        },
+
+        async getFeatures() {
+          const url = new URL(`/api/legacy/samsung-knox.json`, window.location.origin);
+          url.searchParams.set("action", "get-device-groups");
+          url.searchParams.set("imei", this.imei);
+
+          const res = await fetch(url, { method: "GET" });
+          const features = await res.json();
+          this.features = features;
+        },
+
+
+        /**
+         * Gets device model from Samsung Knox API
+         * @returns Device model string or null if not found
+         */
+        async getDeviceModelFromKnox(): Promise<string | null> {
+          try {
+            const deviceInfoUrl = new URL(`/api/legacy/samsung-knox.json`, window.location.origin);
+            deviceInfoUrl.searchParams.set("action", "get-device-info");
+            deviceInfoUrl.searchParams.set("imei", this.imei);
+
+            const deviceInfoRes = await fetch(deviceInfoUrl, { method: "GET" });
+            if (!deviceInfoRes.ok) {
+              return null;
+            }
+
+            const deviceInfo = await deviceInfoRes.json();
+            const rv = deviceInfo?.resultValue;
+            if (!rv) {
+              return null;
+            }
+
+            const model =
+              rv.deviceModelName ||
+              rv.modelName ||
+              rv.deviceModel ||
+              rv.model ||
+              rv.deviceName ||
+              rv.name ||
+              null;
+
+            return model;
+          } catch (error) {
+            console.error("Error fetching device model:", error);
+            return null;
+          }
+        },
+
+        /**
+         * Caches device model on page load
+         */
+        async cacheDeviceModel() {
+          if (this.cachedDeviceModel === null) {
+            const model = await this.getDeviceModelFromKnox();
+            this.cachedDeviceModel = model;
+            if (model) {
+              const modelUpper = model.toUpperCase();
+              this.isA16Device = modelUpper.includes("A16") || modelUpper.includes("SM-A16");
+              console.log(`Device model cached: ${model}, isA16Device: ${this.isA16Device}`);
+            }
+          }
+        },
+
+        /**
+         * Gets the appropriate group ID for a feature based on device model
+         * For A16 devices, returns a16KnoxManageId if available, otherwise knoxManageId
+         * For other devices, returns knoxManageId
+         */
+        getGroupIdForFeature(feature: Feature): string {
+          if (this.isA16Device && feature.a16KnoxManageId) {
+            return feature.a16KnoxManageId;
+          }
+          return feature.knoxManageId;
+        },
+
+        /**
+         * Checks device model and assigns appropriate subscription group
+         * - A16 devices -> A16_SUBSCRIBED group
+         * - A15 and other devices -> SUBSCRIBED group (default)
+         */
+        async assignSubscriptionGroupByDeviceModel() {
+          try {
+            const deviceModel = await this.getDeviceModelFromKnox();
+            if (!deviceModel) {
+              console.warn("Could not determine device model, using default SUBSCRIBED group");
+              // Default to SUBSCRIBED if we can't determine model
+              await this.addFeatureToDevice(KNOX_USER_GROUPS.SUBSCRIBED);
+              this.features.push(KNOX_USER_GROUPS.SUBSCRIBED);
+              return;
+            }
+
+            const modelUpper = deviceModel.toUpperCase();
+
+            // Check if device is A16
+            if (modelUpper.includes("A16") || modelUpper.includes("SM-A16")) {
+              console.log(`Device model detected as A16: ${deviceModel}, assigning to A16_SUBSCRIBED group`);
+              await this.addFeatureToDevice(KNOX_USER_GROUPS.A16_SUBSCRIBED);
+              this.features.push(KNOX_USER_GROUPS.A16_SUBSCRIBED);
+            } else {
+              // Default to SUBSCRIBED for A15 and all other devices
+              console.log(`Device model: ${deviceModel}, assigning to SUBSCRIBED group`);
+              await this.addFeatureToDevice(KNOX_USER_GROUPS.SUBSCRIBED);
+              this.features.push(KNOX_USER_GROUPS.SUBSCRIBED);
+            }
+          } catch (error) {
+            console.error("Error assigning subscription group by device model:", error);
+            // Fallback to default SUBSCRIBED group on error
+            await this.addFeatureToDevice(KNOX_USER_GROUPS.SUBSCRIBED);
+            this.features.push(KNOX_USER_GROUPS.SUBSCRIBED);
+          }
+        },
+
+        /**
+         * Checks device model and assigns appropriate unpaid group
+         * - A16 devices -> A16_UNPAID group
+         * - A15 and other devices -> UNPAID group (default)
+         */
+        async assignUnpaidGroupByDeviceModel() {
+          try {
+            // Ensure device model is cached
+            await this.cacheDeviceModel();
+
+            if (this.isA16Device) {
+              console.log(`A16 device detected, assigning to A16_UNPAID group`);
+              await this.addFeatureToDevice(KNOX_USER_GROUPS.A16_UNPAID);
+              this.features.push(KNOX_USER_GROUPS.A16_UNPAID);
+            } else {
+              // Default to UNPAID for A15 and all other devices
+              console.log(`Non-A16 device, assigning to UNPAID group`);
+              await this.addFeatureToDevice(KNOX_USER_GROUPS.UNPAID);
+              this.features.push(KNOX_USER_GROUPS.UNPAID);
+            }
+          } catch (error) {
+            console.error("Error assigning unpaid group by device model:", error);
+            // Fallback to default UNPAID group on error
+            await this.addFeatureToDevice(KNOX_USER_GROUPS.UNPAID);
+            this.features.push(KNOX_USER_GROUPS.UNPAID);
+          }
+        },
+
+        completeSetup() {
+          if (
+            confirm(
+              "Completing the setup will close the Portal and remove 'Setup' from your Wisephone II's home screen. Continue?"
+            )
+          ) {
+            this.isPhoneSetUp = true;
+            this.$nextTick(() => {
+              window.location.href = this.completeSetupUrl;
+            });
+          }
+        },
+
+        async toggleFeature(feature: Feature, switchElement: HTMLInputElement) {
+          let currentEnabled = false;
+
+          try {
+            if (!this.isSubscribed) {
+              throw new Error("Active subscription required");
+            }
+
+            if (!feature?.knoxManageId) {
+              throw new Error("Invalid feature configuration");
+            }
+
+            // Ensure device model is cached
+            await this.cacheDeviceModel();
+
+            // Get the appropriate group ID based on device model
+            const groupIdForDevice = this.getGroupIdForFeature(feature);
+            const regularGroupId = feature.knoxManageId;
+            const a16GroupId = feature.a16KnoxManageId;
+
+            // Check if feature is enabled (check both regular and A16 groups if applicable)
+            const isRegularEnabled = this.features.includes(regularGroupId);
+            const isA16Enabled = a16GroupId ? this.features.includes(a16GroupId) : false;
+            currentEnabled = isRegularEnabled || isA16Enabled;
+
+            if (feature.isInverse) {
+              currentEnabled = !currentEnabled;
+            }
+
+            const confirmMessage = currentEnabled ? feature.disableMessage : feature.enableMessage;
+            let updatedValue = !currentEnabled;
+            if (feature.isInverse) {
+              updatedValue = currentEnabled;
+            }
+
+            if (!confirm(confirmMessage)) {
+              return;
+            }
+
+            switchElement.checked = !switchElement.checked;
+
+            // Use the device-appropriate group ID for the API call
+            const featureToToggle = {
+              ...feature,
+              knoxManageId: groupIdForDevice
+            };
+
+            await featureManagement.toggleFeature({
+              imei: this.imei,
+              feature: featureToToggle,
+              enabled: updatedValue
+            });
+
+            // Update features list - remove both regular and A16 versions, then add the correct one
+            const groupsToRemove = [regularGroupId];
+            if (a16GroupId) {
+              groupsToRemove.push(a16GroupId);
+            }
+            this.features = this.features.filter((id) => !groupsToRemove.includes(id));
+            if (updatedValue) {
+              this.features.push(groupIdForDevice);
+            }
+
+            this.showSuccessToast(
+              `Your device is being updated. ${feature.name} will be ${!currentEnabled ? "enabled" : "disabled"} shortly.`
+            );
+          } catch (error) {
+            console.error("Feature toggle failed:", error);
+            this.showErrorToast(error instanceof Error ? error.message : "Feature update failed");
+            switchElement.checked = currentEnabled;
+          }
+        },
+
+        /**
+         * Ensures a device has the correct Knox user group configuration by managing exclusive group memberships.
+         * This prevents conflicts between incompatible feature combinations.
+         * @param userGroups - Array of Knox user group IDs currently assigned to the device
+         */
+        async removeExclusiveGroups(userGroups: string[]) {
+          const exclusiveGroups = this.getExclusiveGroups(userGroups);
+          if (!this.hasMultipleExclusiveGroups(exclusiveGroups)) {
+            await this.ensureBaseGroup(userGroups);
+          } else {
+            await this.removeIncompatibleFeatures(userGroups);
+          }
+        },
+
+        /**
+         * Gets the list of exclusive groups from the user's current groups
+         */
+        getExclusiveGroups(userGroups: string[]): string[] {
+          // Unpaid, Subscribed, A16_Unpaid, and A16_Subscribed are exclusive
+          return userGroups.filter(
+            (group) =>
+              group === KNOX_USER_GROUPS.UNPAID ||
+              group === KNOX_USER_GROUPS.SUBSCRIBED ||
+              group === KNOX_USER_GROUPS.A16_SUBSCRIBED ||
+              group === KNOX_USER_GROUPS.A16_UNPAID
+          );
+        },
+
+        /**
+         * Checks if the device has more than one exclusive group assigned
+         */
+        hasMultipleExclusiveGroups(exclusiveGroups: string[]): boolean {
+          return exclusiveGroups.length > 1;
+        },
+
+        /**
+         * Ensures the device has at least one base group (Subscribed or Unpaid)
+         * based on subscription status and device model
+         */
+        async ensureBaseGroup(userGroups: string[]) {
+          const hasBaseGroup = userGroups.some(
+            (group) =>
+              group === KNOX_USER_GROUPS.UNPAID ||
+              group === KNOX_USER_GROUPS.SUBSCRIBED ||
+              group === KNOX_USER_GROUPS.A16_SUBSCRIBED ||
+              group === KNOX_USER_GROUPS.A16_UNPAID
+          );
+          if (!hasBaseGroup) {
+            if (this.isSubscribed) {
+              // Assign appropriate subscription group based on device model
+              await this.assignSubscriptionGroupByDeviceModel();
+            } else {
+              // Assign appropriate unpaid group based on device model
+              await this.assignUnpaidGroupByDeviceModel();
+            }
+          }
+        },
+
+        /**
+         * Removes incompatible feature combinations from the device
+         */
+        async removeIncompatibleFeatures(userGroups: string[]) {
+          const featuresToRemove = this.getIncompatibleFeatures(userGroups);
+          for (const knoxManageId of featuresToRemove) {
+            await this.removeFeatureFromDevice(knoxManageId);
+          }
+          window.location.reload();
+        },
+
+        /**
+         * Determines which features need to be removed to resolve conflicts
+         */
+        getIncompatibleFeatures(userGroups: string[]): string[] {
+          const featuresToRemove: string[] = [];
+
+          // Remove UNPAID if present with any subscription group
+          if (userGroups.includes(KNOX_USER_GROUPS.UNPAID)) {
+            if (
+              userGroups.includes(KNOX_USER_GROUPS.SUBSCRIBED) ||
+              userGroups.includes(KNOX_USER_GROUPS.A16_SUBSCRIBED)
+            ) {
+              featuresToRemove.push(KNOX_USER_GROUPS.UNPAID);
+            }
+          }
+
+          // Remove A16_UNPAID if present with any subscription group
+          if (userGroups.includes(KNOX_USER_GROUPS.A16_UNPAID)) {
+            if (
+              userGroups.includes(KNOX_USER_GROUPS.SUBSCRIBED) ||
+              userGroups.includes(KNOX_USER_GROUPS.A16_SUBSCRIBED)
+            ) {
+              featuresToRemove.push(KNOX_USER_GROUPS.A16_UNPAID);
+            }
+          }
+
+          // Remove SUBSCRIBED if A16_SUBSCRIBED is present (they shouldn't have both)
+          if (
+            userGroups.includes(KNOX_USER_GROUPS.SUBSCRIBED) &&
+            userGroups.includes(KNOX_USER_GROUPS.A16_SUBSCRIBED)
+          ) {
+            featuresToRemove.push(KNOX_USER_GROUPS.SUBSCRIBED);
+          }
+
+          // Remove UNPAID if A16_UNPAID is present (they shouldn't have both)
+          if (
+            userGroups.includes(KNOX_USER_GROUPS.UNPAID) &&
+            userGroups.includes(KNOX_USER_GROUPS.A16_UNPAID)
+          ) {
+            featuresToRemove.push(KNOX_USER_GROUPS.UNPAID);
+          }
+
+          return featuresToRemove;
+        },
+
+        /**
+         * Adds a feature to the device using the Knox API
+         */
+        async addFeatureToDevice(knoxManageId: string) {
+          const url = new URL(`/api/legacy/samsung-knox.json`, window.location.origin);
+          url.searchParams.set("action", "apply-feature");
+          url.searchParams.set("imei", this.imei);
+          url.searchParams.set("knoxManageId", knoxManageId);
+          await fetch(url, { method: "POST" });
+        },
+
+        /**
+         * Removes a feature from the device using the Knox API
+         */
+        async removeFeatureFromDevice(knoxManageId: string) {
+          const url = new URL(`/api/legacy/samsung-knox.json`, window.location.origin);
+          url.searchParams.set("action", "remove-feature");
+          url.searchParams.set("imei", this.imei);
+          url.searchParams.set("knoxManageId", knoxManageId);
+          await fetch(url, { method: "POST" });
+        },
+
+        async installApp(packageName: string) {
+          try {
+            if (!packageName || !this.appsList[packageName]) {
+              throw new Error("Invalid app selected");
+            }
+
+            await appManagement.installApp(this.imei, packageName);
+            this.appsList[packageName].installed = true;
+            this.showSuccessToast(`${this.appsList[packageName].name} will be installed shortly`);
+          } catch (error) {
+            console.error("App installation failed:", error);
+            this.showErrorToast("Failed to install app");
+          }
+        },
+
+        async uninstallApp(packageName: string) {
+          try {
+            await appManagement.uninstallApp(this.imei, packageName);
+            this.appsList[packageName].installed = false;
+            this.showSuccessToast(`${this.appsList[packageName].name} will be uninstalled shortly`);
+          } catch (error) {
+            console.error("App uninstallation failed:", error);
+            this.showErrorToast("Failed to uninstall app");
+          }
+        },
+
+        // Add a method to load the Tool Drawer data client-side
+        async loadToolDrawer() {
+          if (this.isToolDrawerLoaded || this.isToolDrawerLoading) {
+            return;
+          }
+
+          try {
+            this.isToolDrawerLoading = true;
+            const response = await fetch("/api/legacy/ottogrid.json");
+
+            if (!response.ok) {
+              throw new Error("Failed to load Tool Drawer data");
+            }
+
+            const data = await response.json();
+
+            // Process the data and update the appsList
+            if (data && data.rows && data.rows.length) {
+              const updatedAppsList = { ...this.appsList };
+
+              data.rows
+                .filter((row: any) => row && row.cells && row.cells["Tool Drawer"] === "Yes")
+                .forEach((row: any) => {
+                  try {
+                    const packageName = getPackageNameFromPlayStoreUrl(row.cells["Play Store URL"]);
+                    if (!packageName) return;
+
+                    // If the app is already in the list, preserve the installed status
+                    const isInstalled = this.installedApps.some((app) => app.packageName === packageName);
+
+                    updatedAppsList[packageName] = {
+                      source: "Tool Drawer",
+                      installed: isInstalled,
+                      name: row.cells["Tool Name"] || "Unknown App"
+                    };
+                  } catch (error) {
+                    console.error("Error processing app row:", error);
+                  }
+                });
+
+              this.appsList = updatedAppsList;
+              this.isToolDrawerLoaded = true;
+            }
+          } catch (error) {
+            console.error("Error loading Tool Drawer:", error);
+            this.showErrorToast("Failed to load Tool Drawer apps");
+          } finally {
+            this.isToolDrawerLoading = false;
+          }
+        },
+
+        showConfetti() {
+          const confetti = new JSConfetti();
+          confetti.addConfetti();
+        },
+
+        async validateStripeSession() {
+          const sessionId = new URLSearchParams(window.location.search).get("session_id");
+          if (!sessionId) {
+            return;
+          }
+
+          // Remove the session_id url param
+          const url = new URL(window.location.href);
+          url.searchParams.delete("session_id");
+          window.history.replaceState({}, "", url.toString());
+
+          const session = await actions.stripe.validateSubscription.orThrow({ sessionId, imei: this.imei });
+          if (!session) {
+            return;
+          }
+
+          if (session.isSubscribed) {
+            this.showSuccessToast("Congratulations! You're subscribed.");
+            this.showConfetti();
+            this.isSubscribed = true;
+            // Assign appropriate subscription group based on device model
+            await this.assignSubscriptionGroupByDeviceModel();
+          } else {
+            this.showErrorToast("Subscription validation failed. Please try again.");
+          }
+        },
+
+        async init() {
+          this.$watch("imei", async (value) => {
+            try {
+              // Cache device model on page load
+              await this.cacheDeviceModel();
+              await this.getFeatures();
+              if (this.imei) {
+                this.validateStripeSession();
+              }
+            } catch (error) {
+              console.error("Failed to load features:", error);
+            } finally {
+              this.isLoading = false;
+            }
+          });
+
+          this.$watch("isEditing", (value) => {
+            if (!value) {
+              this.nickname = this.originalNickname || "";
+              this.phoneNumber = this.originalPhoneNumber || "";
+            }
+          });
+
+          this.$watch("features", async (userGroups: string[]) => {
+            // Check if device is subscribed but doesn't have any subscription group
+            if (this.isSubscribed) {
+              const hasSubscribedGroup =
+                userGroups.includes(KNOX_USER_GROUPS.SUBSCRIBED) ||
+                userGroups.includes(KNOX_USER_GROUPS.A16_SUBSCRIBED);
+              if (!hasSubscribedGroup) {
+                // Assign appropriate subscription group based on device model
+                await this.assignSubscriptionGroupByDeviceModel();
+              }
+            }
+
+            await this.removeExclusiveGroups(userGroups);
+
+            // Load Tool Drawer data client-side when Tool Drawer feature is enabled
+            if (this.isToolDrawerEnabled && !this.isToolDrawerLoaded) {
+              this.loadToolDrawer();
+            }
+          });
+
+
+          // Sync installed apps in the background
+          if (this.imei) {
+            const formData = new FormData();
+            formData.append("imei", String(this.imei));
+            await actions.wisephones.syncInstalledApps(formData);
+          }
+        }
+      };
+    });
+  </script>
+</Layout>

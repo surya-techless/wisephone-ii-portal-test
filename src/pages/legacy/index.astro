@@ -1,0 +1,301 @@
+---
+import { actions } from "astro:actions";
+import { db, eq, Wisephone } from "astro:db";
+import Icon from "astro-iconify";
+import phoneImg from "@/assets/phone.png";
+import Header from "@/components/Header.astro";
+import Layout from "@/layouts/Layout.astro";
+import Footer from "@/components/Footer.astro";
+import AstroActionToastResponse from "@/components/AstroActionToastResponse.astro";
+
+if (!Astro.locals.auth().userId) {
+  return Astro.redirect("/");
+}
+
+const user = await Astro.locals.currentUser();
+
+if (!user) {
+  return Astro.redirect("/");
+}
+
+const wisephones = await db.select().from(Wisephone).where(eq(Wisephone.userId, user.id));
+const derivedHasNoWisephone = wisephones.length === 0;
+
+const actionResult = Astro.getActionResult(actions.wisephones.createWisephone);
+---
+
+<Layout title="Dashboard" description="Manage your Wisephone II devices.">
+  {actionResult ? <AstroActionToastResponse actionResult={actionResult} /> : null}
+
+  <div class="container h-full p-6 mx-auto prose" x-data="dashboard">
+    <progress
+      x-show="isLoading"
+      x-cloak
+      x-transition
+      class="absolute top-0 left-0 right-0 w-full progress"
+      style="--progress-color: var(--evergreen);"></progress>
+
+    <Header activeTab="page" isProjectPublished={false} projectSlug={""} />
+
+    <main class="flex flex-col gap-6 py-12">
+      {
+        derivedHasNoWisephone ? (
+          <Fragment>
+            <section
+              class="flex flex-col items-center justify-center w-full p-6 bg-transparent border-2 rounded-2xl border-slate-200"
+              x-show="!showForm"
+            >
+              <img
+                src={phoneImg.src}
+                alt="A hand-drawn hand holding a Wisephone II"
+                class="h-[125px] aspect-square"
+                decoding="async"
+                loading="lazy"
+              />
+              <h1 class="text-3xl font-bold text-center">Connect to your Wisephone.</h1>
+              <p class="m-0 text-center">Connect your Wisephone II to manage your device's experience.</p>
+              <button class="mt-8 btn btn-primary w-fit" @click="showForm = true">
+                Get Started
+              </button>
+            </section>
+          </Fragment>
+        ) : (
+          <Fragment>
+            <h1 class="p-0 m-0 text-3xl font-bold">Your Devices</h1>
+            <section class="flex flex-col items-center justify-center w-full bg-white shadow not-prose rounded-2xl">
+              <ul class="flex flex-col items-center justify-center w-full p-0 m-0 rounded-2xl">
+                {wisephones.map((wisephone) => (
+                  <li class="w-full [&:not(:last-child)]:border-b border-slate-200">
+                    <a
+                      @click="isLoading = true"
+                      href={`/legacy/device/${wisephone.imei.toString().padEnd(15, "0")}`}
+                      class="no-underline m-0 p-0 py-4 px-6 w-full grid grid-cols-[1fr_auto] items-center justify-center [&:not(:last-child)]:border-b border-slate-200 hover:bg-slate-50 cursor-pointer active:scale-[98%] transition-all duration-150"
+                    >
+                      <div class="flex flex-col w-full">
+                        <p class="p-0 m-0 font-semibold line-clamp-1">{wisephone.nickname}</p>
+                        <p class="p-0 m-0 text-slate-500 line-clamp-1">{wisephone.phoneNumber}</p>
+                      </div>
+                      <Icon name="lucide:chevron-right" class="w-6 h-6" />
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </section>
+            <button x-show="!showForm" @click="showForm = true" class="btn btn-ghost hover:bg-slate-200">
+              <Icon name="lucide:plus" class="w-6 h-6" />
+              Add Another Wisephone
+            </button>
+          </Fragment>
+        )
+      }
+
+      <section
+        class="flex flex-col items-start justify-center w-full p-6 bg-white shadow rounded-2xl"
+        x-show="showForm"
+        x-transition
+        x-cloak
+        @reset.window="resetForm()"
+      >
+        <div class="flex flex-row justify-between w-full gap-4">
+          <h2 class="text-2xl font-bold">Add a Wisephone</h2>
+
+          <button @click="showForm = false; resetForm()" class="btn btn-sm btn-circle">
+            <span class="sr-only">Close Settings</span>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              class="lucide lucide-x"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg
+            >
+          </button>
+        </div>
+
+        <p class="text-sm m-0 text-slate-500">
+          Complete this form to add a Wisephone II to your portal account
+          {`${user?.primaryEmailAddress?.emailAddress ? `(${user?.primaryEmailAddress?.emailAddress})` : ""}`}. You'll
+          be able to manage the device's features and apps through the portal, and you can add multiple devices to the
+          same portal account.
+        </p>
+
+        <form
+          method="POST"
+          action={actions.wisephones.createWisephone}
+          class="flex flex-col w-full mt-4 gap-4"
+          x-cloak
+          @submit.prevent="$el.checkValidity() && isFormValid() ? $el.submit() : null"
+        >
+          <div class="w-full form-control">
+            <label for="imei" class="label">
+              <span class="label-text">Wisephone IMEI (slot 1)</span>
+              <span class="label-text-alt">Required</span>
+            </label>
+            <input
+              type="text"
+              id="imei"
+              name="imei"
+              x-model.trim="imei1"
+              x-mask="999999999999999"
+              placeholder="350XXXXXXXXXXXX"
+              class="w-full input input-bordered"
+              :class="{ 'input-error': !isImeiValid && hasBlurredImei }"
+              pattern="[0-9]{15}"
+              minlength="15"
+              maxlength="15"
+              title="Please enter exactly 15 digits"
+              @blur="validateImei(); hasBlurredImei = true;"
+              required
+            />
+            <label class="label" x-show="hasBlurredImei && (imei1.length > 0 && (imei1.length !== 15 || !isImeiValid))">
+              <span class="label-text-alt text-error" x-show="imei1.length > 0 && imei1.length !== 15">
+                IMEI must be exactly 15 digits
+              </span>
+              <span class="label-text-alt text-error" x-show="imei1.length === 15 && !isImeiValid">
+                Invalid IMEI. Please check the number and try again.
+              </span>
+            </label>
+            <label class="label">
+              <span class="label-text w-fit text-slate-500 [&_strong]:text-slate-500">
+                On the WiseOS home screen, tap <strong>"Settings"</strong> → tap
+                <strong>"Open System Settings"</strong> → scroll to and tap <strong>"About phone"</strong> → hold down on
+                <strong>"IMEI (slot 1)"</strong> to copy the number.
+              </span>
+            </label>
+          </div>
+
+          <div class="w-full form-control">
+            <label for="imei2" class="label">
+              <span class="label-text">Enter the IMEI one more time</span>
+              <span class="label-text-alt">Required</span>
+            </label>
+            <input
+              type="text"
+              id="imei2"
+              name="imei2"
+              x-model.trim="imei2"
+              x-mask="999999999999999"
+              placeholder="350XXXXXXXXXXXX"
+              class="w-full input input-bordered"
+              :class="{ 'input-error': !isImeiValid && hasBlurredImeiVerification }"
+              pattern="[0-9]{15}"
+              minlength="15"
+              maxlength="15"
+              title="Please enter exactly 15 digits"
+              @blur="validateImei(); hasBlurredImeiVerification = true;"
+              required
+            />
+            <label
+              class="label"
+              x-show="hasBlurredImei && (imei2.length > 0 && ((imei2.length !== 15) || (imei2.length === 15 && imei1 !== imei2)))"
+            >
+              <span class="label-text-alt text-error" x-show="imei2.length > 0 && imei2.length !== 15">
+                IMEI must be exactly 15 digits
+              </span>
+              <span
+                class="label-text-alt text-error"
+                x-show="imei2.length === 15 && imei1.length === 15 && imei1 !== imei2"
+              >
+                IMEIs don't match
+              </span>
+            </label>
+          </div>
+
+          <div class="w-full form-control">
+            <label for="phoneNumber" class="label">
+              <span class="label-text">Wisephone Phone Number</span>
+              <span class="label-text-alt">Required</span>
+            </label>
+            <input
+              type="tel"
+              id="phoneNumber"
+              x-model.trim="phoneNumber"
+              name="phoneNumber"
+              x-mask="999-999-9999"
+              placeholder="XXX-XXX-XXXX"
+              pattern="[0-9]{3}-[0-9]{3}-[0-9]{4}"
+              class="w-full input input-bordered"
+              :class="{ 'input-error': phoneNumber.length > 0 && phoneNumber.replace(/-/g, '').length !== 10 }"
+              required
+            />
+          </div>
+
+          <div class="w-full form-control">
+            <label for="nickname" class="label">
+              <span class="label-text">Give this Wisephone a name or owner</span>
+              <span class="label-text-alt">Required</span>
+            </label>
+            <input
+              id="nickname"
+              x-model.trim="nickname"
+              type="text"
+              name="nickname"
+              placeholder="John Doe"
+              class="w-full input input-bordered"
+              :class="{ 'input-error': nickname.length > 0 && nickname.trim().length === 0 }"
+              required
+            />
+          </div>
+
+          <input type="hidden" name="userId" value={user?.id} />
+
+          <button type="submit" class="mt-4 btn btn-primary" :disabled="!isFormValid()"> Done </button>
+        </form>
+      </section>
+    </main>
+  </div>
+
+  <div class="mb-12">
+    <Footer showLogo={false} />
+  </div>
+
+  <script>
+    import Alpine from "alpinejs";
+    import { isValidIMEI } from "@/libs/utils";
+
+    document.addEventListener("alpine:init", () => {
+      Alpine.data("dashboard", () => ({
+        showForm: false,
+        isLoading: false,
+        imei1: "",
+        imei2: "",
+        phoneNumber: "",
+        nickname: "",
+        imeiMatch: false,
+        hasBlurredImei: false,
+        hasBlurredImeiVerification: false,
+        isImeiValid: true,
+        validateImei() {
+          this.imeiMatch = this.imei1 === this.imei2;
+
+          if (this.imei1.length === 15) {
+            this.isImeiValid = isValidIMEI(this.imei1);
+          } else {
+            this.isImeiValid = false;
+          }
+        },
+
+        isFormValid() {
+          return (
+            this.isImeiValid &&
+            this.imeiMatch &&
+            this.phoneNumber.replace(/-/g, "").length === 10 &&
+            this.nickname.trim().length > 0
+          );
+        },
+        resetForm() {
+          this.imei1 = "";
+          this.imei2 = "";
+          this.phoneNumber = "";
+          this.nickname = "";
+          this.imeiMatch = false;
+          this.hasBlurredImei = false;
+        }
+      }));
+    });
+  </script>
+</Layout>

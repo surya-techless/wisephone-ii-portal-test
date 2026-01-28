@@ -126,7 +126,7 @@ const { activeLink = "devices" } = Astro.props;
 
           <IsAdmin server:defer>
             <a
-              href="/dashboard/admin"
+              href="/legacy/admin"
               @click="$root.mobileMenuOpen = false; mobileMenuOpen = false"
               class="flex items-center px-4 py-3 text-sm text-gray-600 hover:bg-gray-50 rounded-lg"
             >
@@ -151,7 +151,7 @@ const { activeLink = "devices" } = Astro.props;
     <div class="hidden md:block px-6 pb-6">
       <IsAdmin server:defer>
         <a
-          href="/dashboard/admin"
+          href="/legacy/admin"
           @click="mobileMenuOpen = false"
           class="flex items-center py-2 text-sm text-gray-600 hover:text-black"
         >
