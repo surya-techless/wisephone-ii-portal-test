@@ -437,7 +437,7 @@ try {
     <main
       x-show="!isLoading"
       x-cloak
-      class="device-dashboard-main-container relative flex-1 overflow-y-auto overflow-x-hidden md:rounded-xl md:mt-4 md:mb-4 md:mr-4 bg-[#ffffff] w-full pt-16 md:pt-0"
+      class="device-dashboard-main-container relative flex-1 overflow-y-auto overflow-x-hidden md:rounded-xl md:mt-4 md:mb-4 md:mr-4 bg-[#ffffff] w-full pt-3 md:pt-0"
     >
       <!-- Mobile Menu Button -->
       <button
@@ -465,7 +465,7 @@ try {
         <!-- Close Button -->
         <button
           @click="window.location.href = '/dashboard'"
-          class="absolute top-4 right-4 md:top-6 md:right-6 w-8 h-8 flex items-center justify-center hover:bg-gray-100 rounded-full z-10"
+          class="hidden md:flex absolute top-4 right-4 md:top-6 md:right-6 w-8 h-8 items-center justify-center hover:bg-gray-100 rounded-full z-10"
         >
           <Icon name="lucide:x" class="w-5 h-5 text-gray-600" />
         </button>
@@ -474,11 +474,15 @@ try {
           <!-- Header -->
           <div class="mb-4">
             <h2 class="text-xl md:text-2xl font-semibold text-gray-900 mb-1">
-              Device Dashboard → <span x-text="deviceName"></span>
+              <span class="md:hidden" x-text="deviceName"></span>
+              <span class="hidden md:inline">Device Dashboard → <span x-text="deviceName"></span></span>
             </h2>
             <p class="text-gray-600 text-sm">
-              This dashboard allows you to manage settings for this Wisephone. View usage statistics, update
-              subscription or billing information, and decide which features and apps you'd like on the Wisephone.
+              <span class="md:hidden">This dashboard allows you to manage settings for this Wisephone.</span>
+              <span class="hidden md:inline"
+                >This dashboard allows you to manage settings for this Wisephone. View usage statistics, update
+                subscription or billing information, and decide which features and apps you'd like on the Wisephone.</span
+              >
             </p>
           </div>
 
@@ -658,7 +662,7 @@ try {
                         </button>
                       </div>
                       <!-- Device Removal (Visible on mobile only when screen time is disabled) -->
-                      <div class="pt-4 lg:hidden" x-show="!enableScreenTime" x-cloak>
+                      <div class="pt-4 border-t border-gray-200 lg:hidden" x-show="!enableScreenTime" x-cloak>
                         <h4 class="text-sm font-semibold text-gray-900 mb-2">Device Removal</h4>
                         <p class="text-sm text-gray-600 mb-2">
                           Remove this device from this list of managed devices. Perform this action if you want to
@@ -873,7 +877,10 @@ try {
               >
                 <!-- Header Text -->
                 <div class="mb-4 flex-shrink-0 md:max-w-[500px]">
-                  <p class="text-sm text-gray-700">Search for an app you want to install on your Wisephone here.</p>
+                  <p class="text-sm text-gray-700">
+                    <span class="md:hidden">Search for an app you want to install on your Wisephone.</span>
+                    <span class="hidden md:inline">Search for an app you want to install on your Wisephone here.</span>
+                  </p>
                 </div>
 
                 <!-- Search Bar -->
@@ -1041,7 +1048,7 @@ try {
 
               <!-- Device Removal (Mobile View - Below Screen Time) -->
               <div class="mb-6 w-full lg:hidden" x-show="currentTab === 'device-info' && enableScreenTime" x-cloak>
-                <div class="pt-4">
+                <div class="pt-4 border-t border-gray-200">
                   <h4 class="text-sm font-semibold text-gray-900 mb-2">Device Removal</h4>
                   <p class="text-sm text-gray-600 mb-2">
                     Remove this device from this list of managed devices. Perform this action if you want to manage this
