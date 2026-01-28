@@ -64,6 +64,12 @@ const wisephonesWithSubscription = await Promise.all(
 );
 
 const actionResult = Astro.getActionResult(actions.wisephones.createWisephone);
+
+// If a device was just added and it's subscribed, redirect to manage page
+if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei) {
+  const imeiPadded = actionResult.data.wisephone[0].imei.toString().padEnd(15, "0");
+  return Astro.redirect(`/manage/${imeiPadded}`);
+}
 ---
 
 <!-- <Layout title="Dashboard" description="Manage your Wisephone II devices.">

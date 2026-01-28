@@ -1,6 +1,6 @@
 import { defineAction, ActionError } from "astro:actions";
 import { z } from "astro:schema";
-import { db, Wisephone, eq, sql } from "astro:db";
+import { db, Wisephone, BypassTechlessSubscription, eq, sql } from "astro:db";
 import { SamsungKnoxService } from "@/libs/samsung-knox-service";
 import { validateIsSubscribed } from "@/libs/stripe";
 import { isValidIMEI } from "@/libs/utils";
@@ -15,7 +15,7 @@ export const wisephones = {
       phoneNumber: z.string().min(12).max(12),
       userId: z.string()
     }),
-    handler: async (input) => {
+    handler: async (input, context) => {
       try {
         // 1. Get Wisephone from IMEI in Knox
         // 2. Ensure it's using the primary IMEI
@@ -38,9 +38,33 @@ export const wisephones = {
 
         const newWisephone = await db.insert(Wisephone).values(input).returning();
 
+        // Check if device is already subscribed
+        // First check for bypass subscription
+        const bypassSubscription = await db
+          .select()
+          .from(BypassTechlessSubscription)
+          .where(eq(BypassTechlessSubscription.imei, input.imei))
+          .limit(1);
+
+        let isSubscribed = bypassSubscription.length > 0;
+
+        // If not bypassed, check actual subscription
+        if (!isSubscribed && input.phoneNumber) {
+          try {
+            isSubscribed = await validateIsSubscribed({
+              imei: input.imei.toString(),
+              phoneNumber: input.phoneNumber.replace(/[^0-9+]/g, "")
+            });
+            console.log(`New device ${input.imei} subscription status: ${isSubscribed}`);
+          } catch (error) {
+            console.error(`Error checking subscription for new device ${input.imei}:`, error);
+          }
+        }
+
         return {
           success: "Wisephone created successfully!",
-          wisephone: newWisephone
+          wisephone: newWisephone,
+          isSubscribed
         };
       } catch (error: any) {
         if (error?.code === "SQLITE_CONSTRAINT_PRIMARYKEY" || error?.code === "SQLITE_CONSTRAINT") {
