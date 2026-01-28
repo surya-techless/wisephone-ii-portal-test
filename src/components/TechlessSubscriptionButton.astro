@@ -15,8 +15,7 @@ const { customerEmail, deviceIMEI } = Astro.props as Props;
     deviceIMEI = \`${deviceIMEI}\`;
   `}
 >
-  <button class="w-full btn btn-primary" :disabled="!isLoaded" @click="handleClick">Activate BYOC plan</button
-  >
+  <button class="w-full btn btn-primary" :disabled="!isLoaded" @click="handleClick">Activate BYOC Plan</button>
   <dialog x-ref="stripeDialog" id="stripe-dialog" class="modal">
     <div style="background-color: rgb(247, 246, 242)" class="modal-box">
       <div id="stripe-element"></div>

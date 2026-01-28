@@ -14,7 +14,7 @@ import TechlessSubscriptionButton from "@/components/TechlessSubscriptionButton.
 import { FEATURES, FAITH_TOOLS_APPS, getPackageNameFromPlayStoreUrl, isValidIMEI } from "@/libs/utils";
 import { isAdmin } from "@/lib/auth/permissions";
 import type { AppsList } from "@/types/apps";
-// Deprecated:  Devices are now  handled in the manage/[imei].astro page
+
 // Initialize variables with default values
 let imei: string | undefined = Astro.params.imei;
 let wisephone: any = null;
@@ -45,10 +45,10 @@ try {
     return Astro.redirect("/dashboard?error=" + encodeURIComponent("A Wisephone II with that IMEI was not found."));
   }
 
-  // Check if device was just deleted - must happen before any device lookup
   const resultDelete = Astro.getActionResult(actions.wisephones.deleteWisephone);
-  if (resultDelete && !resultDelete.error) {
-    return Astro.redirect("/dashboard?message=" + encodeURIComponent(resultDelete.data?.success || "Wisephone successfully removed from account."));
+  const resultDeleteMessage = resultDelete?.data?.success || "";
+  if (resultDeleteMessage) {
+    return Astro.redirect("/dashboard?message=" + encodeURIComponent(resultDeleteMessage));
   }
 
   const userId = Astro.locals.auth().userId;
@@ -75,11 +75,6 @@ try {
   }
 
   if (!wisephones || !wisephones.length) {
-    // If we just tried to delete but didn't get a success message,
-    // check if there was an error in the delete action
-    if (resultDelete?.error) {
-      return Astro.redirect("/dashboard?error=" + encodeURIComponent(resultDelete.error.message || "Failed to delete device"));
-    }
     return Astro.redirect("/dashboard?error=" + encodeURIComponent("Device not found"));
   }
 
@@ -105,18 +100,26 @@ try {
     .limit(1);
 
   isSubscribed = bypassTechlessSubscription.length > 0;
+  console.log(`[Device Page] Bypass subscription check: ${isSubscribed}`);
 
   if (!isSubscribed && wisephone?.phoneNumber) {
     try {
+      const imeiForCheck = String(wisephone?.imei || "");
+      const phoneForCheck = `${wisephone?.phoneNumber?.replace(/[^0-9+]/g, "") || ""}`;
+      console.log(`[Device Page] Checking subscription - IMEI: ${imeiForCheck}, Phone: ${phoneForCheck}`);
+
       isSubscribed = await validateIsSubscribed({
-        imei: String(wisephone?.imei || ""),
-        phoneNumber: `${wisephone?.phoneNumber?.replace(/[^0-9+]/g, "") || ""}`
+        imei: imeiForCheck,
+        phoneNumber: phoneForCheck
       });
+      console.log(`[Device Page] Subscription check result: ${isSubscribed}`);
     } catch (subscriptionError) {
-      console.error("Error checking subscription status:", subscriptionError);
+      console.error("[Device Page] Error checking subscription status:", subscriptionError);
       // Continue with isSubscribed = false instead of crashing
     }
   }
+
+  console.log(`[Device Page] Final isSubscribed value being passed to client: ${isSubscribed}`);
 
   // Retrieve admin user data with proper error handling
   if (userIsAdmin) {
@@ -403,45 +406,27 @@ const userLink = user?.id
             </p>
 
             <div class="grid sm:grid-cols-2 max-sm:grid-cols-1 gap-4 mt-6">
-              <div class="card rounded-xl border border-[var(--surface-tertiary)] text-slate-800 h-full">
-                <div class="card-body p-6 flex flex-col h-full">
-                  <h3 class="text-lg font-bold !m-0">WiseOS With data</h3>
-                  <p class="text-sm text-slate-500 m-0 mt-1 mb-2">(All-in-One Subscription)</p>
-                  <p class="m-0 mt-2 mb-3">
-                    Get everything in one place, WiseOS, talk, text, and data bundled together for a seamless, hassle-free experience.
+              <div class="card rounded-xl border border-[var(--surface-tertiary)] text-slate-800">
+                <div class="card-body p-6">
+                  <h3 class="text-lg font-bold !m-0">Wisephone Carrier Plan <span class='font-normal text-slate-500'>(Includes WiseOS Subscription)</span></h3>
+                  <p class="m-0 mt-2">
+                    Get all-in-one connectivity with our Wisephone Carrier Plan, which bundles your data, talk, and text with your WiseOS Subscription for a complete experience.
                     <a class="link underline-offset-2 text-slate-500" href="https://wisephone.com/pages/plans" target="_blank">Learn more</a>
                   </p>
-                  <div class="text-sm text-slate-600 mb-3">
-                    <p class="font-semibold mb-1">Includes:</p>
-                    <ul class="list-disc list-inside space-y-1">
-                      <li>WiseOS Subscription</li>
-                      <li>Carrier Service (Data, Talk, and Text)</li>
-                    </ul>
-                  </div>
-                  <a href="https://plans.techless.com" target="_blank" class="flex items-center gap-1 btn btn-primary mt-auto">
-                    Activate All‑In‑One Plan
+                  <a href="https://plans.techless.com" target="_blank" class="flex items-center gap-1 btn btn-primary mt-4">
+                    Activate Carrier Plan*
                     <Icon name="lucide:external-link" class="w-4 h-4" />
                   </a>
                 </div>
               </div>
-              <div class="card rounded-xl border border-[var(--surface-tertiary)] text-slate-800 h-full">
-                <div class="card-body p-6 flex flex-col h-full">
-                  <h3 class="text-lg font-bold !m-0">Bring Your Own Carrier</h3>
-                  <p class="text-sm text-slate-500 m-0 mt-1 mb-2">(WiseOS Subscription - no data included)</p>
-                  <p class="m-0 mt-2 mb-3">Perfect if you already have a carrier you love. Enjoy all the features of WiseOS while keeping your existing mobile plan. <a class="link underline-offset-2 text-slate-500" href="https://wisephone.com/pages/plans" target="_blank">Learn more</a></p>
-                  <div class="text-sm text-slate-600 mb-3">
-                    <p class="font-semibold mb-1">Includes:</p>
-                    <ul class="list-disc list-inside space-y-1">
-                      <li>WiseOS Subscription</li>
-                      <li>No carrier service included — bring your own plan</li>
-                    </ul>
-                  </div>
-                  <div class="mt-auto">
-                    <TechlessSubscriptionButton
-                      deviceIMEI={wisephone?.imei || ""}
-                      customerEmail={user?.emailAddresses[0]?.emailAddress || ""}
-                    />
-                  </div>
+              <div class="card rounded-xl border border-[var(--surface-tertiary)] text-slate-800">
+                <div class="card-body p-6">
+                  <h3 class="text-lg font-bold !m-0">Bring Your Own Carrier <span class='font-normal text-slate-500'>(WiseOS Subscription Required)</span></h3>
+                  <p class="m-0 mt-2">Continue using your existing carrier and unlock your Wisephone's features by activating your WiseOS Subscription. <a class="link underline-offset-2 text-slate-500" href="https://wisephone.com/pages/plans" target="_blank">Learn more</a></p>
+                  <TechlessSubscriptionButton
+                    deviceIMEI={wisephone?.imei || ""}
+                    customerEmail={user?.emailAddresses[0]?.emailAddress || ""}
+                  />
                 </div>
               </div>
             </div>
@@ -522,7 +507,7 @@ const userLink = user?.id
                       x-ref="switch"
                       type="checkbox"
                       class="pointer-events-none toggle"
-                      x-bind:checked="isFeatureEnabled(feature.knoxManageId, feature.isInverse || false)"
+                      x-bind:checked="isFeatureEnabled(feature, feature.isInverse || false)"
                     />
                     {/* Makes loading all start at disabled */}
                     <input disabled x-cloak class="pointer-events-none toggle" x-show="isLoading" type="checkbox" />
@@ -541,10 +526,10 @@ const userLink = user?.id
 
       {/* @TODO: Can this install apps with Play Store hidden? */}
       {/* @TODO: Make search do imperfect matching */}
-      <section x-show="isSubscribed && isToolDrawerEnabled" x-cloak x-collapse>
+      <section x-show="isSubscribed && (isToolDrawerEnabled || isFaithToolsEnabled)" x-cloak x-collapse>
         <div class="flex items-center justify-between mb-4">
           <h2 class="text-2xl font-bold">
-            Manage Apps Test <span class="text-sm font-normal text-slate-500">(beta)</span>
+            Manage Apps <span class="text-sm font-normal text-slate-500">(beta)</span>
           </h2>
         </div>
 
@@ -577,7 +562,7 @@ const userLink = user?.id
                 x-bind:class="{ 'tab-active !bg-[var(--evergreen)] !text-white': currentView === 'faith-tools' }"
                 @click="currentView = 'faith-tools'"
               >
-                faith.tools
+                Extra Tools
               </a>
               <a
                 role="tab"
@@ -596,7 +581,7 @@ const userLink = user?.id
               x-model="currentView"
             >
               <option value="tool-drawer">Tool Drawer</option>
-              <option value="faith-tools">faith.tools</option>
+              <option value="faith-tools">Extra Tools</option>
               <option value="installed">Installed</option>
             </select>
           </div>
@@ -692,10 +677,9 @@ const userLink = user?.id
               <p class="mt-3" x-show="!isFaithToolsEnabled && appSearchQuery.toLowerCase().includes('bible')">
                 Looking for a Bible? Turn on faith.tools integration.
               </p>
-              <!-- Request an app button - Hidden -->
-              <!-- <a class="mt-4 btn btn-primary" href="https://getwisephone.com/request-app" target="_blank">
+              <a class="mt-4 btn btn-primary" href="https://getwisephone.com/request-app" target="_blank">
                 Request an app
-              </a> -->
+              </a>
             </li>
           </ul>
         </div>
@@ -724,6 +708,7 @@ const userLink = user?.id
     import JSConfetti from "js-confetti";
     import {
       type Feature,
+      FEATURES,
       updateUnreachableAlpineState,
       KNOX_USER_GROUPS,
       getPackageNameFromPlayStoreUrl
@@ -756,17 +741,21 @@ const userLink = user?.id
         isToolDrawerLoaded: false,
         // @ts-ignore
         isPhoneSetUp: this.$persist(false),
+        cachedDeviceModel: null as string | null,
+        isA16Device: false,
 
         // Computed properties
         get isToolDrawerEnabled() {
+          const toolDrawerFeature = FEATURES.TOOL_DRAWER;
+          const toolDrawerGroup = this.getGroupIdForFeature(toolDrawerFeature);
           return (
             this.isSubscribed &&
             Array.isArray(this.features) &&
-            (this.features.includes(KNOX_USER_GROUPS.ADD_ON_TOOL_DRAWER) ||
-             this.features.includes(KNOX_USER_GROUPS.A16_ADD_ON_TOOL_DRAWER))
+            this.features.includes(toolDrawerGroup)
           );
         },
         get isFaithToolsEnabled() {
+          // Note: FAITH_TOOLS doesn't have an A16 version yet, so use regular group
           return this.isSubscribed && this.features.includes(KNOX_USER_GROUPS.ADD_ON_FAITH_TOOLS);
         },
         get completeSetupUrl() {
@@ -829,8 +818,10 @@ const userLink = user?.id
           return apps.filter((app) => app.name.toLowerCase().includes(searchQuery));
         },
 
-        isFeatureEnabled(knoxManageId: string, isInverse = false) {
-          const isEnabled = this.features.includes(knoxManageId);
+        isFeatureEnabled(feature: Feature, isInverse = false) {
+          // Get the appropriate group ID based on device model
+          const groupId = this.getGroupIdForFeature(feature);
+          const isEnabled = this.features.includes(groupId);
           return isInverse ? !isEnabled : isEnabled;
         },
 
@@ -860,6 +851,136 @@ const userLink = user?.id
           this.features = features;
         },
 
+
+        /**
+         * Gets device model from Samsung Knox API
+         * @returns Device model string or null if not found
+         */
+        async getDeviceModelFromKnox(): Promise<string | null> {
+          try {
+            const deviceInfoUrl = new URL(`/api/samsung-knox.json`, window.location.origin);
+            deviceInfoUrl.searchParams.set("action", "get-device-info");
+            deviceInfoUrl.searchParams.set("imei", this.imei);
+
+            const deviceInfoRes = await fetch(deviceInfoUrl, { method: "GET" });
+            if (!deviceInfoRes.ok) {
+              return null;
+            }
+
+            const deviceInfo = await deviceInfoRes.json();
+            const rv = deviceInfo?.resultValue;
+            if (!rv) {
+              return null;
+            }
+
+            const model =
+              rv.deviceModelName ||
+              rv.modelName ||
+              rv.deviceModel ||
+              rv.model ||
+              rv.deviceName ||
+              rv.name ||
+              null;
+
+            return model;
+          } catch (error) {
+            console.error("Error fetching device model:", error);
+            return null;
+          }
+        },
+
+        /**
+         * Caches device model on page load
+         */
+        async cacheDeviceModel() {
+          if (this.cachedDeviceModel === null) {
+            const model = await this.getDeviceModelFromKnox();
+            this.cachedDeviceModel = model;
+            if (model) {
+              const modelUpper = model.toUpperCase();
+              this.isA16Device = modelUpper.includes("A16") || modelUpper.includes("SM-A16");
+              console.log(`Device model cached: ${model}, isA16Device: ${this.isA16Device}`);
+            }
+          }
+        },
+
+        /**
+         * Gets the appropriate group ID for a feature based on device model
+         * For A16 devices, returns a16KnoxManageId if available, otherwise knoxManageId
+         * For other devices, returns knoxManageId
+         */
+        getGroupIdForFeature(feature: Feature): string {
+          if (this.isA16Device && feature.a16KnoxManageId) {
+            return feature.a16KnoxManageId;
+          }
+          return feature.knoxManageId;
+        },
+
+        /**
+         * Checks device model and assigns appropriate subscription group
+         * - A16 devices -> A16_SUBSCRIBED group
+         * - A15 and other devices -> SUBSCRIBED group (default)
+         */
+        async assignSubscriptionGroupByDeviceModel() {
+          try {
+            const deviceModel = await this.getDeviceModelFromKnox();
+            if (!deviceModel) {
+              console.warn("Could not determine device model, using default SUBSCRIBED group");
+              // Default to SUBSCRIBED if we can't determine model
+              await this.addFeatureToDevice(KNOX_USER_GROUPS.SUBSCRIBED);
+              this.features.push(KNOX_USER_GROUPS.SUBSCRIBED);
+              return;
+            }
+
+            const modelUpper = deviceModel.toUpperCase();
+
+            // Check if device is A16
+            if (modelUpper.includes("A16") || modelUpper.includes("SM-A16")) {
+              console.log(`Device model detected as A16: ${deviceModel}, assigning to A16_SUBSCRIBED group`);
+              await this.addFeatureToDevice(KNOX_USER_GROUPS.A16_SUBSCRIBED);
+              this.features.push(KNOX_USER_GROUPS.A16_SUBSCRIBED);
+            } else {
+              // Default to SUBSCRIBED for A15 and all other devices
+              console.log(`Device model: ${deviceModel}, assigning to SUBSCRIBED group`);
+              await this.addFeatureToDevice(KNOX_USER_GROUPS.SUBSCRIBED);
+              this.features.push(KNOX_USER_GROUPS.SUBSCRIBED);
+            }
+          } catch (error) {
+            console.error("Error assigning subscription group by device model:", error);
+            // Fallback to default SUBSCRIBED group on error
+            await this.addFeatureToDevice(KNOX_USER_GROUPS.SUBSCRIBED);
+            this.features.push(KNOX_USER_GROUPS.SUBSCRIBED);
+          }
+        },
+
+        /**
+         * Checks device model and assigns appropriate unpaid group
+         * - A16 devices -> A16_UNPAID group
+         * - A15 and other devices -> UNPAID group (default)
+         */
+        async assignUnpaidGroupByDeviceModel() {
+          try {
+            // Ensure device model is cached
+            await this.cacheDeviceModel();
+
+            if (this.isA16Device) {
+              console.log(`A16 device detected, assigning to A16_UNPAID group`);
+              await this.addFeatureToDevice(KNOX_USER_GROUPS.A16_UNPAID);
+              this.features.push(KNOX_USER_GROUPS.A16_UNPAID);
+            } else {
+              // Default to UNPAID for A15 and all other devices
+              console.log(`Non-A16 device, assigning to UNPAID group`);
+              await this.addFeatureToDevice(KNOX_USER_GROUPS.UNPAID);
+              this.features.push(KNOX_USER_GROUPS.UNPAID);
+            }
+          } catch (error) {
+            console.error("Error assigning unpaid group by device model:", error);
+            // Fallback to default UNPAID group on error
+            await this.addFeatureToDevice(KNOX_USER_GROUPS.UNPAID);
+            this.features.push(KNOX_USER_GROUPS.UNPAID);
+          }
+        },
+
         completeSetup() {
           if (
             confirm(
@@ -885,7 +1006,23 @@ const userLink = user?.id
               throw new Error("Invalid feature configuration");
             }
 
-            currentEnabled = this.isFeatureEnabled(feature.knoxManageId, feature.isInverse);
+            // Ensure device model is cached
+            await this.cacheDeviceModel();
+
+            // Get the appropriate group ID based on device model
+            const groupIdForDevice = this.getGroupIdForFeature(feature);
+            const regularGroupId = feature.knoxManageId;
+            const a16GroupId = feature.a16KnoxManageId;
+
+            // Check if feature is enabled (check both regular and A16 groups if applicable)
+            const isRegularEnabled = this.features.includes(regularGroupId);
+            const isA16Enabled = a16GroupId ? this.features.includes(a16GroupId) : false;
+            currentEnabled = isRegularEnabled || isA16Enabled;
+
+            if (feature.isInverse) {
+              currentEnabled = !currentEnabled;
+            }
+
             const confirmMessage = currentEnabled ? feature.disableMessage : feature.enableMessage;
             let updatedValue = !currentEnabled;
             if (feature.isInverse) {
@@ -898,17 +1035,26 @@ const userLink = user?.id
 
             switchElement.checked = !switchElement.checked;
 
+            // Use the device-appropriate group ID for the API call
+            const featureToToggle = {
+              ...feature,
+              knoxManageId: groupIdForDevice
+            };
+
             await featureManagement.toggleFeature({
               imei: this.imei,
-              feature,
+              feature: featureToToggle,
               enabled: updatedValue
             });
 
-            // Update features list
-            if (!updatedValue) {
-              this.features = this.features.filter((id) => id !== feature.knoxManageId);
-            } else {
-              this.features.push(feature.knoxManageId);
+            // Update features list - remove both regular and A16 versions, then add the correct one
+            const groupsToRemove = [regularGroupId];
+            if (a16GroupId) {
+              groupsToRemove.push(a16GroupId);
+            }
+            this.features = this.features.filter((id) => !groupsToRemove.includes(id));
+            if (updatedValue) {
+              this.features.push(groupIdForDevice);
             }
 
             this.showSuccessToast(
@@ -939,8 +1085,14 @@ const userLink = user?.id
          * Gets the list of exclusive groups from the user's current groups
          */
         getExclusiveGroups(userGroups: string[]): string[] {
-          // Unpaid and Subscribed are exclusive
-          return userGroups.filter((group) => group === KNOX_USER_GROUPS.UNPAID || group === KNOX_USER_GROUPS.SUBSCRIBED);
+          // Unpaid, Subscribed, A16_Unpaid, and A16_Subscribed are exclusive
+          return userGroups.filter(
+            (group) =>
+              group === KNOX_USER_GROUPS.UNPAID ||
+              group === KNOX_USER_GROUPS.SUBSCRIBED ||
+              group === KNOX_USER_GROUPS.A16_SUBSCRIBED ||
+              group === KNOX_USER_GROUPS.A16_UNPAID
+          );
         },
 
         /**
@@ -951,16 +1103,25 @@ const userLink = user?.id
         },
 
         /**
-         * Ensures the device has at least one base group (Minimal or Unpaid)
-         * based on subscription status
+         * Ensures the device has at least one base group (Subscribed or Unpaid)
+         * based on subscription status and device model
          */
         async ensureBaseGroup(userGroups: string[]) {
           const hasBaseGroup = userGroups.some(
-            (group) => group === KNOX_USER_GROUPS.UNPAID || group === KNOX_USER_GROUPS.SUBSCRIBED
+            (group) =>
+              group === KNOX_USER_GROUPS.UNPAID ||
+              group === KNOX_USER_GROUPS.SUBSCRIBED ||
+              group === KNOX_USER_GROUPS.A16_SUBSCRIBED ||
+              group === KNOX_USER_GROUPS.A16_UNPAID
           );
           if (!hasBaseGroup) {
-            const baseGroup = this.isSubscribed ? KNOX_USER_GROUPS.SUBSCRIBED : KNOX_USER_GROUPS.UNPAID;
-            await this.addFeatureToDevice(baseGroup);
+            if (this.isSubscribed) {
+              // Assign appropriate subscription group based on device model
+              await this.assignSubscriptionGroupByDeviceModel();
+            } else {
+              // Assign appropriate unpaid group based on device model
+              await this.assignUnpaidGroupByDeviceModel();
+            }
           }
         },
 
@@ -979,13 +1140,45 @@ const userLink = user?.id
          * Determines which features need to be removed to resolve conflicts
          */
         getIncompatibleFeatures(userGroups: string[]): string[] {
-          return [
-            // Remove Unpaid if present with Subscribed we're going to assume
-            // they're subscribed.
+          const featuresToRemove: string[] = [];
+
+          // Remove UNPAID if present with any subscription group
+          if (userGroups.includes(KNOX_USER_GROUPS.UNPAID)) {
+            if (
+              userGroups.includes(KNOX_USER_GROUPS.SUBSCRIBED) ||
+              userGroups.includes(KNOX_USER_GROUPS.A16_SUBSCRIBED)
+            ) {
+              featuresToRemove.push(KNOX_USER_GROUPS.UNPAID);
+            }
+          }
+
+          // Remove A16_UNPAID if present with any subscription group
+          if (userGroups.includes(KNOX_USER_GROUPS.A16_UNPAID)) {
+            if (
+              userGroups.includes(KNOX_USER_GROUPS.SUBSCRIBED) ||
+              userGroups.includes(KNOX_USER_GROUPS.A16_SUBSCRIBED)
+            ) {
+              featuresToRemove.push(KNOX_USER_GROUPS.A16_UNPAID);
+            }
+          }
+
+          // Remove SUBSCRIBED if A16_SUBSCRIBED is present (they shouldn't have both)
+          if (
+            userGroups.includes(KNOX_USER_GROUPS.SUBSCRIBED) &&
+            userGroups.includes(KNOX_USER_GROUPS.A16_SUBSCRIBED)
+          ) {
+            featuresToRemove.push(KNOX_USER_GROUPS.SUBSCRIBED);
+          }
+
+          // Remove UNPAID if A16_UNPAID is present (they shouldn't have both)
+          if (
             userGroups.includes(KNOX_USER_GROUPS.UNPAID) &&
-              userGroups.includes(KNOX_USER_GROUPS.SUBSCRIBED) &&
-              KNOX_USER_GROUPS.UNPAID
-          ].filter(Boolean) as string[];
+            userGroups.includes(KNOX_USER_GROUPS.A16_UNPAID)
+          ) {
+            featuresToRemove.push(KNOX_USER_GROUPS.UNPAID);
+          }
+
+          return featuresToRemove;
         },
 
         /**
@@ -1112,8 +1305,8 @@ const userLink = user?.id
             this.showSuccessToast("Congratulations! You're subscribed.");
             this.showConfetti();
             this.isSubscribed = true;
-            await this.addFeatureToDevice(KNOX_USER_GROUPS.SUBSCRIBED);
-            this.features.push(KNOX_USER_GROUPS.SUBSCRIBED);
+            // Assign appropriate subscription group based on device model
+            await this.assignSubscriptionGroupByDeviceModel();
           } else {
             this.showErrorToast("Subscription validation failed. Please try again.");
           }
@@ -1122,6 +1315,8 @@ const userLink = user?.id
         async init() {
           this.$watch("imei", async (value) => {
             try {
+              // Cache device model on page load
+              await this.cacheDeviceModel();
               await this.getFeatures();
               if (this.imei) {
                 this.validateStripeSession();
@@ -1141,9 +1336,15 @@ const userLink = user?.id
           });
 
           this.$watch("features", async (userGroups: string[]) => {
-            if (this.isSubscribed && !userGroups.includes(KNOX_USER_GROUPS.SUBSCRIBED)) {
-              await this.addFeatureToDevice(KNOX_USER_GROUPS.SUBSCRIBED);
-              this.features.push(KNOX_USER_GROUPS.SUBSCRIBED);
+            // Check if device is subscribed but doesn't have any subscription group
+            if (this.isSubscribed) {
+              const hasSubscribedGroup =
+                userGroups.includes(KNOX_USER_GROUPS.SUBSCRIBED) ||
+                userGroups.includes(KNOX_USER_GROUPS.A16_SUBSCRIBED);
+              if (!hasSubscribedGroup) {
+                // Assign appropriate subscription group based on device model
+                await this.assignSubscriptionGroupByDeviceModel();
+              }
             }
 
             await this.removeExclusiveGroups(userGroups);
@@ -1153,6 +1354,7 @@ const userLink = user?.id
               this.loadToolDrawer();
             }
           });
+
 
           // Sync installed apps in the background
           if (this.imei) {
