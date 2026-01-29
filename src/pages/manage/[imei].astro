@@ -478,8 +478,7 @@ try {
               <span class="hidden md:inline">Device Dashboard → <span x-text="deviceName"></span></span>
             </h2>
             <p class="text-gray-600 text-sm">
-              
-              <span class=" md:inline"
+              <span class="md:inline"
                 >This dashboard allows you to manage <span x-text="deviceName"></span>'s Wisephone.</span
               >
               <!-- <span class="hidden md:inline"
@@ -496,10 +495,10 @@ try {
               <!-- Tabs -->
               <div class="relative mb-6 md:-ml-2 md:w-[500px]">
                 <!-- Tabs container - no border -->
-                <div class="flex flex-nowrap gap-0 pr-0 md:w-[500px] md:justify-between relative z-10">
+                <div class="flex flex-nowrap gap-0 pr-0 md:w-[500px] relative z-10">
                   <button
                     @click="currentTab = 'device-info'"
-                    class="px-2 md:px-6 py-3 text-sm font-medium transition-colors relative flex-1 md:flex-none whitespace-nowrap"
+                    class="px-2 md:px-6 py-3 text-sm font-medium transition-colors relative flex-1 whitespace-nowrap"
                     :class="currentTab === 'device-info' ? 'bg-[#DBD5CD] text-gray-900' : 'text-gray-600 hover:text-gray-900'"
                   >
                     Device Info
@@ -512,7 +511,7 @@ try {
                   </button>
                   <button
                     @click="currentTab = 'features'"
-                    class="px-2 md:px-6 py-3 text-sm font-medium transition-colors relative flex-1 md:flex-none whitespace-nowrap"
+                    class="px-2 md:px-6 py-3 text-sm font-medium transition-colors relative flex-1 whitespace-nowrap"
                     :class="currentTab === 'features' ? 'bg-[#DBD5CD] text-gray-900' : 'text-gray-600 hover:text-gray-900'"
                   >
                     Features
@@ -527,7 +526,7 @@ try {
                     x-show="isSubscribed && isToolDrawerEnabled"
                     x-cloak
                     @click="currentTab = 'app-management'"
-                    class="px-2 md:px-6 py-3 text-sm font-medium transition-colors relative flex-1 md:flex-none whitespace-nowrap"
+                    class="px-2 md:px-6 py-3 text-sm font-medium transition-colors relative flex-1 whitespace-nowrap"
                     :class="currentTab === 'app-management' ? 'bg-[#DBD5CD] text-gray-900' : 'text-gray-600 hover:text-gray-900'"
                   >
                     Tool Management

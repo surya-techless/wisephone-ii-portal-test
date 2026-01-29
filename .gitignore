@@ -35,3 +35,8 @@ pnpm-debug.log*
 *.crt
 localhost*
 *.local
+
+# Testing utilities
+TESTING-SUBSCRIPTION-CHECKER.md
+check-subscription.js
+run-subscription-check.sh
