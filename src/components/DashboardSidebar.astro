@@ -14,13 +14,27 @@ const { activeLink = "devices" } = Astro.props;
 <style is:global>
   /* Mobile-specific styles for Clerk UserButton modal */
   @media (max-width: 768px) {
-    .cl-userButtonPopoverCard {
+    /* Try multiple possible Clerk modal selectors */
+    .cl-userButtonPopoverCard,
+    .cl-card,
+    .cl-modalContent,
+    .cl-popoverCard,
+    [data-localization-key="userButton.popoverCard"] {
       position: fixed !important;
       top: 50% !important;
       left: 50% !important;
-      transform: translate(-50%, -50) !important;
-      z-index: 70 !important;
-      max-width: 90vw !important;
+      transform: translate(-50%, -50%) !important;
+      z-index: 9999 !important;
+    }
+
+    /* Ensure Clerk portal container is properly positioned */
+    .cl-userButtonPopoverRootBox,
+    .cl-internal-b3fm6y {
+      position: fixed !important;
+      top: 50% !important;
+      left: 50% !important;
+      transform: translate(-50%, -50%) !important;
+      z-index: 9999 !important;
     }
   }
 </style>
@@ -36,7 +50,32 @@ const { activeLink = "devices" } = Astro.props;
 </div>
 
 <!-- Sidebar with Support Popup -->
-<div x-data="{ showSupportPopup: false }" class="md:relative h-full relative">
+<div
+  x-data="{
+    showSupportPopup: false,
+    showAccountBackdrop: false,
+    init() {
+      // Watch for Clerk modal to close and hide backdrop
+      const observer = new MutationObserver(() => {
+        const clerkModal = document.querySelector('.cl-userButtonPopoverCard, .cl-card, .cl-modalContent, .cl-popoverCard');
+        if (!clerkModal && this.showAccountBackdrop) {
+          this.showAccountBackdrop = false;
+        }
+      });
+      observer.observe(document.body, { childList: true, subtree: true });
+    }
+  }"
+  class="md:relative h-full relative"
+>
+  <!-- Account Modal Backdrop (Mobile Only) -->
+  <div
+    x-show="showAccountBackdrop"
+    x-cloak
+    x-transition.opacity
+    @click="showAccountBackdrop = false"
+    class="md:hidden fixed inset-0 bg-black bg-opacity-60 z-[9998]"
+  >
+  </div>
   <!-- Sidebar -->
   <aside
     class="w-64 flex flex-col justify-between h-screen bg-[#f7f6f2] md:relative fixed right-0 top-0 z-50 transition-transform duration-300 translate-x-full md:translate-x-0"
@@ -104,7 +143,7 @@ const { activeLink = "devices" } = Astro.props;
           <div
             class="px-4 py-3 relative cursor-pointer"
             x-data
-            @click="$el.querySelector('button')?.click(); $root.mobileMenuOpen = false; mobileMenuOpen = false"
+            @click="showAccountBackdrop = true; $el.querySelector('button')?.click(); $root.mobileMenuOpen = false; mobileMenuOpen = false"
           >
             <div class="flex items-center w-full text-sm text-gray-600">
               <img src="/assets/portal-icons/account-circle.svg" alt="" class="w-5 h-5" />
