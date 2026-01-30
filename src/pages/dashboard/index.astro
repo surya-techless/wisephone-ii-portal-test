@@ -356,7 +356,7 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
   }
 </style>
 
-<div class="dashboard-container flex h-screen w-full min-w-[360px] bg-[#f7f6f2] relative" x-data={`dashboard(${JSON.stringify({ userEmail: user?.primaryEmailAddress?.emailAddress || "" })})`} @activate-modal.window="openActivateModal($event.detail?.imei || $event.detail)">
+<div class="dashboard-container flex h-screen w-full min-w-[360px] bg-[#f7f6f2] relative" x-data={`dashboard(${JSON.stringify({ userEmail: user?.primaryEmailAddress?.emailAddress || "", newDevice: actionResult?.data && !actionResult.error && !actionResult.data.isSubscribed && actionResult.data.wisephone?.[0] ? { imei: actionResult.data.wisephone[0].imei.toString().padEnd(15, "0"), phoneNumber: actionResult.data.wisephone[0].phoneNumber || "" } : null })})`} @activate-modal.window="openActivateModal($event.detail?.imei || $event.detail)">
   <progress
     x-show="isLoading"
     x-cloak
@@ -797,7 +797,7 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
   import { loadStripe, type Stripe } from "@stripe/stripe-js";
 
   document.addEventListener("alpine:init", () => {
-    Alpine.data("dashboard", (initialData?: { userEmail?: string }) => ({
+    Alpine.data("dashboard", (initialData?: { userEmail?: string; newDevice?: { imei: string; phoneNumber: string } | null }) => ({
       showForm: false,
       isLoading: false,
       mobileMenuOpen: false,
@@ -1041,6 +1041,18 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
       async init() {
         // Initialize Stripe
         await this.initializeStripe();
+
+        // Check if a new unsubscribed device was just added
+        if (initialData?.newDevice?.imei) {
+          console.log("New unsubscribed device detected, opening activate modal:", initialData.newDevice);
+          // Wait a bit for Alpine to fully initialize
+          await new Promise(resolve => setTimeout(resolve, 300));
+          this.openActivateModal({
+            imei: initialData.newDevice.imei,
+            phoneNumber: initialData.newDevice.phoneNumber
+          });
+          return;
+        }
 
         // Handle activation redirect on component initialization
         const urlParams = new URLSearchParams(window.location.search);
