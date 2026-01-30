@@ -44,7 +44,10 @@ export const stripe = {
         // Required param replaced by Stripe, and we can't have it percent encoded
         return_url: returnUrl.toString(),
         automatic_tax: { enabled: true },
-        allow_promotion_codes: true
+        allow_promotion_codes: true,
+        metadata: {
+          imei: input.deviceIMEI
+        }
       });
 
       return {

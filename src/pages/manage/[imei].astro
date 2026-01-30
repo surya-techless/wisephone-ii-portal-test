@@ -2453,6 +2453,9 @@ try {
                     });
 
                     if (response.ok) {
+                      // Capture original phone number BEFORE updating state (for comparison)
+                      const originalPhoneBeforeUpdate = this.originalDevicePhone.replace(/\D/g, "");
+
                       // Format phone number for display
                       const formattedPhone =
                         cleanedPhoneNumber.length === 10
@@ -2468,42 +2471,54 @@ try {
                       // Close modal
                       this.closeEditModal();
 
-                      // Re-check subscription status with new phone number (reusing same logic as page load)
-                      // The page load checks: 1) bypassTechlessSubscription, 2) validateIsSubscribed
-                      // We use the validateIsUserSubscribed action which calls validateIsSubscribed
-                      console.log("[DEBUG] Re-checking subscription after phone number update", {
-                        imei: this.imei,
-                        phoneNumber: formattedPhoneNumber
-                      });
+                      // Check if phone number changed by comparing cleaned versions
+                      // Use the captured original value (before update) for comparison
+                      const phoneNumberChanged = originalPhoneBeforeUpdate !== cleanedPhoneNumber;
 
-                      try {
-                        // Use the existing action that mirrors the page load subscription check
-                        // This action calls validateIsSubscribed (same as page load logic)
-                        const subscriptionResult = await actions.wisephones.validateIsUserSubscribed.orThrow({
+                      // Only re-check subscription if phone number changed
+                      if (phoneNumberChanged) {
+                        // Re-check subscription status with new phone number (reusing same logic as page load)
+                        // The page load checks: 1) bypassTechlessSubscription, 2) validateIsSubscribed
+                        // We use the validateIsUserSubscribed action which calls validateIsSubscribed
+                        console.log("[DEBUG] Re-checking subscription after phone number update", {
                           imei: this.imei,
-                          phoneNumber: formattedPhoneNumber
+                          phoneNumber: formattedPhoneNumber,
+                          originalPhone: originalPhoneBeforeUpdate,
+                          newPhone: cleanedPhoneNumber
                         });
 
-                        const hasSubscription = subscriptionResult?.isSubscribed === true;
+                        try {
+                          // Use the existing action that mirrors the page load subscription check
+                          // This action calls validateIsSubscribed (same as page load logic)
+                          const subscriptionResult = await actions.wisephones.validateIsUserSubscribed.orThrow({
+                            imei: this.imei,
+                            phoneNumber: formattedPhoneNumber
+                          });
 
-                        console.log("[DEBUG] Subscription check result:", {
-                          isSubscribed: hasSubscription,
-                          subscriptionResult
-                        });
+                          const hasSubscription = subscriptionResult?.isSubscribed === true;
 
-                        if (!hasSubscription) {
-                          // No subscription found, close manage page and redirect to dashboard immediately
-                          // The dashboard will show "Activate Plan" button for this device
-                          window.location.href = "/dashboard";
-                          return;
-                        } else {
-                          // Subscription found, update local state
-                          this.isSubscribed = true;
+                          console.log("[DEBUG] Subscription check result:", {
+                            isSubscribed: hasSubscription,
+                            subscriptionResult
+                          });
+
+                          if (!hasSubscription) {
+                            // No subscription found, close manage page and redirect to dashboard immediately
+                            // The dashboard will show "Activate Plan" button for this device
+                            window.location.href = "/dashboard";
+                            return;
+                          } else {
+                            // Subscription found, update local state
+                            this.isSubscribed = true;
+                            this.showSuccessToast("Device details updated successfully");
+                          }
+                        } catch (subscriptionError) {
+                          console.error("[DEBUG] Error checking subscription:", subscriptionError);
+                          // Continue anyway, subscription check failed but device was updated
                           this.showSuccessToast("Device details updated successfully");
                         }
-                      } catch (subscriptionError) {
-                        console.error("[DEBUG] Error checking subscription:", subscriptionError);
-                        // Continue anyway, subscription check failed but device was updated
+                      } else {
+                        // Phone number didn't change, just show success message and stay on page
                         this.showSuccessToast("Device details updated successfully");
                       }
                     } else {
