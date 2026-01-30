@@ -122,7 +122,9 @@ export const wisephones = {
       imei: z.number(),
       nickname: z
         .string()
-        .max(64)
+        .max(15, {
+          message: "The name of the device is too long. Please limit the name to 15 characters."
+        })
         .optional()
         .refine(
           (val: string | undefined) => {

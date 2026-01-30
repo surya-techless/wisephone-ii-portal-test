@@ -1197,6 +1197,7 @@ try {
                     <input
                       type="text"
                       x-model="editName"
+                      maxlength="15"
                       class="w-full mt-3 pl-6 pb-3 pt-1 text-m text-gray-700 tracking-wide"
                     />
                   </div>
@@ -2415,6 +2416,15 @@ try {
 
                 async saveDeviceDetails() {
                   try {
+                    // Validate device name length (max 15 characters)
+                    const trimmedName = this.editName.trim();
+                    if (trimmedName.length > 15) {
+                      this.showErrorToast(
+                        "The name of the device is too long. Please limit the name to 15 characters."
+                      );
+                      return;
+                    }
+
                     // Clean phone number (remove dashes, keep only digits)
                     const cleanedPhoneNumber = this.editPhoneNumber.replace(/\D/g, "");
 
@@ -2497,8 +2507,18 @@ try {
                         this.showSuccessToast("Device details updated successfully");
                       }
                     } else {
-                      console.error("Failed to update device");
-                      this.showErrorToast("Failed to update device. Please try again.");
+                      // Try to parse error response for validation messages
+                      try {
+                        const errorData = await response.json();
+                        if (errorData?.error?.message) {
+                          this.showErrorToast(errorData.error.message);
+                        } else {
+                          this.showErrorToast("Failed to update device. Please try again.");
+                        }
+                      } catch (parseError) {
+                        console.error("Failed to update device");
+                        this.showErrorToast("Failed to update device. Please try again.");
+                      }
                     }
                   } catch (error) {
                     console.error("Error updating device:", error);
