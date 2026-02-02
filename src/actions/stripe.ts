@@ -128,7 +128,13 @@ export const stripe = {
       console.log("PAY DEBUG: [A2.9] Subscription retrieved - ID:", subscription.id);
       console.log("PAY DEBUG: [A2.10] Subscription status:", subscription.status);
 
+      // Flow: User completes checkout → subscription is created → validateSubscription action runs
+      // → sets IMEI on customer metadata → Later, validateIsSubscribed calls validateSubscription
+      // → searches customers by IMEI → finds customer → checks their subscriptions
+      //
       // Add IMEI to customer metadata. This is how we can identify the customer is subscribed.
+      // The validateIsSubscribed function searches customers by IMEI metadata, then checks
+      // if those customers have active subscriptions.
       console.log("PAY DEBUG: [A2.11] Updating customer metadata with IMEI");
       await stripeInstance.customers.update(session.customer as string, {
         metadata: {
