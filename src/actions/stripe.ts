@@ -2,6 +2,7 @@ import { defineAction } from "astro:actions";
 import { STRIPE_SECRET_KEY } from "astro:env/server";
 import { z } from "astro:content";
 import Stripe from "stripe";
+import { db, Wisephone, sql } from "astro:db";
 
 const stripeInstance = new Stripe(STRIPE_SECRET_KEY || STRIPE_SECRET_KEY, {
   apiVersion: "2025-02-24.acacia",
@@ -27,12 +28,47 @@ export const stripe = {
       console.log("PAY DEBUG: [A1.2] deviceIMEI:", input.deviceIMEI);
       console.log("PAY DEBUG: [A1.2.1] Stripe mode (from secret key):", isStripeTestMode ? "TEST" : "LIVE");
 
+      // Fetch wisephone record to get phone number for redirect URL
+      let phoneNumber: string | null = null;
+      try {
+        const imeiNumber = Number(input.deviceIMEI);
+        if (!isNaN(imeiNumber)) {
+          const wisephone = await db
+            .select()
+            .from(Wisephone)
+            .where(sql`${Wisephone.imei} = ${imeiNumber}`)
+            .limit(1)
+            .get();
+
+          if (wisephone?.phoneNumber) {
+            phoneNumber = wisephone.phoneNumber;
+            console.log("PAY DEBUG: [A1.2.2] Phone number fetched from database:", phoneNumber);
+          } else {
+            console.log("PAY DEBUG: [A1.2.2] No phone number found in database for IMEI:", input.deviceIMEI);
+          }
+        } else {
+          console.log("PAY DEBUG: [A1.2.2] Invalid IMEI format, cannot fetch phone number");
+        }
+      } catch (error) {
+        console.error("PAY DEBUG: [A1.2.3] Error fetching phone number from database:", error);
+        // Continue without phone number - not critical for checkout creation
+      }
+
       // Return directly to manage page after payment completion
       // Note: Stripe embedded checkout will replace {CHECKOUT_SESSION_ID} with actual session ID
       // Server-side validation will check if payment was successful
       const returnUrl = new URL(`/manage/${input.deviceIMEI}`, context.url.origin);
       returnUrl.searchParams.set("session_id", "{CHECKOUT_SESSION_ID}");
       returnUrl.searchParams.set("payment_status", "checking");
+
+      // Add phone number to redirect URL if available (for client-side subscription check)
+      if (phoneNumber) {
+        returnUrl.searchParams.set("phone", phoneNumber);
+        console.log("PAY DEBUG: [A1.3.0] Phone number added to return URL");
+      } else {
+        console.log("PAY DEBUG: [A1.3.0] No phone number available to add to return URL");
+      }
+
       console.log("PAY DEBUG: [A1.3] Return URL set to:", returnUrl.toString());
       console.log("PAY DEBUG: [A1.3.1] NOTE: {CHECKOUT_SESSION_ID} will be replaced by Stripe on redirect");
       console.log("PAY DEBUG: [A1.3.2] NOTE: Payment will be validated server-side on manage page");
