@@ -96,11 +96,11 @@ export const FEATURES: Record<string, Feature> = {
     a16KnoxManageId: KNOX_USER_GROUPS.A16_ADD_ON_GOOGLE_APPS,
     lucideIcon: "layout-grid",
     name: "Google Apps",
-    description: "Get access to Google Messages, Google Maps, Google Photos, and Google Meet (new).",
+    description: "Get access to Google Maps, Google Photos, and Google Meet (new).",
     enableMessage:
-      "I acknowledge turning on this feature allows access to Google Messages, Maps, Photos, and Meet on this device. At this time Google Messages has Gemini AI available to chat with, so please use caution when making this decision.",
+      "I acknowledge turning on this feature allows access to Google Maps, Photos, and Meet on this device.",
     disableMessage:
-      "I acknowledge turning off this feature removes access to Google Messages, Maps, Photos, and Meet on this device immediately."
+      "I acknowledge turning off this feature removes access to Google Maps, Photos, and Meet on this device immediately."
   },
   NO_HOTSPOT: {
     isEnabled: true,
