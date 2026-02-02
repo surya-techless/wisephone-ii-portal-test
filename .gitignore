@@ -40,3 +40,15 @@ localhost*
 TESTING-SUBSCRIPTION-CHECKER.md
 check-subscription.js
 run-subscription-check.sh
+
+# Scripts and data files (temporary/development)
+checker.py
+duplicates_report.py
+generate_tooldrawer_complete.py
+newApps.json
+remove_duplicates.py
+tool-Drawer.csv
+toolDrawer.json
+
+# Test files (development)
+tests/byoc-activation-flow.spec.ts
