@@ -150,15 +150,20 @@ try {
 
   // Check subscription status
   console.log("PAY DEBUG: [S1] Server-side subscription check for IMEI:", imei);
+  console.log("PAY DEBUG: [S1.0] Full URL:", Astro.url.toString());
+  console.log("PAY DEBUG: [S1.0.1] All URL params:", Object.fromEntries(Astro.url.searchParams.entries()));
 
   // Check if this is a Stripe redirect (session_id in URL)
   const sessionIdParam = Astro.url.searchParams.get("session_id");
   const paymentStatusParam = Astro.url.searchParams.get("payment_status");
 
+  console.log("PAY DEBUG: [S1.0.2] Raw session_id param:", sessionIdParam);
+  console.log("PAY DEBUG: [S1.0.3] Is placeholder?", sessionIdParam === "{CHECKOUT_SESSION_ID}");
+  console.log("PAY DEBUG: [S1.0.4] payment_status param:", paymentStatusParam);
+
   if (sessionIdParam && sessionIdParam !== "{CHECKOUT_SESSION_ID}") {
-    console.log("PAY DEBUG: [S1.0] Stripe session_id found in URL - validating payment");
-    console.log("PAY DEBUG: [S1.0.1] session_id:", sessionIdParam);
-    console.log("PAY DEBUG: [S1.0.2] payment_status param:", paymentStatusParam);
+    console.log("PAY DEBUG: [S1.0.5] ✅ Valid session_id found - validating payment");
+    console.log("PAY DEBUG: [S1.0.6] session_id:", sessionIdParam);
 
     try {
       // Validate subscription using session_id (direct validation, no metadata search needed)
@@ -189,7 +194,13 @@ try {
     }
   } else {
     // Normal flow: no Stripe redirect, check subscription normally
-    console.log("PAY DEBUG: [S1.1] No Stripe session_id in URL - running normal subscription check");
+    if (sessionIdParam) {
+      console.log("PAY DEBUG: [S1.1] session_id is placeholder or invalid - running normal subscription check");
+      console.log("PAY DEBUG: [S1.1.0] session_id value:", sessionIdParam);
+      console.log("PAY DEBUG: [S1.1.1] This means Stripe hasn't replaced the placeholder yet or payment was cancelled");
+    } else {
+      console.log("PAY DEBUG: [S1.1] No Stripe session_id in URL - running normal subscription check");
+    }
 
     const bypassTechlessSubscription = await db
       .select()
@@ -199,26 +210,45 @@ try {
 
     isSubscribed = bypassTechlessSubscription.length > 0;
     console.log("PAY DEBUG: [S1.2] Bypass subscription check result:", isSubscribed);
+    console.log("PAY DEBUG: [S1.2.1] wisephone exists:", !!wisephone);
+    console.log("PAY DEBUG: [S1.2.2] wisephone phoneNumber:", wisephone?.phoneNumber);
 
     if (!isSubscribed && wisephone?.phoneNumber) {
       try {
         const imeiForCheck = String(wisephone?.imei || "");
         const phoneForCheck = `${wisephone?.phoneNumber?.replace(/[^0-9+]/g, "") || ""}`;
-        console.log("PAY DEBUG: [S1.3] Calling validateIsSubscribed with:");
+        console.log("PAY DEBUG: [S1.3] ✅ Running validateIsSubscribed");
         console.log("PAY DEBUG: [S1.4]   - IMEI:", imeiForCheck);
         console.log("PAY DEBUG: [S1.5]   - Phone:", phoneForCheck);
+        console.log("PAY DEBUG: [S1.5.1] Calling validateIsSubscribed function...");
 
+        const startTime = Date.now();
         isSubscribed = await validateIsSubscribed({
           imei: imeiForCheck,
           phoneNumber: phoneForCheck
         });
+        const endTime = Date.now();
+        const duration = endTime - startTime;
 
-        console.log("PAY DEBUG: [S1.6] validateIsSubscribed result:", isSubscribed);
+        console.log("PAY DEBUG: [S1.6] ✅ validateIsSubscribed completed");
+        console.log("PAY DEBUG: [S1.6.1] Result:", isSubscribed);
+        console.log("PAY DEBUG: [S1.6.2] Duration:", duration, "ms");
       } catch (subscriptionError) {
-        console.error("PAY DEBUG: [S1.7] ERROR checking subscription status:", subscriptionError);
+        console.error("PAY DEBUG: [S1.7] ❌ ERROR checking subscription status:", subscriptionError);
+        console.error(
+          "PAY DEBUG: [S1.7.1] Error details:",
+          subscriptionError instanceof Error ? subscriptionError.message : subscriptionError
+        );
       }
     } else {
-      console.log("PAY DEBUG: [S1.3] Skipping validateIsSubscribed - bypass found or no phone number");
+      console.log("PAY DEBUG: [S1.3] ⚠️ Skipping validateIsSubscribed");
+      if (isSubscribed) {
+        console.log("PAY DEBUG: [S1.3.1] Reason: Bypass subscription found");
+      }
+      if (!wisephone?.phoneNumber) {
+        console.log("PAY DEBUG: [S1.3.2] Reason: No phone number available");
+        console.log("PAY DEBUG: [S1.3.3] wisephone:", wisephone ? "exists" : "null");
+      }
     }
   }
 
