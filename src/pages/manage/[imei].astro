@@ -2991,10 +2991,24 @@ try {
 
                 async validateStripeSession() {
                   console.log("PAY DEBUG: [M1] validateStripeSession called on device page");
+                  console.log("PAY DEBUG: [M1.0] Current IMEI in component:", this.imei);
+
                   const urlParams = new URLSearchParams(window.location.search);
                   const validatedParam = urlParams.get("validated");
                   let sessionId = urlParams.get("session_id");
                   console.log("PAY DEBUG: [M1.1] validated param:", validatedParam, "session_id from URL:", sessionId);
+
+                  // Ensure IMEI is available - extract from URL if still missing
+                  if (!this.imei) {
+                    const pathMatch = window.location.pathname.match(/\/manage\/([^/?]+)/);
+                    if (pathMatch && pathMatch[1]) {
+                      this.imei = pathMatch[1];
+                      console.log("PAY DEBUG: [M1.1.1] Extracted IMEI from URL in validateStripeSession:", this.imei);
+                    } else {
+                      console.log("PAY DEBUG: [M1.1.1] ERROR: Cannot extract IMEI from URL, cannot validate");
+                      return;
+                    }
+                  }
 
                   // Priority 1: If validated=true is present, trust it and set isSubscribed immediately
                   if (validatedParam === "true") {
@@ -3187,40 +3201,103 @@ try {
                 async init() {
                   console.log("PAY DEBUG: [M0] Device page init() called");
                   console.log("PAY DEBUG: [M0.1] Initial isSubscribed (from server):", this.isSubscribed);
-                  console.log("PAY DEBUG: [M0.2] IMEI:", this.imei);
-                  console.log("PAY DEBUG: [M0.3] Device Phone:", this.devicePhone);
+                  console.log("PAY DEBUG: [M0.2] IMEI (from x-init):", this.imei);
+                  console.log("PAY DEBUG: [M0.3] Device Phone (from x-init):", this.devicePhone);
                   console.log("PAY DEBUG: [M0.4] Current URL:", window.location.href);
 
-                  // FIRST: Check subscription directly by IMEI (this is the most reliable check after redirect)
-                  if (this.imei && this.devicePhone) {
-                    console.log("PAY DEBUG: [M0.5] Running immediate IMEI-based subscription check");
-                    const subscriptionFound = await this.checkSubscriptionByImei();
-                    console.log("PAY DEBUG: [M0.6] IMEI check result - subscriptionFound:", subscriptionFound);
-                    console.log("PAY DEBUG: [M0.7] isSubscribed after IMEI check:", this.isSubscribed);
-                  } else {
-                    console.log("PAY DEBUG: [M0.5] Skipping IMEI check - missing IMEI or phone number");
-                  }
-
-                  // SECOND: Validate Stripe session if session_id is in URL (after checkout redirect)
-                  if (this.imei) {
-                    console.log("PAY DEBUG: [M0.8] Checking for Stripe session validation");
-                    await this.validateStripeSession();
-                    console.log("PAY DEBUG: [M0.9] isSubscribed after validateStripeSession:", this.isSubscribed);
-
-                    // Fallback polling: If validation failed but session_id exists, poll subscription status
-                    const urlParams = new URLSearchParams(window.location.search);
-                    const hasSessionId =
-                      urlParams.get("session_id") || sessionStorage.getItem("stripeCheckoutSessionId");
-
-                    if (!this.isSubscribed && hasSessionId && this.devicePhone) {
-                      console.log(
-                        "PAY DEBUG: [M0.10] Fallback polling: isSubscribed=false but session_id exists, starting polling"
-                      );
-                      this.startFallbackPolling();
+                  // Extract IMEI from URL pathname as fallback if not set by x-init
+                  if (!this.imei) {
+                    const pathMatch = window.location.pathname.match(/\/manage\/([^/?]+)/);
+                    if (pathMatch && pathMatch[1]) {
+                      this.imei = pathMatch[1];
+                      console.log("PAY DEBUG: [M0.5] Extracted IMEI from URL pathname:", this.imei);
+                    } else {
+                      console.log("PAY DEBUG: [M0.5] Could not extract IMEI from URL pathname");
                     }
                   }
 
-                  console.log("PAY DEBUG: [M0.11] Final isSubscribed state after all checks:", this.isSubscribed);
+                  // Extract phone number from URL or use fallback if not set
+                  if (!this.devicePhone || this.devicePhone === "(111) 111-1111") {
+                    // Try to get from URL params (if passed)
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const phoneParam = urlParams.get("phone");
+                    if (phoneParam) {
+                      this.devicePhone = phoneParam;
+                      console.log("PAY DEBUG: [M0.6] Extracted phone from URL params:", this.devicePhone);
+                    } else {
+                      console.log(
+                        "PAY DEBUG: [M0.6] Phone not in URL params, will use fallback or skip phone-based checks"
+                      );
+                    }
+                  }
+
+                  console.log("PAY DEBUG: [M0.7] Final IMEI after extraction:", this.imei);
+                  console.log("PAY DEBUG: [M0.8] Final Device Phone after extraction:", this.devicePhone);
+
+                  // FIRST: Check subscription directly by IMEI (this is the most reliable check after redirect)
+                  if (this.imei && this.devicePhone && this.devicePhone !== "(111) 111-1111") {
+                    console.log("PAY DEBUG: [M0.9] Running immediate IMEI-based subscription check");
+                    const subscriptionFound = await this.checkSubscriptionByImei();
+                    console.log("PAY DEBUG: [M0.10] IMEI check result - subscriptionFound:", subscriptionFound);
+                    console.log("PAY DEBUG: [M0.11] isSubscribed after IMEI check:", this.isSubscribed);
+                  } else {
+                    console.log("PAY DEBUG: [M0.9] Skipping IMEI check - missing IMEI or valid phone number");
+                    if (!this.imei) console.log("PAY DEBUG: [M0.9.1] Reason: IMEI is missing");
+                    if (!this.devicePhone || this.devicePhone === "(111) 111-1111") {
+                      console.log("PAY DEBUG: [M0.9.2] Reason: Phone number is missing or is placeholder");
+                    }
+                  }
+
+                  // SECOND: Validate Stripe session if session_id or validated=true is in URL (after checkout redirect)
+                  // This should run even if IMEI wasn't set initially, as we can extract it from URL
+                  const urlParams = new URLSearchParams(window.location.search);
+                  const hasValidatedParam = urlParams.get("validated") === "true";
+                  const hasSessionId = urlParams.get("session_id") || sessionStorage.getItem("stripeCheckoutSessionId");
+
+                  if (hasValidatedParam || hasSessionId) {
+                    console.log(
+                      "PAY DEBUG: [M0.12] validated=true or session_id found in URL - running validateStripeSession"
+                    );
+                    console.log(
+                      "PAY DEBUG: [M0.12.1] validated param:",
+                      hasValidatedParam,
+                      "session_id:",
+                      hasSessionId ? "present" : "absent"
+                    );
+
+                    // Ensure IMEI is set before validation (should be set by now from URL extraction)
+                    if (!this.imei) {
+                      console.log("PAY DEBUG: [M0.12.2] WARNING: IMEI still not set, cannot validate Stripe session");
+                    } else {
+                      await this.validateStripeSession();
+                      console.log("PAY DEBUG: [M0.13] isSubscribed after validateStripeSession:", this.isSubscribed);
+                    }
+                  } else if (this.imei) {
+                    // Normal case: no Stripe redirect, but IMEI is available - still check for session
+                    console.log(
+                      "PAY DEBUG: [M0.12] No Stripe redirect params, but IMEI available - checking for session"
+                    );
+                    await this.validateStripeSession();
+                    console.log("PAY DEBUG: [M0.13] isSubscribed after validateStripeSession:", this.isSubscribed);
+                  } else {
+                    console.log("PAY DEBUG: [M0.12] Skipping validateStripeSession - no IMEI and no Stripe params");
+                  }
+
+                  // Fallback polling: If validation failed but session_id exists, poll subscription status
+                  if (
+                    !this.isSubscribed &&
+                    hasSessionId &&
+                    this.imei &&
+                    this.devicePhone &&
+                    this.devicePhone !== "(111) 111-1111"
+                  ) {
+                    console.log(
+                      "PAY DEBUG: [M0.14] Fallback polling: isSubscribed=false but session_id exists, starting polling"
+                    );
+                    this.startFallbackPolling();
+                  }
+
+                  console.log("PAY DEBUG: [M0.15] Final isSubscribed state after all checks:", this.isSubscribed);
 
                   // Load cached total apps count on initialization
                   this.loadCachedTotalApps();
