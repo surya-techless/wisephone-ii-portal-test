@@ -615,7 +615,7 @@ try {
                     class="px-2 md:px-6 py-3 text-sm font-medium transition-colors relative flex-1 whitespace-nowrap"
                     :class="currentTab === 'app-management' ? 'bg-[#DBD5CD] text-gray-900' : 'text-gray-600 hover:text-gray-900'"
                   >
-                    App Management
+                    Tool Management
                     <span
                       x-show="currentTab === 'app-management'"
                       class="absolute bottom-0 left-0 right-0 h-[3px] bg-[#DBD5CD] -mb-[2px]"></span>
@@ -952,7 +952,7 @@ try {
                 </div>
               </div>
 
-              <!-- App Management Tab -->
+              <!-- Tool Management Tab -->
               <div
                 x-show="currentTab === 'app-management'"
                 x-cloak
@@ -1898,7 +1898,7 @@ try {
                 },
 
                 // Load available apps from apps.json - both Tool Drawer and Faith Tools
-                // This should be called immediately when App Management tab is clicked
+                // This should be called immediately when Tool Management tab is clicked
                 loadAvailableApps() {
                   if (this.isAvailableAppsLoaded) {
                     return;
@@ -1968,9 +1968,9 @@ try {
                   }
                 },
 
-                // Fetch installed apps from Samsung Knox API when App Management tab is clicked
+                // Fetch installed apps from Samsung Knox API when Tool Management tab is clicked
                 // Flow:
-                // 1. User clicks "App Management" tab -> currentTab watcher triggers
+                // 1. User clicks "Tool Management" tab -> currentTab watcher triggers
                 // 2. loadAvailableApps() is called immediately (fast, no API call)
                 // 3. This function fetches installed apps from Samsung Knox API (async, slow)
                 // 4. Updates installedApps array
@@ -3433,7 +3433,7 @@ try {
                     }
                   });
 
-                  // Watch for currentTab changes - load apps when App Management tab is clicked
+                  // Watch for currentTab changes - load apps when Tool Management tab is clicked
                   this.$watch("currentTab", async (newTab) => {
                     if (newTab === "app-management") {
                       // Open installed apps section by default when entering this tab

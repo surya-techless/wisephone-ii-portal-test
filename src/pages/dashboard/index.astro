@@ -1040,12 +1040,21 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
 
           if (isSubscribed) {
             console.log("PAY DEBUG: [5.8] Subscription detected! Redirecting to device info page...");
+            console.log("PAY DEBUG: [5.8.1] REDIRECT TRIGGER: Polling path - subscription detected via polling");
+            console.log("PAY DEBUG: [5.8.2] REDIRECT REASON: Subscription status check returned true");
+            console.log("PAY DEBUG: [5.8.3] REDIRECT SOURCE: Dashboard polling mechanism");
+            console.log("PAY DEBUG: [5.8.4] REDIRECT DATA - IMEI:", imei);
+            console.log("PAY DEBUG: [5.8.5] REDIRECT DATA - Phone Number:", phoneNumber);
             this.stopSubscriptionPolling();
 
             // Normal redirect to device info page (deeplink auto-trigger only happens in manage/imei page)
             const imeiString = imei.replace(/[^0-9]/g, '').padEnd(15, '0');
-            console.log("PAY DEBUG: [5.9] Redirecting to device info page:", `/manage/${imeiString}`);
-            window.location.href = `/manage/${imeiString}`;
+            const redirectPath = `/manage/${imeiString}`;
+            console.log("PAY DEBUG: [5.9] Redirecting to device info page:", redirectPath);
+            console.log("PAY DEBUG: [5.9.1] REDIRECT TARGET:", redirectPath);
+            console.log("PAY DEBUG: [5.9.2] REDIRECT FULL URL:", window.location.origin + redirectPath);
+            console.log("PAY DEBUG: [5.9.3] REDIRECT EXECUTING NOW...");
+            window.location.href = redirectPath;
             return;
           }
 
@@ -1171,12 +1180,20 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
 
               if (validationResult?.isSubscribed) {
                 console.log("PAY DEBUG: [2.9] Subscription validated successfully, redirecting to device page");
+                console.log("PAY DEBUG: [2.9.0] REDIRECT TRIGGER: Direct validation path - session_id validation succeeded");
+                console.log("PAY DEBUG: [2.9.0.1] REDIRECT REASON: Stripe subscription validation returned isSubscribed=true");
+                console.log("PAY DEBUG: [2.9.0.2] REDIRECT SOURCE: Dashboard init() - All-in-One Plan activation");
+                console.log("PAY DEBUG: [2.9.0.3] REDIRECT DATA - IMEI:", imeiString);
+                console.log("PAY DEBUG: [2.9.0.4] REDIRECT DATA - Session ID:", sessionId);
                 // Subscription is valid, redirect to device info page with session_id and validated flag
                 // Don't clear sessionStorage here - let manage page clear it after validation
                 const redirectUrl = new URL(`/manage/${imeiString}`, window.location.origin);
                 redirectUrl.searchParams.set('session_id', sessionId);
                 redirectUrl.searchParams.set('validated', 'true');
                 console.log("PAY DEBUG: [2.9.1] Redirecting with session_id and validated flag:", redirectUrl.toString());
+                console.log("PAY DEBUG: [2.9.1.1] REDIRECT TARGET:", redirectUrl.toString());
+                console.log("PAY DEBUG: [2.9.1.2] REDIRECT URL PARAMS:", Object.fromEntries(redirectUrl.searchParams.entries()));
+                console.log("PAY DEBUG: [2.9.1.3] REDIRECT EXECUTING NOW...");
                 window.location.href = redirectUrl.toString();
                 return;
               } else {
@@ -1314,7 +1331,15 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
 
             // Normal redirect to device info page (deeplink auto-trigger only happens in manage/imei page)
             console.log("PAY DEBUG: [D1] Subscription confirmed, redirecting to manage page");
-            window.location.href = `/manage/${this.imei}`;
+            console.log("PAY DEBUG: [D1.1] REDIRECT TRIGGER: Device card checkSubscriptionStatus - subscription confirmed");
+            console.log("PAY DEBUG: [D1.2] REDIRECT REASON: validateIsUserSubscribed returned isSubscribed=true");
+            console.log("PAY DEBUG: [D1.3] REDIRECT SOURCE: Dashboard device card subscription check");
+            console.log("PAY DEBUG: [D1.4] REDIRECT DATA - IMEI:", this.imei);
+            const redirectPath = `/manage/${this.imei}`;
+            console.log("PAY DEBUG: [D1.5] REDIRECT TARGET:", redirectPath);
+            console.log("PAY DEBUG: [D1.6] REDIRECT FULL URL:", window.location.origin + redirectPath);
+            console.log("PAY DEBUG: [D1.7] REDIRECT EXECUTING NOW...");
+            window.location.href = redirectPath;
           } else {
             // Refresh to show updated status
             window.location.reload();
