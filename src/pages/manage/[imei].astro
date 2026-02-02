@@ -3328,6 +3328,72 @@ try {
                       await this.assignSubscriptionGroupByDeviceModel();
                       console.log("PAY DEBUG: [M0.9.7] Subscription group assigned");
                     }
+                  } else if (sessionId === "{CHECKOUT_SESSION_ID}" && paymentStatus === "checking") {
+                    // Stripe redirect with placeholder session_id (embedded checkout doesn't replace it)
+                    // Use stored session_id from sessionStorage to validate
+                    console.log("PAY DEBUG: [M0.9] Stripe redirect detected but session_id is placeholder");
+                    console.log("PAY DEBUG: [M0.9.1] Reading real session_id from sessionStorage");
+
+                    const storedSessionId = sessionStorage.getItem("stripeCheckoutSessionId");
+                    const storedImei = sessionStorage.getItem("stripeCheckoutImei");
+
+                    if (storedSessionId && this.imei && storedImei === this.imei) {
+                      console.log("PAY DEBUG: [M0.9.2] Found matching session_id in sessionStorage:", storedSessionId);
+                      console.log("PAY DEBUG: [M0.9.3] Calling validateSubscription action to set customer metadata");
+
+                      try {
+                        // Call validateSubscription action to:
+                        // 1. Validate the subscription
+                        // 2. Set IMEI on customer metadata (so future searches work)
+                        const validationResult = await actions.stripe.validateSubscription.orThrow({
+                          sessionId: storedSessionId,
+                          imei: this.imei
+                        });
+
+                        console.log("PAY DEBUG: [M0.9.4] Validation result:", validationResult);
+                        console.log(
+                          "PAY DEBUG: [M0.9.5] isSubscribed from validation:",
+                          validationResult?.isSubscribed
+                        );
+
+                        if (validationResult?.isSubscribed) {
+                          console.log("PAY DEBUG: [M0.9.6] ✅ Payment successful, subscription is active");
+                          this.isSubscribed = true;
+
+                          // Assign subscription group
+                          await this.assignSubscriptionGroupByDeviceModel();
+                          console.log("PAY DEBUG: [M0.9.7] Subscription group assigned");
+                        } else {
+                          console.log("PAY DEBUG: [M0.9.6] ❌ Payment not completed or subscription not active");
+                        }
+                      } catch (validationError) {
+                        console.error("PAY DEBUG: [M0.9.8] ERROR validating Stripe session:", validationError);
+                        // Continue with normal flow - don't block the page
+                      }
+
+                      // Clean up URL params and sessionStorage
+                      const cleanUrl = new URL(window.location.href);
+                      cleanUrl.searchParams.delete("session_id");
+                      cleanUrl.searchParams.delete("payment_status");
+                      window.history.replaceState({}, "", cleanUrl.toString());
+                      console.log("PAY DEBUG: [M0.9.9] Cleaned up URL params");
+
+                      sessionStorage.removeItem("stripeCheckoutSessionId");
+                      sessionStorage.removeItem("stripeCheckoutImei");
+                      console.log("PAY DEBUG: [M0.9.10] Cleared sessionStorage");
+                    } else {
+                      console.log("PAY DEBUG: [M0.9.2] No matching session_id in sessionStorage");
+                      console.log("PAY DEBUG: [M0.9.2.1] storedSessionId:", storedSessionId ? "exists" : "missing");
+                      console.log("PAY DEBUG: [M0.9.2.2] this.imei:", this.imei);
+                      console.log("PAY DEBUG: [M0.9.2.3] storedImei:", storedImei);
+                      console.log("PAY DEBUG: [M0.9.2.4] IMEI match:", storedImei === this.imei);
+
+                      // Clean up URL params even if sessionStorage doesn't have it
+                      const cleanUrl = new URL(window.location.href);
+                      cleanUrl.searchParams.delete("session_id");
+                      cleanUrl.searchParams.delete("payment_status");
+                      window.history.replaceState({}, "", cleanUrl.toString());
+                    }
                   } else {
                     // Normal flow: no Stripe redirect
                     console.log("PAY DEBUG: [M0.9] Normal navigation - no Stripe redirect");
