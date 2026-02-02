@@ -1203,16 +1203,6 @@ try {
                   </div>
 
                   <div>
-                    <label class="block text-base text-gray-700">IMEI</label>
-                    <input
-                      type="text"
-                      x-model="editImei"
-                      readonly
-                      class="w-full mt-3 pl-6 pb-3 pt-1 text-m text-gray-700 tracking-wide"
-                    />
-                  </div>
-
-                  <div>
                     <label class="block text-base text-gray-700">Phone Number</label>
                     <input
                       type="text"
@@ -1351,7 +1341,6 @@ try {
                 pendingAppToUninstallName: "",
                 showEditModal: false,
                 editName: "",
-                editImei: "",
                 editPhoneNumber: "",
                 showRemoveModal: false,
                 cachedTotalApps: 0,
@@ -2395,7 +2384,6 @@ try {
 
                 openEditModal() {
                   this.editName = this.deviceName;
-                  this.editImei = this.imei;
                   // Format phone number when opening modal
                   const phoneDigits = this.devicePhone.replace(/\D/g, "");
                   if (phoneDigits.length === 10) {
@@ -2410,7 +2398,6 @@ try {
                   this.showEditModal = false;
                   // Reset form fields
                   this.editName = "";
-                  this.editImei = "";
                   this.editPhoneNumber = "";
                 },
 
