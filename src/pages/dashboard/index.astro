@@ -792,7 +792,7 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
 
 <script>
   import Alpine from "alpinejs";
-  import { isValidIMEI, STRIPE_PUBLIC_KEY } from "@/libs/utils";
+  import { isValidIMEI, STRIPE_PUBLIC_KEY, updateUnreachableAlpineState } from "@/libs/utils";
   import { actions } from "astro:actions";
   import { loadStripe, type Stripe } from "@stripe/stripe-js";
 
@@ -1039,31 +1039,12 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
           console.log("PAY DEBUG: [5.7] Poll result - isSubscribed:", isSubscribed);
 
           if (isSubscribed) {
-            console.log("PAY DEBUG: [5.8] Subscription detected! Checking for auto-complete setup...");
+            console.log("PAY DEBUG: [5.8] Subscription detected! Redirecting to device info page...");
             this.stopSubscriptionPolling();
 
-            // Auto-complete setup flow (mobile only)
-            const isMobile = window.innerWidth < 640; // Tailwind sm breakpoint
-            const isPhoneSetUpKey = `isPhoneSetUp_${imei.replace(/[^0-9]/g, '')}`;
-            const isPhoneSetUp = localStorage.getItem(isPhoneSetUpKey) === 'true';
-            console.log("PAY DEBUG: [5.9] isMobile:", isMobile, "isPhoneSetUp:", isPhoneSetUp);
-
-            if (isMobile && !isPhoneSetUp && phoneNumber) {
-              console.log("PAY DEBUG: [5.10] Auto-completing setup on mobile...");
-              // Set isPhoneSetUp = true in localStorage
-              localStorage.setItem(isPhoneSetUpKey, 'true');
-              // Construct deeplink
-              const cleanedPhone = phoneNumber.replace(/\D/g, '');
-              const imeiString = imei.replace(/[^0-9]/g, '').padEnd(15, '0');
-              const deeplink = `http://localhost?imei=${imeiString}&phone=${cleanedPhone}&subscription=done`;
-              console.log("PAY DEBUG: [5.11] Redirecting to deeplink:", deeplink);
-              window.location.href = deeplink;
-              return;
-            }
-
-            // Normal redirect to device info page
+            // Normal redirect to device info page (deeplink auto-trigger only happens in manage/imei page)
             const imeiString = imei.replace(/[^0-9]/g, '').padEnd(15, '0');
-            console.log("PAY DEBUG: [5.12] Redirecting to device info page:", `/manage/${imeiString}`);
+            console.log("PAY DEBUG: [5.9] Redirecting to device info page:", `/manage/${imeiString}`);
             window.location.href = `/manage/${imeiString}`;
             return;
           }
@@ -1331,26 +1312,8 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
           if (result?.isSubscribed === true) {
             this.isSubscribed = true;
 
-            // Auto-complete setup flow (mobile only)
-            const isMobile = window.innerWidth < 640; // Tailwind sm breakpoint
-            // Use Alpine's persist key format: alpine:persist:manageDevice:isPhoneSetUp
-            const isPhoneSetUpKey = 'alpine:persist:manageDevice:isPhoneSetUp';
-            const isPhoneSetUp = localStorage.getItem(isPhoneSetUpKey) === 'true';
-
-            if (isMobile && !isPhoneSetUp && phoneNumber) {
-              console.log("Auto-completing setup on mobile...");
-              // Set isPhoneSetUp = true in localStorage using Alpine's persist key format
-              localStorage.setItem(isPhoneSetUpKey, 'true');
-              // Construct deeplink
-              const cleanedPhone = phoneNumber.replace(/\D/g, '');
-              const imeiString = this.imei.replace(/[^0-9]/g, '').padEnd(15, '0');
-              const deeplink = `http://localhost?imei=${imeiString}&phone=${cleanedPhone}&subscription=done`;
-              console.log("Redirecting to deeplink:", deeplink);
-              window.location.href = deeplink;
-              return;
-            }
-
-            // Normal redirect to device info page
+            // Normal redirect to device info page (deeplink auto-trigger only happens in manage/imei page)
+            console.log("PAY DEBUG: [D1] Subscription confirmed, redirecting to manage page");
             window.location.href = `/manage/${this.imei}`;
           } else {
             // Refresh to show updated status

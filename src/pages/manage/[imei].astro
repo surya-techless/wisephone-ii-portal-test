@@ -2416,16 +2416,13 @@ try {
                 },
 
                 completeSetup() {
-                  if (
-                    confirm(
-                      "Completing the setup will close the Portal and remove 'Setup' from your Wisephone II's home screen. Continue?"
-                    )
-                  ) {
-                    this.isPhoneSetUp = true;
-                    this.$nextTick(() => {
-                      window.location.href = this.completeSetupUrl;
-                    });
-                  }
+                  // Set isPhoneSetUp = true
+                  this.isPhoneSetUp = true;
+
+                  // Trigger deeplink
+                  this.$nextTick(() => {
+                    window.location.href = this.completeSetupUrl;
+                  });
                 },
 
                 formatPhoneNumber(event: Event) {
@@ -3507,6 +3504,42 @@ try {
 
                   // Log all Google-managed apps excluding system apps
                   this.logGoogleManagedApps();
+
+                  // Auto-trigger completeSetup if device is subscribed and not set up (mobile only)
+                  const isMobile = window.innerWidth < 640; // Tailwind sm breakpoint
+                  console.log("PAY DEBUG: [M0.16] Checking deeplink trigger conditions:");
+                  console.log("PAY DEBUG: [M0.16.0] isMobile:", isMobile);
+                  console.log("PAY DEBUG: [M0.16.1] isSubscribed:", this.isSubscribed);
+                  console.log("PAY DEBUG: [M0.16.2] isPhoneSetUp:", this.isPhoneSetUp);
+                  console.log("PAY DEBUG: [M0.16.3] devicePhone:", this.devicePhone);
+                  console.log(
+                    "PAY DEBUG: [M0.16.4] devicePhone is placeholder?",
+                    this.devicePhone === "(111) 111-1111"
+                  );
+
+                  const condition1 = isMobile;
+                  const condition2 = this.isSubscribed;
+                  const condition3 = !this.isPhoneSetUp;
+                  const condition4 = !!this.devicePhone;
+                  const condition5 = this.devicePhone !== "(111) 111-1111";
+
+                  console.log("PAY DEBUG: [M0.16.5] Condition 1 (isMobile):", condition1);
+                  console.log("PAY DEBUG: [M0.16.6] Condition 2 (isSubscribed):", condition2);
+                  console.log("PAY DEBUG: [M0.16.7] Condition 3 (!isPhoneSetUp):", condition3);
+                  console.log("PAY DEBUG: [M0.16.8] Condition 4 (devicePhone exists):", condition4);
+                  console.log("PAY DEBUG: [M0.16.9] Condition 5 (devicePhone not placeholder):", condition5);
+
+                  if (condition1 && condition2 && condition3 && condition4 && condition5) {
+                    console.log("PAY DEBUG: [M0.16.10] ✅ All conditions passed - triggering deeplink");
+                    this.completeSetup();
+                  } else {
+                    console.log("PAY DEBUG: [M0.16.10] ❌ Conditions not met - deeplink not triggered");
+                    if (!condition1) console.log("PAY DEBUG: [M0.16.11] Reason: Not mobile view (desktop/web)");
+                    if (!condition2) console.log("PAY DEBUG: [M0.16.12] Reason: Device is not subscribed");
+                    if (!condition3) console.log("PAY DEBUG: [M0.16.13] Reason: Phone is already set up");
+                    if (!condition4) console.log("PAY DEBUG: [M0.16.14] Reason: Phone number is missing");
+                    if (!condition5) console.log("PAY DEBUG: [M0.16.15] Reason: Phone number is placeholder");
+                  }
                 },
 
                 logGoogleManagedApps() {
