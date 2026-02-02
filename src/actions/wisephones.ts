@@ -417,7 +417,13 @@ export const wisephones = {
       phoneNumber: z.string().min(12).max(12)
     }),
     handler: async (input) => {
+      console.log("PAY DEBUG: [A3] validateIsUserSubscribed action called");
+      console.log("PAY DEBUG: [A3.1] imei:", input.imei);
+      console.log("PAY DEBUG: [A3.2] phoneNumber:", input.phoneNumber);
+
+      console.log("PAY DEBUG: [A3.3] Calling validateIsSubscribed function");
       const isSubscribed = await validateIsSubscribed({ phoneNumber: input.phoneNumber, imei: input.imei });
+      console.log("PAY DEBUG: [A3.4] validateIsSubscribed result:", isSubscribed);
 
       return {
         success: "User is subscribed",

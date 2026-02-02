@@ -813,6 +813,7 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
       isStripeEmbedded: false,
       stripeInstance: undefined as Stripe | undefined,
       sessionClientSecret: undefined as string | undefined,
+      stripeSessionId: undefined as string | undefined,
       customerEmail: initialData?.userEmail || "",
       imei1: "",
       imei2: "",
@@ -851,13 +852,16 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
         this.isImeiValid = true;
       },
       openActivateModal(imei: string | { imei?: string; phoneNumber?: string }) {
+        console.log("PAY DEBUG: [0] openActivateModal called");
+        console.log("PAY DEBUG: [0.1] Parameter:", imei);
         // Handle both direct call and event detail
         const imeiValue = typeof imei === 'string' ? imei : (imei?.imei || '');
         const phoneNumber = typeof imei === 'object' ? (imei?.phoneNumber || null) : null;
-        console.log("Opening activate modal for IMEI:", imeiValue, "Phone:", phoneNumber);
+        console.log("PAY DEBUG: [0.2] Opening activate modal for IMEI:", imeiValue, "Phone:", phoneNumber);
         this.activeDeviceImei = imeiValue;
         this.activeDevicePhoneNumber = phoneNumber;
         this.showActivateModal = true;
+        console.log("PAY DEBUG: [0.3] Activate modal opened, activeDeviceImei set to:", this.activeDeviceImei);
       },
       closeActivateModal() {
         this.showActivateModal = false;
@@ -880,8 +884,12 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
         }
       },
       async handleStripeCheckout() {
+        console.log("PAY DEBUG: [1] handleStripeCheckout called");
+        console.log("PAY DEBUG: [1.1] activeDeviceImei:", this.activeDeviceImei);
+        console.log("PAY DEBUG: [1.2] customerEmail:", this.customerEmail);
+
         if (!this.activeDeviceImei || !this.customerEmail) {
-          console.error("Missing device IMEI or customer email");
+          console.error("PAY DEBUG: [1.3] ERROR - Missing device IMEI or customer email");
           return;
         }
 
@@ -889,46 +897,91 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
           // Create Stripe session if not already created
           if (!this.sessionClientSecret) {
             const imeiString = this.activeDeviceImei.replace(/[^0-9]/g, '').padEnd(15, '0');
+            console.log("PAY DEBUG: [1.4] Creating Stripe checkout session with IMEI:", imeiString);
 
             const data = await actions.stripe.createSubscriptionPage.orThrow({
               customerEmail: this.customerEmail,
               deviceIMEI: imeiString
             });
+            console.log("PAY DEBUG: [1.5] Stripe checkout session created, client_secret received");
+            console.log("PAY DEBUG: [1.5.0] Session status at creation:", data.session.status);
+            console.log("PAY DEBUG: [1.5.0.1] Session payment status:", data.session.payment_status);
+            console.log("PAY DEBUG: [1.5.0.2] Session subscription:", data.session.subscription);
             this.sessionClientSecret = data.session.client_secret as string;
+            this.stripeSessionId = data.session.id;
+            console.log("PAY DEBUG: [1.5.1] Stored session ID:", this.stripeSessionId);
+            console.log("PAY DEBUG: [1.5.2] NOTE: Session created but subscription NOT activated yet - user must complete checkout");
+          } else {
+            console.log("PAY DEBUG: [1.4] Using existing session client secret");
           }
 
           // Initialize embedded checkout if not already done
           if (!this.isStripeEmbedded && this.stripeInstance) {
+            console.log("PAY DEBUG: [1.6] Initializing embedded Stripe checkout");
+
+            // Store session ID in sessionStorage before mounting checkout
+            // This way we can retrieve it after Stripe redirects (since return_url doesn't replace {CHECKOUT_SESSION_ID})
+            if (this.stripeSessionId) {
+              const imeiString = this.activeDeviceImei?.replace(/[^0-9]/g, '').padEnd(15, '0') || '';
+              sessionStorage.setItem('stripeCheckoutSessionId', this.stripeSessionId);
+              sessionStorage.setItem('stripeCheckoutImei', imeiString);
+              console.log("PAY DEBUG: [1.6.0] Stored session ID in sessionStorage:", this.stripeSessionId);
+              console.log("PAY DEBUG: [1.6.0.1] Stored IMEI in sessionStorage:", imeiString);
+            }
+
             const checkout = await this.stripeInstance.initEmbeddedCheckout({
               clientSecret: this.sessionClientSecret
             });
             checkout?.mount("#stripe-subscription-element");
+
+            // Note: Stripe embedded checkout doesn't have an 'on' method
+            // Instead, it will redirect to the return_url when complete
+            // The return_url has {CHECKOUT_SESSION_ID} placeholder which Stripe should replace
+            // But if it doesn't, we'll retrieve the session ID from sessionStorage
+
             this.isStripeEmbedded = true;
+            console.log("PAY DEBUG: [1.7] Embedded checkout mounted successfully");
+            console.log("PAY DEBUG: [1.7.1] NOTE: When checkout completes, Stripe will redirect to return_url");
+            console.log("PAY DEBUG: [1.7.2] Session ID stored in sessionStorage as fallback if return_url doesn't have it");
+          } else {
+            console.log("PAY DEBUG: [1.6] Embedded checkout already initialized");
           }
 
           // Show the dialog
+          console.log("PAY DEBUG: [1.8] Opening Stripe checkout dialog");
           (this.$refs.stripeDialog as HTMLDialogElement)?.showModal();
+          console.log("PAY DEBUG: [1.9] Stripe checkout dialog opened");
         } catch (error) {
-          console.error("Error opening Stripe checkout:", error);
+          console.error("PAY DEBUG: [1.10] ERROR opening Stripe checkout:", error);
           alert("Failed to open checkout. Please try again.");
         }
       },
       async checkSubscriptionStatus(imei: string, phoneNumber?: string | null): Promise<boolean> {
+        console.log("PAY DEBUG: [4] checkSubscriptionStatus called");
+        console.log("PAY DEBUG: [4.1] IMEI:", imei);
+        console.log("PAY DEBUG: [4.2] Phone number parameter:", phoneNumber);
+
         try {
           let devicePhoneNumber = phoneNumber || this.activeDevicePhoneNumber;
+          console.log("PAY DEBUG: [4.3] Initial devicePhoneNumber:", devicePhoneNumber);
 
           // If no phone number provided, try to find it from device cards
           if (!devicePhoneNumber) {
+            console.log("PAY DEBUG: [4.4] No phone number found, searching device cards");
             const deviceCards = document.querySelectorAll('[x-data*="deviceCard"]');
+            console.log("PAY DEBUG: [4.5] Found device cards:", deviceCards.length);
+
             for (const card of Array.from(deviceCards)) {
               const cardData = (window as any).Alpine?.$data?.(card);
               if (cardData && cardData.imei === imei) {
+                console.log("PAY DEBUG: [4.6] Found matching device card for IMEI:", imei);
                 const phoneElement = card.querySelector('p.text-gray-500');
                 if (phoneElement) {
                   const phoneText = phoneElement.textContent || '';
                   const phoneMatch = phoneText.match(/(\d{3})[-\s]?(\d{3})[-\s]?(\d{4})/);
                   if (phoneMatch) {
                     devicePhoneNumber = `${phoneMatch[1]}-${phoneMatch[2]}-${phoneMatch[3]}`;
+                    console.log("PAY DEBUG: [4.7] Extracted phone number from DOM:", devicePhoneNumber);
                     break;
                   }
                 }
@@ -937,24 +990,38 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
           }
 
           if (!devicePhoneNumber) {
-            console.error("Could not find phone number for device");
+            console.error("PAY DEBUG: [4.8] ERROR - Could not find phone number for device");
             return false;
           }
 
+          const normalizedImei = imei.replace(/[^0-9]/g, '');
+          console.log("PAY DEBUG: [4.9] Calling validateIsUserSubscribed with:");
+          console.log("PAY DEBUG: [4.10]   - IMEI (normalized):", normalizedImei);
+          console.log("PAY DEBUG: [4.11]   - Phone number:", devicePhoneNumber);
+
           // Call the subscription validation action
           const result = await actions.wisephones.validateIsUserSubscribed.orThrow({
-            imei: imei.replace(/[^0-9]/g, ''),
+            imei: normalizedImei,
             phoneNumber: devicePhoneNumber
           });
 
+          console.log("PAY DEBUG: [4.12] validateIsUserSubscribed result:", result);
+          console.log("PAY DEBUG: [4.13] isSubscribed:", result?.isSubscribed);
+
           return result?.isSubscribed === true;
         } catch (error) {
-          console.error("Error checking subscription status:", error);
+          console.error("PAY DEBUG: [4.14] ERROR checking subscription status:", error);
           return false;
         }
       },
       async startSubscriptionPolling(imei: string, phoneNumber?: string | null) {
+        console.log("PAY DEBUG: [5] startSubscriptionPolling called");
+        console.log("PAY DEBUG: [5.1] IMEI:", imei);
+        console.log("PAY DEBUG: [5.2] Phone number:", phoneNumber);
+        console.log("PAY DEBUG: [5.3] Already polling?", this.pollingSubscription);
+
         if (this.pollingSubscription) {
+          console.log("PAY DEBUG: [5.4] Already polling, returning");
           return; // Already polling
         }
 
@@ -962,56 +1029,62 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
         this.isLoading = true; // Show loading bar
         const maxAttempts = 20; // Poll for up to 60 seconds (20 * 3s)
         let attempts = 0;
+        console.log("PAY DEBUG: [5.5] Starting polling with maxAttempts:", maxAttempts);
 
         const poll = async () => {
           attempts++;
-          console.log(`Polling subscription status (attempt ${attempts}/${maxAttempts})...`);
+          console.log(`PAY DEBUG: [5.6] Polling subscription status (attempt ${attempts}/${maxAttempts})...`);
 
           const isSubscribed = await this.checkSubscriptionStatus(imei, phoneNumber);
+          console.log("PAY DEBUG: [5.7] Poll result - isSubscribed:", isSubscribed);
 
           if (isSubscribed) {
-            console.log("Subscription detected! Checking for auto-complete setup...");
+            console.log("PAY DEBUG: [5.8] Subscription detected! Checking for auto-complete setup...");
             this.stopSubscriptionPolling();
-            // Keep loading bar visible during redirect
 
             // Auto-complete setup flow (mobile only)
             const isMobile = window.innerWidth < 640; // Tailwind sm breakpoint
             const isPhoneSetUpKey = `isPhoneSetUp_${imei.replace(/[^0-9]/g, '')}`;
             const isPhoneSetUp = localStorage.getItem(isPhoneSetUpKey) === 'true';
+            console.log("PAY DEBUG: [5.9] isMobile:", isMobile, "isPhoneSetUp:", isPhoneSetUp);
 
             if (isMobile && !isPhoneSetUp && phoneNumber) {
-              console.log("Auto-completing setup on mobile...");
+              console.log("PAY DEBUG: [5.10] Auto-completing setup on mobile...");
               // Set isPhoneSetUp = true in localStorage
               localStorage.setItem(isPhoneSetUpKey, 'true');
               // Construct deeplink
               const cleanedPhone = phoneNumber.replace(/\D/g, '');
               const imeiString = imei.replace(/[^0-9]/g, '').padEnd(15, '0');
               const deeplink = `http://localhost?imei=${imeiString}&phone=${cleanedPhone}&subscription=done`;
-              console.log("Redirecting to deeplink:", deeplink);
+              console.log("PAY DEBUG: [5.11] Redirecting to deeplink:", deeplink);
               window.location.href = deeplink;
               return;
             }
 
             // Normal redirect to device info page
             const imeiString = imei.replace(/[^0-9]/g, '').padEnd(15, '0');
+            console.log("PAY DEBUG: [5.12] Redirecting to device info page:", `/manage/${imeiString}`);
             window.location.href = `/manage/${imeiString}`;
             return;
           }
 
           if (attempts >= maxAttempts) {
-            console.log("Polling timeout reached. Device will show 'Activate Plan' button.");
+            console.log("PAY DEBUG: [5.13] Polling timeout reached. Device will show 'Activate Plan' button.");
             this.stopSubscriptionPolling();
             // Keep loading bar visible during reload
             // Refresh page to show updated status
+            console.log("PAY DEBUG: [5.14] Reloading page due to timeout");
             window.location.reload();
             return;
           }
 
           // Continue polling
+          console.log("PAY DEBUG: [5.15] Scheduling next poll in 3 seconds");
           this.pollingInterval = setTimeout(poll, 3000);
         };
 
         // Start polling immediately (no delay for first check)
+        console.log("PAY DEBUG: [5.16] Starting first poll immediately");
         poll();
       },
       stopSubscriptionPolling() {
@@ -1055,59 +1128,119 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
         }
 
         // Handle activation redirect on component initialization
+        console.log("PAY DEBUG: [2] Dashboard init() - checking for activation redirect");
         const urlParams = new URLSearchParams(window.location.search);
-        const activated = urlParams.get('activated');
-        const imei = urlParams.get('imei');
-        const sessionId = urlParams.get('session_id');
+        let activated = urlParams.get('activated');
+        let imei = urlParams.get('imei');
+        let sessionId = urlParams.get('session_id');
+
+        // If session_id is missing or is the placeholder, try to get it from sessionStorage
+        if ((!sessionId || sessionId === '{CHECKOUT_SESSION_ID}') && activated === 'true') {
+          console.log("PAY DEBUG: [2.0.1] session_id missing or is placeholder, checking sessionStorage");
+          const storedSessionId = sessionStorage.getItem('stripeCheckoutSessionId');
+          const storedImei = sessionStorage.getItem('stripeCheckoutImei');
+
+          if (storedSessionId && storedImei) {
+            console.log("PAY DEBUG: [2.0.2] Found session ID in sessionStorage:", storedSessionId);
+            console.log("PAY DEBUG: [2.0.3] Found IMEI in sessionStorage:", storedImei);
+
+            // Use stored values
+            sessionId = storedSessionId;
+            if (!imei) {
+              imei = storedImei;
+            }
+
+            // Update URL with actual session_id
+            const url = new URL(window.location.href);
+            url.searchParams.set('session_id', sessionId);
+            if (!url.searchParams.has('imei')) {
+              url.searchParams.set('imei', storedImei);
+            }
+            window.history.replaceState({}, '', url.toString());
+            console.log("PAY DEBUG: [2.0.4] Updated URL with session_id from sessionStorage");
+
+            // Clean up sessionStorage
+            sessionStorage.removeItem('stripeCheckoutSessionId');
+            sessionStorage.removeItem('stripeCheckoutImei');
+          } else {
+            console.log("PAY DEBUG: [2.0.5] No session ID found in sessionStorage either");
+          }
+        }
+
+        console.log("PAY DEBUG: [2.1] URL params - activated:", activated, "imei:", imei, "session_id:", sessionId);
 
         if (activated === 'true' && imei) {
+          console.log("PAY DEBUG: [2.2] Activation detected, showing loading bar");
           // Show loading bar immediately
           this.isLoading = true;
 
           // If we have a session_id, validate the Stripe subscription first
           if (sessionId) {
+            console.log("PAY DEBUG: [2.3] session_id found, validating subscription");
             try {
               const imeiString = imei.replace(/[^0-9]/g, '').padEnd(15, '0');
+              console.log("PAY DEBUG: [2.4] Calling validateSubscription with:");
+              console.log("PAY DEBUG: [2.5]   - sessionId:", sessionId);
+              console.log("PAY DEBUG: [2.6]   - imei (normalized):", imeiString);
+
               const validationResult = await actions.stripe.validateSubscription.orThrow({
                 sessionId: sessionId,
                 imei: imeiString
               });
 
+              console.log("PAY DEBUG: [2.7] validateSubscription result:", validationResult);
+              console.log("PAY DEBUG: [2.8] isSubscribed:", validationResult?.isSubscribed);
+
               if (validationResult?.isSubscribed) {
+                console.log("PAY DEBUG: [2.9] Subscription validated successfully, redirecting to device page");
                 // Subscription is valid, redirect to device info page
                 window.location.href = `/manage/${imeiString}`;
                 return;
+              } else {
+                console.log("PAY DEBUG: [2.10] Subscription validation returned false, will start polling");
               }
             } catch (error) {
-              console.error("Error validating Stripe session:", error);
+              console.error("PAY DEBUG: [2.11] ERROR validating Stripe session:", error);
               // Continue with polling if validation fails
             }
+          } else {
+            console.log("PAY DEBUG: [2.3] No session_id in URL, skipping validation, will start polling");
           }
 
           // Clean up URL parameters
+          console.log("PAY DEBUG: [3] Cleaning up URL parameters");
           const cleanUrl = new URL(window.location.href);
           cleanUrl.searchParams.delete('activated');
           cleanUrl.searchParams.delete('imei');
           cleanUrl.searchParams.delete('session_id');
           window.history.replaceState({}, '', cleanUrl.toString());
+          console.log("PAY DEBUG: [3.1] URL cleaned, new URL:", cleanUrl.toString());
 
           this.pollingImei = imei;
+          console.log("PAY DEBUG: [3.2] Set pollingImei to:", imei);
 
           // Try to get phone number from sessionStorage or device data
           const storedImei = sessionStorage.getItem('activatingDeviceImei');
           let phoneNumber = null;
+          console.log("PAY DEBUG: [3.3] Stored IMEI from sessionStorage:", storedImei);
 
           // Wait a bit for Alpine to initialize all device cards
+          console.log("PAY DEBUG: [3.4] Waiting 100ms for Alpine to initialize");
           await new Promise(resolve => setTimeout(resolve, 100));
 
           // Try to find phone number from device cards
+          console.log("PAY DEBUG: [3.5] Searching for phone number in device cards");
           const deviceCards = document.querySelectorAll('[x-data*="deviceCard"]');
+          console.log("PAY DEBUG: [3.6] Found device cards:", deviceCards.length);
+
           for (const card of Array.from(deviceCards)) {
             const cardData = (window as any).Alpine?.$data?.(card);
             if (cardData && cardData.imei === imei) {
+              console.log("PAY DEBUG: [3.7] Found matching device card");
               // Use phoneNumber from card data if available
               if (cardData.phoneNumber) {
                 phoneNumber = cardData.phoneNumber;
+                console.log("PAY DEBUG: [3.8] Found phone number from card data:", phoneNumber);
                 break;
               }
               // Fallback: try to extract from DOM
@@ -1117,6 +1250,7 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
                 const phoneMatch = phoneText.match(/(\d{3})[-\s]?(\d{3})[-\s]?(\d{4})/);
                 if (phoneMatch) {
                   phoneNumber = `${phoneMatch[1]}-${phoneMatch[2]}-${phoneMatch[3]}`;
+                  console.log("PAY DEBUG: [3.9] Extracted phone number from DOM:", phoneNumber);
                   break;
                 }
               }
@@ -1125,11 +1259,13 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
 
           // Clean up sessionStorage
           if (storedImei) {
+            console.log("PAY DEBUG: [3.10] Cleaning up sessionStorage");
             sessionStorage.removeItem('activatingDeviceImei');
             sessionStorage.removeItem('activationType');
           }
 
           // Start polling - loading bar will stay visible until redirect/reload
+          console.log("PAY DEBUG: [3.11] Starting subscription polling with IMEI:", imei, "Phone:", phoneNumber);
           await this.startSubscriptionPolling(imei, phoneNumber);
         }
       }
