@@ -150,34 +150,54 @@ try {
 
   // Check subscription status
   console.log("PAY DEBUG: [S1] Server-side subscription check for IMEI:", imei);
-  const bypassTechlessSubscription = await db
-    .select()
-    .from(BypassTechlessSubscription)
-    .where(eq(BypassTechlessSubscription.imei, Number(imei)))
-    .limit(1);
 
-  isSubscribed = bypassTechlessSubscription.length > 0;
-  console.log("PAY DEBUG: [S1.1] Bypass subscription check result:", isSubscribed);
+  // Check if subscription was already validated (from dashboard redirect after Stripe checkout)
+  const validatedParam = Astro.url.searchParams.get("validated");
+  const sessionIdParam = Astro.url.searchParams.get("session_id");
 
-  if (!isSubscribed && wisephone?.phoneNumber) {
-    try {
-      const imeiForCheck = String(wisephone?.imei || "");
-      const phoneForCheck = `${wisephone?.phoneNumber?.replace(/[^0-9+]/g, "") || ""}`;
-      console.log("PAY DEBUG: [S1.2] Calling validateIsSubscribed with:");
-      console.log("PAY DEBUG: [S1.3]   - IMEI:", imeiForCheck);
-      console.log("PAY DEBUG: [S1.4]   - Phone:", phoneForCheck);
-
-      isSubscribed = await validateIsSubscribed({
-        imei: imeiForCheck,
-        phoneNumber: phoneForCheck
-      });
-
-      console.log("PAY DEBUG: [S1.5] validateIsSubscribed result:", isSubscribed);
-    } catch (subscriptionError) {
-      console.error("PAY DEBUG: [S1.6] ERROR checking subscription status:", subscriptionError);
-    }
+  if (validatedParam === "true" || sessionIdParam) {
+    console.log(
+      "PAY DEBUG: [S1.0] Subscription validation flag or session_id found in URL - skipping server-side check"
+    );
+    console.log(
+      "PAY DEBUG: [S1.0.1] validated param:",
+      validatedParam,
+      "session_id param:",
+      sessionIdParam ? "present" : "absent"
+    );
+    console.log("PAY DEBUG: [S1.0.2] Will rely on client-side validation instead");
+    // Set to false initially - client-side validation will update it
+    isSubscribed = false;
   } else {
-    console.log("PAY DEBUG: [S1.2] Skipping validateIsSubscribed - bypass found or no phone number");
+    const bypassTechlessSubscription = await db
+      .select()
+      .from(BypassTechlessSubscription)
+      .where(eq(BypassTechlessSubscription.imei, Number(imei)))
+      .limit(1);
+
+    isSubscribed = bypassTechlessSubscription.length > 0;
+    console.log("PAY DEBUG: [S1.1] Bypass subscription check result:", isSubscribed);
+
+    if (!isSubscribed && wisephone?.phoneNumber) {
+      try {
+        const imeiForCheck = String(wisephone?.imei || "");
+        const phoneForCheck = `${wisephone?.phoneNumber?.replace(/[^0-9+]/g, "") || ""}`;
+        console.log("PAY DEBUG: [S1.2] Calling validateIsSubscribed with:");
+        console.log("PAY DEBUG: [S1.3]   - IMEI:", imeiForCheck);
+        console.log("PAY DEBUG: [S1.4]   - Phone:", phoneForCheck);
+
+        isSubscribed = await validateIsSubscribed({
+          imei: imeiForCheck,
+          phoneNumber: phoneForCheck
+        });
+
+        console.log("PAY DEBUG: [S1.5] validateIsSubscribed result:", isSubscribed);
+      } catch (subscriptionError) {
+        console.error("PAY DEBUG: [S1.6] ERROR checking subscription status:", subscriptionError);
+      }
+    } else {
+      console.log("PAY DEBUG: [S1.2] Skipping validateIsSubscribed - bypass found or no phone number");
+    }
   }
 
   console.log("PAY DEBUG: [S1.7] Final server-side isSubscribed:", isSubscribed);
@@ -2918,64 +2938,190 @@ try {
 
                 async validateStripeSession() {
                   console.log("PAY DEBUG: [M1] validateStripeSession called on device page");
-                  let sessionId = new URLSearchParams(window.location.search).get("session_id");
-                  console.log("PAY DEBUG: [M1.1] session_id from URL:", sessionId);
+                  const urlParams = new URLSearchParams(window.location.search);
+                  const validatedParam = urlParams.get("validated");
+                  let sessionId = urlParams.get("session_id");
+                  console.log("PAY DEBUG: [M1.1] validated param:", validatedParam, "session_id from URL:", sessionId);
 
+                  // Priority 1: If validated=true is present, trust it and set isSubscribed immediately
+                  if (validatedParam === "true") {
+                    console.log(
+                      "PAY DEBUG: [M1.2] validated=true found in URL - subscription already validated, setting isSubscribed to true"
+                    );
+                    this.isSubscribed = true;
+
+                    // Still need to get session_id for group assignment if not already present
+                    if (!sessionId || sessionId === "{CHECKOUT_SESSION_ID}") {
+                      console.log("PAY DEBUG: [M1.2.1] session_id missing, checking sessionStorage");
+                      const storedSessionId = sessionStorage.getItem("stripeCheckoutSessionId");
+                      const storedImei = sessionStorage.getItem("stripeCheckoutImei");
+
+                      if (storedSessionId && storedImei === this.imei) {
+                        console.log("PAY DEBUG: [M1.2.2] Found session ID in sessionStorage:", storedSessionId);
+                        sessionId = storedSessionId;
+                      }
+                    }
+
+                    // Assign subscription group
+                    await this.assignSubscriptionGroupByDeviceModel();
+                    console.log("PAY DEBUG: [M1.2.3] Subscription group assigned");
+
+                    // Clean up URL params and sessionStorage
+                    const cleanUrl = new URL(window.location.href);
+                    cleanUrl.searchParams.delete("validated");
+                    cleanUrl.searchParams.delete("session_id");
+                    window.history.replaceState({}, "", cleanUrl.toString());
+                    console.log("PAY DEBUG: [M1.2.4] Cleaned up URL params");
+
+                    // Clear sessionStorage after successful validation
+                    if (sessionId) {
+                      sessionStorage.removeItem("stripeCheckoutSessionId");
+                      sessionStorage.removeItem("stripeCheckoutImei");
+                      console.log("PAY DEBUG: [M1.2.5] Cleared sessionStorage after validation");
+                    }
+
+                    return;
+                  }
+
+                  // Priority 2: Check for session_id in URL
                   // If session_id is missing or is the placeholder, try to get it from sessionStorage
                   if (!sessionId || sessionId === "{CHECKOUT_SESSION_ID}") {
-                    console.log("PAY DEBUG: [M1.1.1] session_id missing or is placeholder, checking sessionStorage");
+                    console.log("PAY DEBUG: [M1.3] session_id missing or is placeholder, checking sessionStorage");
                     const storedSessionId = sessionStorage.getItem("stripeCheckoutSessionId");
                     const storedImei = sessionStorage.getItem("stripeCheckoutImei");
 
                     if (storedSessionId && storedImei === this.imei) {
-                      console.log("PAY DEBUG: [M1.1.2] Found session ID in sessionStorage:", storedSessionId);
+                      console.log("PAY DEBUG: [M1.3.1] Found session ID in sessionStorage:", storedSessionId);
                       sessionId = storedSessionId;
 
                       // Update URL with actual session_id
                       const url = new URL(window.location.href);
                       url.searchParams.set("session_id", sessionId);
                       window.history.replaceState({}, "", url.toString());
-
-                      // Clean up sessionStorage
-                      sessionStorage.removeItem("stripeCheckoutSessionId");
-                      sessionStorage.removeItem("stripeCheckoutImei");
                     } else {
-                      console.log("PAY DEBUG: [M1.1.3] No matching session ID in sessionStorage");
+                      console.log("PAY DEBUG: [M1.3.2] No matching session ID in sessionStorage");
                     }
                   }
 
                   if (!sessionId || sessionId === "{CHECKOUT_SESSION_ID}") {
-                    console.log("PAY DEBUG: [M1.2] No valid session_id found, skipping validation");
+                    console.log("PAY DEBUG: [M1.4] No valid session_id found, skipping validation");
                     return;
                   }
 
-                  // Remove the session_id url param
+                  // Remove the session_id url param before validation
                   const url = new URL(window.location.href);
                   url.searchParams.delete("session_id");
                   window.history.replaceState({}, "", url.toString());
-                  console.log("PAY DEBUG: [M1.3] Removed session_id from URL");
+                  console.log("PAY DEBUG: [M1.5] Removed session_id from URL");
 
                   try {
-                    console.log("PAY DEBUG: [M1.4] Validating Stripe subscription with session_id:", sessionId);
+                    console.log("PAY DEBUG: [M1.6] Validating Stripe subscription with session_id:", sessionId);
                     const session = await actions.stripe.validateSubscription.orThrow({
                       sessionId,
                       imei: this.imei
                     });
 
-                    console.log("PAY DEBUG: [M1.5] Validation result:", session);
-                    console.log("PAY DEBUG: [M1.6] isSubscribed:", session?.isSubscribed);
+                    console.log("PAY DEBUG: [M1.7] Validation result:", session);
+                    console.log("PAY DEBUG: [M1.8] isSubscribed:", session?.isSubscribed);
 
                     if (session?.isSubscribed) {
-                      console.log("PAY DEBUG: [M1.7] Subscription validated! Updating isSubscribed to true");
+                      console.log("PAY DEBUG: [M1.9] Subscription validated! Updating isSubscribed to true");
                       this.isSubscribed = true;
                       // Assign appropriate subscription group based on device model
                       await this.assignSubscriptionGroupByDeviceModel();
-                      console.log("PAY DEBUG: [M1.8] Subscription group assigned");
+                      console.log("PAY DEBUG: [M1.10] Subscription group assigned");
+
+                      // Clear sessionStorage only after successful validation
+                      sessionStorage.removeItem("stripeCheckoutSessionId");
+                      sessionStorage.removeItem("stripeCheckoutImei");
+                      console.log("PAY DEBUG: [M1.11] Cleared sessionStorage after successful validation");
                     } else {
-                      console.log("PAY DEBUG: [M1.9] Subscription validation returned false");
+                      console.log("PAY DEBUG: [M1.12] Subscription validation returned false");
                     }
                   } catch (error) {
-                    console.error("PAY DEBUG: [M1.10] ERROR validating Stripe session:", error);
+                    console.error("PAY DEBUG: [M1.13] ERROR validating Stripe session:", error);
+                  }
+                },
+
+                fallbackPollingInterval: null as number | null,
+
+                startFallbackPolling() {
+                  console.log("PAY DEBUG: [M2] Starting fallback polling for subscription status");
+
+                  // Clear any existing polling
+                  this.stopFallbackPolling();
+
+                  const maxAttempts = 5; // Poll for up to 10 seconds (5 * 2s)
+                  let attempts = 0;
+
+                  const poll = async () => {
+                    attempts++;
+                    console.log(`PAY DEBUG: [M2.1] Fallback polling attempt ${attempts}/${maxAttempts}`);
+
+                    if (!this.imei || !this.devicePhone) {
+                      console.log("PAY DEBUG: [M2.2] Missing IMEI or phone number, stopping polling");
+                      this.stopFallbackPolling();
+                      return;
+                    }
+
+                    try {
+                      // Format phone number for API (must be exactly 12 characters: 123-456-7890)
+                      const cleanedPhone = this.devicePhone.replace(/[^0-9]/g, "");
+                      const formattedPhoneNumber =
+                        cleanedPhone.length === 10
+                          ? `${cleanedPhone.slice(0, 3)}-${cleanedPhone.slice(3, 6)}-${cleanedPhone.slice(6)}`
+                          : cleanedPhone;
+
+                      // Use the same action that checks subscription status
+                      const subscriptionResult = await actions.wisephones.validateIsUserSubscribed.orThrow({
+                        imei: this.imei,
+                        phoneNumber: formattedPhoneNumber
+                      });
+
+                      const hasSubscription = subscriptionResult?.isSubscribed === true;
+                      console.log("PAY DEBUG: [M2.3] Poll result - isSubscribed:", hasSubscription);
+
+                      if (hasSubscription) {
+                        console.log("PAY DEBUG: [M2.4] Subscription detected via polling! Updating status");
+                        this.isSubscribed = true;
+                        this.stopFallbackPolling();
+
+                        // Assign subscription group
+                        this.assignSubscriptionGroupByDeviceModel();
+                        console.log("PAY DEBUG: [M2.5] Subscription group assigned");
+
+                        // Clear sessionStorage
+                        sessionStorage.removeItem("stripeCheckoutSessionId");
+                        sessionStorage.removeItem("stripeCheckoutImei");
+                        console.log("PAY DEBUG: [M2.6] Cleared sessionStorage");
+                        return;
+                      }
+
+                      if (attempts >= maxAttempts) {
+                        console.log("PAY DEBUG: [M2.7] Fallback polling timeout reached");
+                        this.stopFallbackPolling();
+                        // Don't reload - just show the current state
+                        console.log("PAY DEBUG: [M2.8] Subscription not detected after polling, keeping current state");
+                        return;
+                      }
+
+                      // Continue polling
+                      this.fallbackPollingInterval = window.setTimeout(poll, 2000);
+                    } catch (error) {
+                      console.error("PAY DEBUG: [M2.9] ERROR during fallback polling:", error);
+                      this.stopFallbackPolling();
+                    }
+                  };
+
+                  // Start polling after 2 seconds
+                  this.fallbackPollingInterval = window.setTimeout(poll, 2000);
+                },
+
+                stopFallbackPolling() {
+                  if (this.fallbackPollingInterval !== null) {
+                    clearTimeout(this.fallbackPollingInterval);
+                    this.fallbackPollingInterval = null;
+                    console.log("PAY DEBUG: [M2.10] Stopped fallback polling");
                   }
                 },
 
@@ -2988,6 +3134,18 @@ try {
                   if (this.imei) {
                     console.log("PAY DEBUG: [M0.3] IMEI is set, checking for Stripe session validation");
                     await this.validateStripeSession();
+
+                    // Fallback polling: If validation failed but session_id exists, poll subscription status
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const hasSessionId =
+                      urlParams.get("session_id") || sessionStorage.getItem("stripeCheckoutSessionId");
+
+                    if (!this.isSubscribed && hasSessionId && this.devicePhone) {
+                      console.log(
+                        "PAY DEBUG: [M0.4] Fallback polling: isSubscribed=false but session_id exists, starting polling"
+                      );
+                      this.startFallbackPolling();
+                    }
                   }
 
                   // Load cached total apps count on initialization

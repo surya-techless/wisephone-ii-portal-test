@@ -1158,10 +1158,7 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
             }
             window.history.replaceState({}, '', url.toString());
             console.log("PAY DEBUG: [2.0.4] Updated URL with session_id from sessionStorage");
-
-            // Clean up sessionStorage
-            sessionStorage.removeItem('stripeCheckoutSessionId');
-            sessionStorage.removeItem('stripeCheckoutImei');
+            console.log("PAY DEBUG: [2.0.5] Keeping sessionStorage for manage page fallback - will be cleared after validation");
           } else {
             console.log("PAY DEBUG: [2.0.5] No session ID found in sessionStorage either");
           }
@@ -1193,8 +1190,13 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
 
               if (validationResult?.isSubscribed) {
                 console.log("PAY DEBUG: [2.9] Subscription validated successfully, redirecting to device page");
-                // Subscription is valid, redirect to device info page
-                window.location.href = `/manage/${imeiString}`;
+                // Subscription is valid, redirect to device info page with session_id and validated flag
+                // Don't clear sessionStorage here - let manage page clear it after validation
+                const redirectUrl = new URL(`/manage/${imeiString}`, window.location.origin);
+                redirectUrl.searchParams.set('session_id', sessionId);
+                redirectUrl.searchParams.set('validated', 'true');
+                console.log("PAY DEBUG: [2.9.1] Redirecting with session_id and validated flag:", redirectUrl.toString());
+                window.location.href = redirectUrl.toString();
                 return;
               } else {
                 console.log("PAY DEBUG: [2.10] Subscription validation returned false, will start polling");
