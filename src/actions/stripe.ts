@@ -27,15 +27,15 @@ export const stripe = {
       console.log("PAY DEBUG: [A1.2] deviceIMEI:", input.deviceIMEI);
       console.log("PAY DEBUG: [A1.2.1] Stripe mode (from secret key):", isStripeTestMode ? "TEST" : "LIVE");
 
-      // Return to dashboard with activation parameters for polling
-      // Note: Stripe embedded checkout should replace {CHECKOUT_SESSION_ID} with actual session ID
-      // But if it doesn't, we'll retrieve it from sessionStorage (set before checkout)
-      const returnUrl = new URL("/dashboard", context.url.origin);
-      returnUrl.searchParams.set("activated", "true");
-      returnUrl.searchParams.set("imei", input.deviceIMEI);
+      // Return directly to manage page after payment completion
+      // Note: Stripe embedded checkout will replace {CHECKOUT_SESSION_ID} with actual session ID
+      // Server-side validation will check if payment was successful
+      const returnUrl = new URL(`/manage/${input.deviceIMEI}`, context.url.origin);
       returnUrl.searchParams.set("session_id", "{CHECKOUT_SESSION_ID}");
+      returnUrl.searchParams.set("payment_status", "checking");
       console.log("PAY DEBUG: [A1.3] Return URL set to:", returnUrl.toString());
-      console.log("PAY DEBUG: [A1.3.1] NOTE: {CHECKOUT_SESSION_ID} should be replaced by Stripe on redirect");
+      console.log("PAY DEBUG: [A1.3.1] NOTE: {CHECKOUT_SESSION_ID} will be replaced by Stripe on redirect");
+      console.log("PAY DEBUG: [A1.3.2] NOTE: Payment will be validated server-side on manage page");
 
       console.log("PAY DEBUG: [A1.4] Creating Stripe checkout session");
       const session = await stripeInstance.checkout.sessions.create({
