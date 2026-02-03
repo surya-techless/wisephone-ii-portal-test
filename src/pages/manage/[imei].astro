@@ -2415,14 +2415,42 @@ try {
                   this.isEditing = false;
                 },
 
-                completeSetup() {
-                  // Set isPhoneSetUp = true
-                  this.isPhoneSetUp = true;
-
-                  // Trigger deeplink
-                  this.$nextTick(() => {
-                    window.location.href = this.completeSetupUrl;
-                  });
+                async completeSetup() {
+                  try {
+                    // Step 1: Get current features to check what groups exist
+                    await this.getFeatures();
+                    
+                    // Step 2: Check subscription status and assign appropriate groups
+                    if (this.isSubscribed) {
+                      const hasSubscribedGroup = 
+                        this.features.includes(KNOX_USER_GROUPS.SUBSCRIBED) ||
+                        this.features.includes(KNOX_USER_GROUPS.A16_SUBSCRIBED);
+                      if (!hasSubscribedGroup) {
+                        await this.assignSubscriptionGroupByDeviceModel();
+                      }
+                    } else {
+                      const hasUnpaidGroup = 
+                        this.features.includes(KNOX_USER_GROUPS.UNPAID) ||
+                        this.features.includes(KNOX_USER_GROUPS.A16_UNPAID);
+                      if (!hasUnpaidGroup) {
+                        await this.assignUnpaidGroupByDeviceModel();
+                      }
+                    }
+                    
+                    // Step 3: Remove conflicting groups
+                    await this.removeExclusiveGroups(this.features);
+                    
+                    // Step 4: Set isPhoneSetUp = true
+                    this.isPhoneSetUp = true;
+                    
+                    // Step 5: Navigate to localhost (after all groups are assigned)
+                    this.$nextTick(() => {
+                      window.location.href = this.completeSetupUrl;
+                    });
+                  } catch (error) {
+                    console.error("Error during complete setup:", error);
+                    this.showErrorToast("Failed to complete setup. Please try again.");
+                  }
                 },
 
                 formatPhoneNumber(event: Event) {
@@ -2957,6 +2985,8 @@ try {
                 get completeSetupUrl() {
                   // Clean phone number (remove dashes) for the deeplink
                   const cleanedPhone = this.devicePhone.replace(/\D/g, "");
+                  // Use localhost for webview (triggers automatic closing)
+                  // The appUrlOpen listener will also handle custom scheme URLs for direct app opens
                   return `http://localhost?imei=${this.imei}&phone=${cleanedPhone}&subscription=done`;
                 },
 
