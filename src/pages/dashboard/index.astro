@@ -711,6 +711,7 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
               href="https://plans.techless.com/"
               target="_blank"
               rel="noopener noreferrer"
+              @click="closeActivateModal()"
               class="flex items-center justify-center gap-1 w-full px-4 py-2 bg-[#C07F53] text-white rounded-md text-sm font-medium hover:bg-[#A06F43] transition-colors cursor-pointer mt-auto"
             >
               Activate All‑In‑One Plan
@@ -795,6 +796,10 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
   import { isValidIMEI, STRIPE_PUBLIC_KEY, updateUnreachableAlpineState } from "@/libs/utils";
   import { actions } from "astro:actions";
   import { loadStripe, type Stripe } from "@stripe/stripe-js";
+  import { SubscriptionPollingService, type Device } from "@/services/SubscriptionPollingService";
+
+  // Initialize subscription polling service
+  let subscriptionPollingService: SubscriptionPollingService | null = null;
 
   document.addEventListener("alpine:init", () => {
     Alpine.data("dashboard", (initialData?: { userEmail?: string; newDevice?: { imei: string; phoneNumber: string } | null }) => ({
@@ -1101,9 +1106,94 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
           form.submit();
         }
       },
+      /**
+       * Update device card subscription status
+       */
+      updateDeviceCardSubscription(imei: string, isSubscribed: boolean): void {
+        const normalizedImei = imei.replace(/[^0-9]/g, '').padEnd(15, '0');
+        console.log('[Dashboard] Updating device card subscription status:', normalizedImei, isSubscribed);
+
+        // Find device card element
+        const deviceCards = document.querySelectorAll('[x-data*="deviceCard"]');
+        for (const card of Array.from(deviceCards)) {
+          const cardData = (window as any).Alpine?.$data?.(card);
+          if (cardData && cardData.imei === normalizedImei) {
+            console.log('[Dashboard] Found device card, updating isSubscribed');
+            cardData.isSubscribed = isSubscribed;
+            break;
+          }
+        }
+      },
+
+      /**
+       * Initialize background polling for unsubscribed devices
+       */
+      initializeBackgroundPolling(): void {
+        // Wait for device cards to be initialized
+        setTimeout(() => {
+          const unsubscribedDevices: Device[] = [];
+
+          // Find all unsubscribed device cards
+          const deviceCards = document.querySelectorAll('[x-data*="deviceCard"]');
+          for (const card of Array.from(deviceCards)) {
+            const cardData = (window as any).Alpine?.$data?.(card);
+            if (cardData && !cardData.isSubscribed && cardData.phoneNumber) {
+              unsubscribedDevices.push({
+                imei: cardData.imei,
+                phoneNumber: cardData.phoneNumber
+              });
+            }
+          }
+
+          if (unsubscribedDevices.length > 0) {
+            console.log('[Dashboard] Starting background polling for', unsubscribedDevices.length, 'unsubscribed devices');
+
+            // Initialize polling service if not already initialized
+            if (!subscriptionPollingService) {
+              subscriptionPollingService = new SubscriptionPollingService({
+                pollInterval: 10000, // 10 seconds
+                checkSubscription: async (imei: string, phoneNumber: string) => {
+                  try {
+                    const normalizedImei = imei.replace(/[^0-9]/g, '');
+                    const result = await actions.wisephones.validateIsUserSubscribed.orThrow({
+                      imei: normalizedImei,
+                      phoneNumber: phoneNumber
+                    });
+                    return result?.isSubscribed === true;
+                  } catch (error) {
+                    console.error('[Dashboard] Error checking subscription:', error);
+                    return false;
+                  }
+                },
+                onSubscriptionDetected: (device) => {
+                  console.log('[Dashboard] Subscription detected for device:', device.imei);
+                  // Update device card state
+                  this.updateDeviceCardSubscription(device.imei, true);
+                }
+              });
+            }
+
+            // Start polling
+            subscriptionPollingService.startPolling(unsubscribedDevices);
+
+            // Listen for subscription detected events (from service)
+            window.addEventListener('subscription-detected', ((event: CustomEvent) => {
+              const { imei } = event.detail;
+              console.log('[Dashboard] Subscription detected event received for:', imei);
+              this.updateDeviceCardSubscription(imei, true);
+            }) as EventListener);
+          } else {
+            console.log('[Dashboard] No unsubscribed devices found, skipping background polling');
+          }
+        }, 500); // Wait 500ms for Alpine to fully initialize device cards
+      },
+
       async init() {
         // Initialize Stripe
         await this.initializeStripe();
+
+        // Initialize background polling for unsubscribed devices
+        this.initializeBackgroundPolling();
 
         // Check if a new unsubscribed device was just added
         if (initialData?.newDevice?.imei) {
@@ -1114,6 +1204,14 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
             imei: initialData.newDevice.imei,
             phoneNumber: initialData.newDevice.phoneNumber
           });
+
+          // Add device to polling service
+          if (subscriptionPollingService && initialData.newDevice.phoneNumber) {
+            subscriptionPollingService.addDevice({
+              imei: initialData.newDevice.imei,
+              phoneNumber: initialData.newDevice.phoneNumber
+            });
+          }
           return;
         }
 
@@ -1277,11 +1375,31 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
       phoneNumber: deviceData.phoneNumber || '',
       init() {
         console.log("Device card initialized:", { imei: this.imei, isSubscribed: this.isSubscribed, phoneNumber: this.phoneNumber });
+
         // Update subscription status if it changed
         this.$watch('isSubscribed', (value) => {
           if (value) {
             console.log(`Device ${this.imei} is now subscribed`);
+            // Remove from polling service if it exists
+            if (subscriptionPollingService) {
+              subscriptionPollingService.removeDevice(this.imei);
+            }
           }
+        });
+
+        // Listen for subscription detected events
+        const handleSubscriptionDetected = ((event: CustomEvent) => {
+          if (event.detail.imei === this.imei) {
+            console.log(`[DeviceCard] Subscription detected for this device: ${this.imei}`);
+            this.isSubscribed = true;
+          }
+        }) as EventListener;
+
+        window.addEventListener('subscription-detected', handleSubscriptionDetected);
+
+        // Cleanup listener on component destroy
+        this.$el.addEventListener('alpine:destroyed', () => {
+          window.removeEventListener('subscription-detected', handleSubscriptionDetected);
         });
       },
       openActivateModal() {
@@ -1350,6 +1468,23 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
         }
       }
     }));
+
+    // Cleanup polling service on page unload
+    window.addEventListener('beforeunload', () => {
+      if (subscriptionPollingService) {
+        subscriptionPollingService.destroy();
+        subscriptionPollingService = null;
+      }
+    });
+
+    // Also cleanup on page hide (when navigating away)
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden && subscriptionPollingService) {
+        // Service will pause automatically via Page Visibility API
+        // But we can also manually pause if needed
+        subscriptionPollingService.pausePolling();
+      }
+    });
   });
 </script>
 </Layout>
