@@ -2450,11 +2450,14 @@ try {
                       const mobileApp = (window as any).mobileApp;
                       if (mobileApp && typeof mobileApp.postMessage === 'function') {
                         const cleanedPhone = this.devicePhone.replace(/\D/g, "");
+                        // CRITICAL: InAppBrowser requires messages to be wrapped in a 'detail' object
                         mobileApp.postMessage({
-                          action: 'completeSetup',
-                          imei: this.imei,
-                          phone: cleanedPhone,
-                          subscription: 'done'
+                          detail: {
+                            action: 'completeSetup',
+                            imei: this.imei,
+                            phone: cleanedPhone,
+                            subscription: 'done'
+                          }
                         });
                         console.log("✅ Setup completion sent via postMessage (no localhost navigation)");
                       } else {
