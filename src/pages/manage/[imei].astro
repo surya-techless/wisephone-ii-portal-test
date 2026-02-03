@@ -979,7 +979,7 @@ try {
                     <input
                       type="text"
                       x-model.debounce.300ms="appSearchQuery"
-                      placeholder="Search apps or categories (e.g., Finance, Books & Reference)"
+                      placeholder="Search apps or categories (e.g, Finance, Books)"
                       class="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-md text-sm bg-gray-100 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                     />
                   </div>
@@ -2419,30 +2419,30 @@ try {
                   try {
                     // Step 1: Get current features to check what groups exist
                     await this.getFeatures();
-                    
+
                     // Step 2: Check subscription status and assign appropriate groups
                     if (this.isSubscribed) {
-                      const hasSubscribedGroup = 
+                      const hasSubscribedGroup =
                         this.features.includes(KNOX_USER_GROUPS.SUBSCRIBED) ||
                         this.features.includes(KNOX_USER_GROUPS.A16_SUBSCRIBED);
                       if (!hasSubscribedGroup) {
                         await this.assignSubscriptionGroupByDeviceModel();
                       }
                     } else {
-                      const hasUnpaidGroup = 
+                      const hasUnpaidGroup =
                         this.features.includes(KNOX_USER_GROUPS.UNPAID) ||
                         this.features.includes(KNOX_USER_GROUPS.A16_UNPAID);
                       if (!hasUnpaidGroup) {
                         await this.assignUnpaidGroupByDeviceModel();
                       }
                     }
-                    
+
                     // Step 3: Remove conflicting groups
                     await this.removeExclusiveGroups(this.features);
-                    
+
                     // Step 4: Set isPhoneSetUp = true
                     this.isPhoneSetUp = true;
-                    
+
                     // Step 5: Send setup completion message via postMessage (prevents localhost page from showing)
                     this.$nextTick(() => {
                       // Try postMessage first (no navigation, no localhost page)
@@ -3008,7 +3008,7 @@ try {
                   // The appUrlOpen listener will also handle custom scheme URLs for direct app opens
                   return `http://localhost?imei=${this.imei}&phone=${cleanedPhone}&subscription=done`;
                 },
-                
+
                 get completeSetupDeepLink() {
                   // Custom scheme URL for direct app opens (not from webview)
                   const cleanedPhone = this.devicePhone.replace(/\D/g, "");

@@ -47,7 +47,7 @@ export class SubscriptionPollingService {
   private isPaused = false;
   private visibilityHandler: (() => void) | null = null;
 
-  private config: Required<Omit<SubscriptionPollingConfig, 'onSubscriptionDetected' | 'onError'>> & {
+  private config: Required<Omit<SubscriptionPollingConfig, "onSubscriptionDetected" | "onError">> & {
     onSubscriptionDetected?: (device: Device) => void;
     onError?: (device: Device, error: Error) => void;
     checkSubscription: (imei: string, phoneNumber: string) => Promise<boolean>;
@@ -71,15 +71,15 @@ export class SubscriptionPollingService {
    */
   startPolling(devices: Device[]): void {
     if (this.isPolling) {
-      console.log('[SubscriptionPolling] Already polling, adding devices to existing poll');
-      devices.forEach(device => this.addDevice(device));
+      console.log("[SubscriptionPolling] Already polling, adding devices to existing poll");
+      devices.forEach((device) => this.addDevice(device));
       return;
     }
 
-    console.log('[SubscriptionPolling] Starting polling for', devices.length, 'devices');
+    console.log("[SubscriptionPolling] Starting polling for", devices.length, "devices");
 
     // Add all devices to polling list
-    devices.forEach(device => {
+    devices.forEach((device) => {
       const normalizedImei = this.normalizeImei(device.imei);
       this.devices.set(normalizedImei, {
         imei: normalizedImei,
@@ -99,7 +99,7 @@ export class SubscriptionPollingService {
    * Stop polling completely
    */
   stopPolling(): void {
-    console.log('[SubscriptionPolling] Stopping polling');
+    console.log("[SubscriptionPolling] Stopping polling");
 
     if (this.pollingIntervalId !== null) {
       clearInterval(this.pollingIntervalId);
@@ -123,11 +123,11 @@ export class SubscriptionPollingService {
     const normalizedImei = this.normalizeImei(device.imei);
 
     if (this.devices.has(normalizedImei)) {
-      console.log('[SubscriptionPolling] Device already in polling list:', normalizedImei);
+      console.log("[SubscriptionPolling] Device already in polling list:", normalizedImei);
       return;
     }
 
-    console.log('[SubscriptionPolling] Adding device to polling list:', normalizedImei);
+    console.log("[SubscriptionPolling] Adding device to polling list:", normalizedImei);
     this.devices.set(normalizedImei, {
       imei: normalizedImei,
       phoneNumber: device.phoneNumber
@@ -146,7 +146,7 @@ export class SubscriptionPollingService {
     const normalizedImei = this.normalizeImei(imei);
 
     if (this.devices.delete(normalizedImei)) {
-      console.log('[SubscriptionPolling] Removed device from polling list:', normalizedImei);
+      console.log("[SubscriptionPolling] Removed device from polling list:", normalizedImei);
     }
 
     // If no devices left, stop polling
@@ -161,7 +161,7 @@ export class SubscriptionPollingService {
   pausePolling(): void {
     if (this.isPaused) return;
 
-    console.log('[SubscriptionPolling] Pausing polling');
+    console.log("[SubscriptionPolling] Pausing polling");
     this.isPaused = true;
 
     if (this.pollingTimeoutId !== null) {
@@ -176,7 +176,7 @@ export class SubscriptionPollingService {
   resumePolling(): void {
     if (!this.isPaused || !this.isPolling) return;
 
-    console.log('[SubscriptionPolling] Resuming polling');
+    console.log("[SubscriptionPolling] Resuming polling");
     this.isPaused = false;
 
     // Immediately check devices when resuming
@@ -207,13 +207,16 @@ export class SubscriptionPollingService {
     }
 
     const devicesToCheck = Array.from(this.devices.values());
-    console.log('[SubscriptionPolling] Checking', devicesToCheck.length, 'devices');
+    console.log("[SubscriptionPolling] Checking", devicesToCheck.length, "devices");
 
     // Use requestIdleCallback if available for non-blocking execution
-    if (typeof requestIdleCallback !== 'undefined') {
-      requestIdleCallback(() => {
-        this.checkDevicesInParallel(devicesToCheck);
-      }, { timeout: 5000 });
+    if (typeof requestIdleCallback !== "undefined") {
+      requestIdleCallback(
+        () => {
+          this.checkDevicesInParallel(devicesToCheck);
+        },
+        { timeout: 5000 }
+      );
     } else {
       // Fallback to setTimeout for immediate execution
       setTimeout(() => {
@@ -227,9 +230,9 @@ export class SubscriptionPollingService {
    */
   private async checkDevicesInParallel(devices: Device[]): Promise<void> {
     // Check all devices in parallel (non-blocking)
-    const checkPromises = devices.map(device =>
-      this.checkDeviceSubscription(device).catch(error => {
-        console.error('[SubscriptionPolling] Error checking device:', device.imei, error);
+    const checkPromises = devices.map((device) =>
+      this.checkDeviceSubscription(device).catch((error) => {
+        console.error("[SubscriptionPolling] Error checking device:", device.imei, error);
         if (this.config.onError) {
           this.config.onError(device, error);
         }
@@ -245,12 +248,12 @@ export class SubscriptionPollingService {
    */
   private async checkDeviceSubscription(device: Device): Promise<boolean> {
     try {
-      console.log('[SubscriptionPolling] Checking subscription for device:', device.imei);
+      console.log("[SubscriptionPolling] Checking subscription for device:", device.imei);
 
       const isSubscribed = await this.config.checkSubscription(device.imei, device.phoneNumber);
 
       if (isSubscribed) {
-        console.log('[SubscriptionPolling] ✅ Subscription detected for device:', device.imei);
+        console.log("[SubscriptionPolling] ✅ Subscription detected for device:", device.imei);
 
         // Remove from polling list
         this.removeDevice(device.imei);
@@ -268,7 +271,7 @@ export class SubscriptionPollingService {
 
       return false;
     } catch (error) {
-      console.error('[SubscriptionPolling] Error checking subscription for device:', device.imei, error);
+      console.error("[SubscriptionPolling] Error checking subscription for device:", device.imei, error);
       if (this.config.onError) {
         this.config.onError(device, error instanceof Error ? error : new Error(String(error)));
       }
@@ -300,7 +303,7 @@ export class SubscriptionPollingService {
    * Setup Page Visibility API handlers
    */
   private setupVisibilityHandling(): void {
-    if (typeof document === 'undefined') return;
+    if (typeof document === "undefined") return;
 
     this.visibilityHandler = () => {
       if (document.hidden) {
@@ -310,15 +313,15 @@ export class SubscriptionPollingService {
       }
     };
 
-    document.addEventListener('visibilitychange', this.visibilityHandler);
+    document.addEventListener("visibilitychange", this.visibilityHandler);
   }
 
   /**
    * Cleanup visibility handlers
    */
   private cleanupVisibilityHandling(): void {
-    if (this.visibilityHandler && typeof document !== 'undefined') {
-      document.removeEventListener('visibilitychange', this.visibilityHandler);
+    if (this.visibilityHandler && typeof document !== "undefined") {
+      document.removeEventListener("visibilitychange", this.visibilityHandler);
       this.visibilityHandler = null;
     }
   }
@@ -327,10 +330,10 @@ export class SubscriptionPollingService {
    * Dispatch Alpine event when subscription is detected
    */
   private dispatchSubscriptionDetectedEvent(device: Device): void {
-    if (typeof window === 'undefined') return;
+    if (typeof window === "undefined") return;
 
     // Dispatch custom event that Alpine components can listen to
-    const event = new CustomEvent('subscription-detected', {
+    const event = new CustomEvent("subscription-detected", {
       detail: {
         imei: device.imei,
         phoneNumber: device.phoneNumber
@@ -345,7 +348,7 @@ export class SubscriptionPollingService {
    * Normalize IMEI format (remove non-digits, pad to 15 characters)
    */
   private normalizeImei(imei: string): string {
-    return imei.replace(/[^0-9]/g, '').padEnd(15, '0');
+    return imei.replace(/[^0-9]/g, "").padEnd(15, "0");
   }
 
   /**
