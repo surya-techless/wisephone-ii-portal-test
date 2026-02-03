@@ -2443,9 +2443,25 @@ try {
                     // Step 4: Set isPhoneSetUp = true
                     this.isPhoneSetUp = true;
                     
-                    // Step 5: Navigate to localhost (after all groups are assigned)
+                    // Step 5: Send setup completion message via postMessage (prevents localhost page from showing)
                     this.$nextTick(() => {
-                      window.location.href = this.completeSetupUrl;
+                      // Try postMessage first (no navigation, no localhost page)
+                      // @ts-ignore - window.mobileApp is injected at runtime by InAppBrowser
+                      const mobileApp = (window as any).mobileApp;
+                      if (mobileApp && typeof mobileApp.postMessage === 'function') {
+                        const cleanedPhone = this.devicePhone.replace(/\D/g, "");
+                        mobileApp.postMessage({
+                          action: 'completeSetup',
+                          imei: this.imei,
+                          phone: cleanedPhone,
+                          subscription: 'done'
+                        });
+                        console.log("✅ Setup completion sent via postMessage (no localhost navigation)");
+                      } else {
+                        // Fallback to localhost if mobileApp not available
+                        console.log("⚠️ mobileApp not available, falling back to localhost navigation");
+                        window.location.href = this.completeSetupUrl;
+                      }
                     });
                   } catch (error) {
                     console.error("Error during complete setup:", error);
@@ -2988,6 +3004,12 @@ try {
                   // Use localhost for webview (triggers automatic closing)
                   // The appUrlOpen listener will also handle custom scheme URLs for direct app opens
                   return `http://localhost?imei=${this.imei}&phone=${cleanedPhone}&subscription=done`;
+                },
+                
+                get completeSetupDeepLink() {
+                  // Custom scheme URL for direct app opens (not from webview)
+                  const cleanedPhone = this.devicePhone.replace(/\D/g, "");
+                  return `com.techless.wiseos://setup?imei=${this.imei}&phone=${cleanedPhone}&subscription=done`;
                 },
 
                 get isToolDrawerEnabled() {
