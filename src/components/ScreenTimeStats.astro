@@ -119,41 +119,11 @@ const serializedData = screenTimeData.map((week) => {
     isLoading: ${serializedData.length === 0},
     imei: ${JSON.stringify(imei)},
     async init() {
-      // If no data provided, fetch it client-side
+      // Device stats API call disabled
+      // If no data provided, skip fetching
       if (this.screenTimeData.length === 0 && this.imei) {
-        this.isLoading = true;
-        try {
-          const response = await fetch("/api/device-stats/" + this.imei + "?weeks=4");
-          if (response.ok) {
-            const data = await response.json();
-            if (data.weeks && Array.isArray(data.weeks) && data.weeks.length > 0) {
-              // Transform API response to match component format
-              this.screenTimeData = data.weeks.map((week) => ({
-                ...week,
-                weekStartDate: week.weekStartDate ? new Date(week.weekStartDate).toISOString() : null,
-                weekEndDate: week.weekEndDate ? new Date(week.weekEndDate).toISOString() : null,
-                syncedAt: week.syncedAt ? new Date(week.syncedAt).toISOString() : new Date().toISOString(),
-                apps: (week.apps || [])
-                  .filter((app) => (app.totalTimeMs || 0) > 0)
-                  .map((app) => ({
-                    ...app,
-                    weekStartDate: app.weekStartDate ? new Date(app.weekStartDate).toISOString() : null
-                  })),
-                days: (week.days || []).map((day) => ({
-                  ...day,
-                  date: day.date ? new Date(day.date).toISOString() : null,
-                  apps: (day.apps || []).filter((app) => (app.totalTimeMs || 0) > 0)
-                }))
-              }));
-            }
-          } else {
-            devLog.error("Failed to fetch screen time data:", response.status, response.statusText);
-          }
-        } catch (error) {
-          devLog.error("Error fetching screen time data:", error);
-        } finally {
-          this.isLoading = false;
-        }
+        this.isLoading = false;
+        devLog.log("Screen time data not available - API call disabled");
       } else {
         this.isLoading = false;
       }
