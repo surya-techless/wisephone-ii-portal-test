@@ -1,5 +1,5 @@
 import { KNOX_CLIENT_SECRET, KNOX_CLIENT_ID, KNOX_REGION } from "astro:env/server";
-import { isValidIMEI } from "@/libs/utils";
+import { isValidIMEI, devLog } from "@/libs/utils";
 
 export type App = {
   appAction: string;
@@ -152,7 +152,7 @@ export class SamsungKnoxService {
 
       return data.access_token;
     } catch (error) {
-      console.error(error);
+      devLog.error(error);
       throw new Error("Failed to get Knox token");
     }
   }
@@ -193,13 +193,13 @@ export class SamsungKnoxService {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => null);
-        console.error("Knox API error:", errorData);
+        devLog.error("Knox API error:", errorData);
         throw new Error(`Failed to add device ${imei} to group ${groupId}: ${response.status} ${response.statusText}`);
       }
 
       return response.json();
     } catch (error) {
-      console.error("Knox feature application error:", error);
+      devLog.error("Knox feature application error:", error);
       if (error instanceof Error) {
         throw error;
       }
@@ -237,7 +237,7 @@ export class SamsungKnoxService {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => null);
-        console.error("Knox API error:", errorData);
+        devLog.error("Knox API error:", errorData);
         throw new Error(
           `Failed to remove device ${imei} from group ${groupId}: ${response.status} ${response.statusText}`
         );
@@ -245,7 +245,7 @@ export class SamsungKnoxService {
 
       return response.json();
     } catch (error) {
-      console.error("Knox feature removal error:", error);
+      devLog.error("Knox feature removal error:", error);
       if (error instanceof Error) {
         throw error;
       }
@@ -357,7 +357,7 @@ export class SamsungKnoxService {
 
     if (!response.ok) {
       const data = await response.json();
-      console.error(data);
+      devLog.error(data);
       throw new Error("Failed to send notification to device");
     }
 
@@ -371,13 +371,13 @@ export class SamsungKnoxService {
    */
   public static async getUserIdFromImei(imei: string): Promise<string | null> {
     if (!imei) {
-      console.error("Empty IMEI provided");
+      devLog.error("Empty IMEI provided");
       throw new Error("IMEI is required");
     }
 
     // Validate IMEI format using our utility function
     if (!isValidIMEI(imei)) {
-      console.error(`Invalid IMEI format or checksum: ${imei}`);
+      devLog.error(`Invalid IMEI format or checksum: ${imei}`);
       throw new Error(`Invalid IMEI: ${imei}. IMEI must be a valid 15-digit number.`);
     }
 
@@ -396,7 +396,7 @@ export class SamsungKnoxService {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => null);
-        console.error("Knox API error:", errorData);
+        devLog.error("Knox API error:", errorData);
         throw new Error(`Failed to fetch Knox device info for IMEI ${imei}: ${response.status} ${response.statusText}`);
       }
 
@@ -404,13 +404,13 @@ export class SamsungKnoxService {
 
       if (data.resultCode !== "0") {
         // Log the specific error code and message from Knox API
-        console.error(`Knox API returned non-success code: ${data.resultCode} - ${data.resultMessage}`);
+        devLog.error(`Knox API returned non-success code: ${data.resultCode} - ${data.resultMessage}`);
         return null;
       }
 
       return data.resultValue?.userId ?? null;
     } catch (error) {
-      console.error("Error fetching device info:", error);
+      devLog.error("Error fetching device info:", error);
       if (error instanceof Error) {
         throw error;
       }
@@ -444,7 +444,7 @@ export class SamsungKnoxService {
       const data = (await response.json()) as KnoxDeviceInfoResponse;
       return data;
     } catch (error) {
-      console.error("Error fetching device info:", error);
+      devLog.error("Error fetching device info:", error);
       return null;
     }
   }
@@ -459,7 +459,7 @@ export class SamsungKnoxService {
       const deviceInfo = await this.getDeviceFromImei(imei);
       return deviceInfo?.resultValue?.deviceId ?? null;
     } catch (error) {
-      console.error("Error fetching device ID:", error);
+      devLog.error("Error fetching device ID:", error);
       return null;
     }
   }
@@ -519,7 +519,7 @@ export class SamsungKnoxService {
 
     if (!response.ok) {
       const data = await response.json();
-      console.error(data);
+      devLog.error(data);
       throw new Error("Failed to initiate app installation on device");
     }
 
@@ -603,7 +603,7 @@ export class SamsungKnoxService {
 
     if (!response.ok) {
       const data = await response.json();
-      console.error(data);
+      devLog.error(data);
       throw new Error("Failed to initiate app uninstallation on device");
     }
 
@@ -647,7 +647,7 @@ export class SamsungKnoxService {
 
     if (!response.ok) {
       const data = await response.json();
-      console.error(data);
+      devLog.error(data);
       throw new Error("Failed to fetch installed applications");
     }
 
@@ -697,7 +697,7 @@ export class SamsungKnoxService {
 
     if (!response.ok) {
       const data = await response.json();
-      console.error(data);
+      devLog.error(data);
       throw new Error("Failed to sync installed applications list");
     }
 

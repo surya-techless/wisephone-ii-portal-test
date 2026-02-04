@@ -10,6 +10,7 @@ import {
   sql
 } from "astro:db";
 import { captureException } from "@sentry/astro";
+import { devLog } from "@/libs/utils";
 
 /**
  * POST /api/device-stats/sync
@@ -112,7 +113,6 @@ import { captureException } from "@sentry/astro";
 //   │ weekStartDate     │ DATE               │ For easier querying               │
 //   └───────────────────┴────────────────────┴───────────────────────────────────┘
 
-
 // CORS headers for device sync requests
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -134,21 +134,21 @@ export const POST: APIRoute = async ({ request }) => {
     // ============================================
     // DATABASE VERIFICATION - Check we're connected to the right DB
     // ============================================
-    console.log("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    console.log("🔍 DATABASE VERIFICATION");
-    console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    devLog.log("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    devLog.log("🔍 DATABASE VERIFICATION");
+    devLog.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
     try {
       // Test database connection
       const dbTest = await db.select().from(Wisephone).limit(1);
-      console.log("✅ Database connection: OK");
-      console.log(`📊 Sample Wisephone records: ${dbTest.length} found`);
+      devLog.log("✅ Database connection: OK");
+      devLog.log(`📊 Sample Wisephone records: ${dbTest.length} found`);
 
       // Count total devices and verify we're hitting the right DB
       const allDevices = await db.select().from(Wisephone);
-      console.log(`📱 Total devices in Wisephone table: ${allDevices.length}`);
+      devLog.log(`📱 Total devices in Wisephone table: ${allDevices.length}`);
       if (allDevices.length > 0) {
-        console.log(
+        devLog.log(
           `   Sample IMEIs: ${allDevices
             .slice(0, 3)
             .map((d) => d.imei)
@@ -159,34 +159,34 @@ export const POST: APIRoute = async ({ request }) => {
         const testImei = 350256489950778;
         const testDevice = allDevices.find((d) => d.imei === testImei);
         if (testDevice) {
-          console.log(`\n🔍 VERIFICATION: Checking device ${testImei}:`);
-          console.log(`   Current nickname in DB: "${testDevice.nickname}"`);
-          console.log(`   Expected nickname (remote): "surya 0778"`);
+          devLog.log(`\n🔍 VERIFICATION: Checking device ${testImei}:`);
+          devLog.log(`   Current nickname in DB: "${testDevice.nickname}"`);
+          devLog.log(`   Expected nickname (remote): "surya 0778"`);
           if (testDevice.nickname === "surya 0778") {
-            console.log(`   ✅ Database matches remote (nickname is correct)`);
-            console.log(`   ✅ CONFIRMED: Connected to REMOTE database`);
+            devLog.log(`   ✅ Database matches remote (nickname is correct)`);
+            devLog.log(`   ✅ CONFIRMED: Connected to REMOTE database`);
           } else {
-            console.log(`   ❌ ERROR: Database nickname doesn't match remote!`);
-            console.log(`   ❌ WARNING: This suggests we're hitting LOCAL SQLite, not remote DB!`);
-            console.log(`   ❌ Current nickname: "${testDevice.nickname}"`);
-            console.log(`   ❌ Expected nickname: "surya 0778"`);
-            console.log(`\n⚠️  ACTION REQUIRED: Stop server and run: npm run dev:remote`);
+            devLog.log(`   ❌ ERROR: Database nickname doesn't match remote!`);
+            devLog.log(`   ❌ WARNING: This suggests we're hitting LOCAL SQLite, not remote DB!`);
+            devLog.log(`   ❌ Current nickname: "${testDevice.nickname}"`);
+            devLog.log(`   ❌ Expected nickname: "surya 0778"`);
+            devLog.log(`\n⚠️  ACTION REQUIRED: Stop server and run: npm run dev:remote`);
           }
         } else {
-          console.log(`\n⚠️  WARNING: Device ${testImei} not found in database!`);
+          devLog.log(`\n⚠️  WARNING: Device ${testImei} not found in database!`);
         }
       }
 
       // Count existing DeviceScreenTime records
       const existingScreenTime = await db.select().from(DeviceScreenTime).limit(5);
-      console.log(`📊 Existing DeviceScreenTime records (sample): ${existingScreenTime.length}`);
+      devLog.log(`📊 Existing DeviceScreenTime records (sample): ${existingScreenTime.length}`);
       if (existingScreenTime.length > 0) {
-        console.log(`   Sample IMEIs with data: ${[...new Set(existingScreenTime.map((d) => d.imei))].join(", ")}`);
+        devLog.log(`   Sample IMEIs with data: ${[...new Set(existingScreenTime.map((d) => d.imei))].join(", ")}`);
       }
 
       // Count existing DeviceAppUsage records
       const existingAppUsage = await db.select().from(DeviceAppUsage).limit(5);
-      console.log(`📱 Existing DeviceAppUsage records (sample): ${existingAppUsage.length}`);
+      devLog.log(`📱 Existing DeviceAppUsage records (sample): ${existingAppUsage.length}`);
 
       // Show database environment info
       // Astro DB uses ASTRO_DB_REMOTE_URL and ASTRO_DB_APP_TOKEN for remote connection
@@ -196,35 +196,35 @@ export const POST: APIRoute = async ({ request }) => {
       // Also check for legacy Turso env vars
       const tursoUrl = import.meta.env.TURSO_DATABASE_URL;
 
-      console.log(`🌍 Environment: ${import.meta.env.MODE || "unknown"}`);
+      devLog.log(`🌍 Environment: ${import.meta.env.MODE || "unknown"}`);
 
       if (astroRemoteUrl || tursoUrl) {
         const dbUrl = astroRemoteUrl || tursoUrl;
         // Extract database name from URL (format: libsql://database-name.turso.io)
         const urlMatch = dbUrl.match(/libsql:\/\/([^\.]+)\.turso\.io/);
         const dbName = urlMatch ? urlMatch[1] : "unknown";
-        console.log(`🔗 Database Type: Turso (remote)`);
-        console.log(`📛 Database Name: ${dbName}`);
-        console.log(`🔗 Database URL: ${dbUrl.replace(/\/\/[^:]+:[^@]+@/, "//***:***@")}`); // Hide credentials
-        console.log(`🔑 Remote Token: ${astroAppToken ? "✅ Set" : "❌ Missing"}`);
+        devLog.log(`🔗 Database Type: Turso (remote)`);
+        devLog.log(`📛 Database Name: ${dbName}`);
+        devLog.log(`🔗 Database URL: ${dbUrl.replace(/\/\/[^:]+:[^@]+@/, "//***:***@")}`); // Hide credentials
+        devLog.log(`🔑 Remote Token: ${astroAppToken ? "✅ Set" : "❌ Missing"}`);
       } else {
         // Local SQLite - try to get database name from config
         const dbPath = import.meta.env.DATABASE_PATH || ".astro/db.sqlite";
         const dbName = dbPath.split("/").pop() || "db.sqlite";
-        console.log(`🔗 Database Type: Local SQLite`);
-        console.log(`📛 Database Name: ${dbName}`);
-        console.log(`📁 Database Path: ${dbPath}`);
-        console.log(`\n❌ ERROR: Using LOCAL SQLite database!`);
-        console.log(`⚠️  This means data will NOT sync to remote database!`);
-        console.log(`\n💡 SOLUTION: Stop the server and run:`);
-        console.log(`   npm run dev:remote`);
-        console.log(`\n   Or set these environment variables:`);
-        console.log(`   ASTRO_DB_REMOTE_URL=libsql://your-db.turso.io`);
-        console.log(`   ASTRO_DB_APP_TOKEN=your-token`);
-        console.log(`\n⚠️  Current request will use LOCAL database only!`);
+        devLog.log(`🔗 Database Type: Local SQLite`);
+        devLog.log(`📛 Database Name: ${dbName}`);
+        devLog.log(`📁 Database Path: ${dbPath}`);
+        devLog.log(`\n❌ ERROR: Using LOCAL SQLite database!`);
+        devLog.log(`⚠️  This means data will NOT sync to remote database!`);
+        devLog.log(`\n💡 SOLUTION: Stop the server and run:`);
+        devLog.log(`   npm run dev:remote`);
+        devLog.log(`\n   Or set these environment variables:`);
+        devLog.log(`   ASTRO_DB_REMOTE_URL=libsql://your-db.turso.io`);
+        devLog.log(`   ASTRO_DB_APP_TOKEN=your-token`);
+        devLog.log(`\n⚠️  Current request will use LOCAL database only!`);
       }
 
-      console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
+      devLog.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
 
       // Check if all screen time tables exist, create if any are missing
       let tablesExist = true;
@@ -238,10 +238,10 @@ export const POST: APIRoute = async ({ request }) => {
       for (const { name, table } of tablesToCheck) {
         try {
           await db.select().from(table).limit(1);
-          console.log(`✅ ${name} table exists`);
+          devLog.log(`✅ ${name} table exists`);
         } catch (tableError: any) {
           if (tableError?.code === "SQLITE_UNKNOWN" || tableError?.message?.includes("no such table")) {
-            console.log(`⚠️ ${name} table missing`);
+            devLog.log(`⚠️ ${name} table missing`);
             tablesExist = false;
           } else {
             throw tableError;
@@ -250,12 +250,12 @@ export const POST: APIRoute = async ({ request }) => {
       }
 
       if (!tablesExist) {
-        console.log("⚠️ Some screen time tables are missing, creating all tables...");
+        devLog.log("⚠️ Some screen time tables are missing, creating all tables...");
         await createScreenTimeTables();
-        console.log("✅ All screen time tables created successfully");
+        devLog.log("✅ All screen time tables created successfully");
       }
     } catch (dbError) {
-      console.error("❌ Database connection failed:", dbError);
+      devLog.error("❌ Database connection failed:", dbError);
       return new Response(
         JSON.stringify({
           error: "Database connection failed",
@@ -276,7 +276,7 @@ export const POST: APIRoute = async ({ request }) => {
     const expectedKey = import.meta.env.DEVICE_SYNC_API_KEY;
 
     if (!expectedKey) {
-      console.error("DEVICE_SYNC_API_KEY not configured");
+      devLog.error("DEVICE_SYNC_API_KEY not configured");
       return new Response(JSON.stringify({ error: "Server misconfigured without Api key" }), {
         status: 500,
         headers: {
@@ -297,11 +297,11 @@ export const POST: APIRoute = async ({ request }) => {
     }
 
     const body = await request.json();
-    console.log("========================================");
-    console.log("📥 NEW SCREEN TIME DATA RECEIVED");
-    console.log("========================================");
-    console.log("Full payload:", JSON.stringify(body, null, 2));
-    console.log("========================================");
+    devLog.log("========================================");
+    devLog.log("📥 NEW SCREEN TIME DATA RECEIVED");
+    devLog.log("========================================");
+    devLog.log("Full payload:", JSON.stringify(body, null, 2));
+    devLog.log("========================================");
 
     const { device, weeks, collectedAt } = body;
 
@@ -340,10 +340,10 @@ export const POST: APIRoute = async ({ request }) => {
       });
     }
 
-    console.log(`🔍 Looking up device with IMEI: ${imeiNumber} (type: ${typeof imeiNumber})`);
+    devLog.log(`🔍 Looking up device with IMEI: ${imeiNumber} (type: ${typeof imeiNumber})`);
     const wisephone = await db.select().from(Wisephone).where(eq(Wisephone.imei, imeiNumber)).get();
 
-    console.log(`📱 Wisephone lookup result:`, wisephone ? `Found device: ${JSON.stringify(wisephone)}` : "NOT FOUND");
+    devLog.log(`📱 Wisephone lookup result:`, wisephone ? `Found device: ${JSON.stringify(wisephone)}` : "NOT FOUND");
 
     if (!wisephone) {
       return new Response(JSON.stringify({ error: "Unknown device" }), {
@@ -358,26 +358,26 @@ export const POST: APIRoute = async ({ request }) => {
     // Delete ALL existing data for this IMEI (fresh insert approach)
     // Device always sends complete 4-week snapshot, so we replace everything
     const imeiString = String(device.imei);
-    console.log(`🗑️  Deleting all existing data for IMEI: ${imeiString}...`);
+    devLog.log(`🗑️  Deleting all existing data for IMEI: ${imeiString}...`);
 
     // Delete in order: child tables first, then parent
     await db.delete(DeviceDailyAppUsage).where(eq(DeviceDailyAppUsage.imei, imeiString));
     await db.delete(DeviceDailyScreenTime).where(eq(DeviceDailyScreenTime.imei, imeiString));
     await db.delete(DeviceAppUsage).where(eq(DeviceAppUsage.imei, imeiString));
     await db.delete(DeviceScreenTime).where(eq(DeviceScreenTime.imei, imeiString));
-    console.log(`✅ Deleted existing data for IMEI: ${imeiString}`);
+    devLog.log(`✅ Deleted existing data for IMEI: ${imeiString}`);
 
     let syncedWeeks = 0;
     let syncedApps = 0;
     let syncedDays = 0;
     let syncedDailyApps = 0;
 
-    console.log(`📊 Processing ${weeks.length} weeks of data...`);
+    devLog.log(`📊 Processing ${weeks.length} weeks of data...`);
 
     // Process each week's data (always INSERT since we deleted everything)
     for (let i = 0; i < weeks.length; i++) {
       const week = weeks[i];
-      console.log(`\n📅 Processing week ${i + 1}/${weeks.length}: ${week.weekLabel || "Unknown"}`);
+      devLog.log(`\n📅 Processing week ${i + 1}/${weeks.length}: ${week.weekLabel || "Unknown"}`);
 
       // Parse dates - new format uses "YYYY-MM-DD" strings, old format uses formatted strings
       let weekStart: Date | null = null;
@@ -385,28 +385,28 @@ export const POST: APIRoute = async ({ request }) => {
 
       if (week.startDate && week.endDate) {
         // New format: "YYYY-MM-DD" strings
-        console.log(`   📅 New format detected: startDate="${week.startDate}", endDate="${week.endDate}"`);
+        devLog.log(`   📅 New format detected: startDate="${week.startDate}", endDate="${week.endDate}"`);
         weekStart = new Date(week.startDate + "T00:00:00.000Z");
         weekEnd = new Date(week.endDate + "T23:59:59.999Z");
       } else if (week.startDateFormatted && week.endDateFormatted) {
         // Old format: formatted strings like "Dec 9"
-        console.log(
+        devLog.log(
           `   📅 Old format detected: startDateFormatted="${week.startDateFormatted}", endDateFormatted="${week.endDateFormatted}"`
         );
         weekStart = parseWeekDate(week.startDateFormatted);
         weekEnd = parseWeekDate(week.endDateFormatted);
       }
 
-      console.log(`   Parsed start date: ${weekStart ? weekStart.toISOString() : "NULL"}`);
-      console.log(`   Parsed end date: ${weekEnd ? weekEnd.toISOString() : "NULL"}`);
+      devLog.log(`   Parsed start date: ${weekStart ? weekStart.toISOString() : "NULL"}`);
+      devLog.log(`   Parsed end date: ${weekEnd ? weekEnd.toISOString() : "NULL"}`);
 
       if (!weekStart || !weekEnd) {
-        console.warn(`⚠️  Skipping week ${i + 1} with invalid dates`);
+        devLog.warn(`⚠️  Skipping week ${i + 1} with invalid dates`);
         continue;
       }
 
       // Insert new DeviceScreenTime record (we already deleted all old data for this IMEI)
-      console.log(`   ➕ Inserting DeviceScreenTime record...`);
+      devLog.log(`   ➕ Inserting DeviceScreenTime record...`);
       const insertData = {
         imei: imeiString,
         weekStartDate: weekStart,
@@ -422,15 +422,15 @@ export const POST: APIRoute = async ({ request }) => {
       try {
         const result = await db.insert(DeviceScreenTime).values(insertData);
         screenTimeId = Number(result.lastInsertRowid);
-        console.log(`   ✅ Inserted DeviceScreenTime record (ID: ${screenTimeId})`);
+        devLog.log(`   ✅ Inserted DeviceScreenTime record (ID: ${screenTimeId})`);
       } catch (insertError: any) {
-        console.error(`   ❌ Error inserting DeviceScreenTime:`, insertError);
+        devLog.error(`   ❌ Error inserting DeviceScreenTime:`, insertError);
         throw insertError;
       }
 
       // Insert daily breakdown data (new format)
       if (week.days && Array.isArray(week.days) && week.days.length > 0) {
-        console.log(`   📅 Inserting ${week.days.length} daily screen time records...`);
+        devLog.log(`   📅 Inserting ${week.days.length} daily screen time records...`);
         let weekSyncedDays = 0;
         let weekSyncedDailyApps = 0;
 
@@ -451,9 +451,9 @@ export const POST: APIRoute = async ({ request }) => {
 
             dailyScreenTimeId = Number(dailyResult.lastInsertRowid);
             weekSyncedDays++;
-            console.log(`   📅 Inserted daily record ID: ${dailyScreenTimeId} for date: ${dayDate.toISOString()}`);
+            devLog.log(`   📅 Inserted daily record ID: ${dailyScreenTimeId} for date: ${dayDate.toISOString()}`);
           } catch (dailyError: any) {
-            console.error(`   ❌ Error inserting DeviceDailyScreenTime for date ${dayDate}:`, dailyError);
+            devLog.error(`   ❌ Error inserting DeviceDailyScreenTime for date ${dayDate}:`, dailyError);
             throw dailyError;
           }
 
@@ -473,11 +473,11 @@ export const POST: APIRoute = async ({ request }) => {
             try {
               await db.insert(DeviceDailyAppUsage).values(dailyAppRecords);
               weekSyncedDailyApps += dailyAppRecords.length;
-              console.log(
+              devLog.log(
                 `   📱 Inserted ${dailyAppRecords.length} daily app records for date: ${dayDate.toISOString()}`
               );
             } catch (dailyAppError: any) {
-              console.error(`   ❌ Error inserting DeviceDailyAppUsage for date ${dayDate}:`, dailyAppError);
+              devLog.error(`   ❌ Error inserting DeviceDailyAppUsage for date ${dayDate}:`, dailyAppError);
               throw dailyAppError;
             }
           }
@@ -485,14 +485,12 @@ export const POST: APIRoute = async ({ request }) => {
 
         syncedDays += weekSyncedDays;
         syncedDailyApps += weekSyncedDailyApps;
-        console.log(
-          `   ✅ Inserted ${weekSyncedDays} daily records and ${weekSyncedDailyApps} daily app usage records`
-        );
+        devLog.log(`   ✅ Inserted ${weekSyncedDays} daily records and ${weekSyncedDailyApps} daily app usage records`);
       }
 
       // Insert weekly app usage data (for backward compatibility and weekly aggregates)
       if (week.apps && Array.isArray(week.apps) && week.apps.length > 0) {
-        console.log(`   📱 Inserting ${week.apps.length} weekly app usage records...`);
+        devLog.log(`   📱 Inserting ${week.apps.length} weekly app usage records...`);
         const appRecords = week.apps.map((app: any) => ({
           screenTimeId,
           imei: imeiString,
@@ -503,41 +501,41 @@ export const POST: APIRoute = async ({ request }) => {
           weekStartDate: weekStart
         }));
 
-        console.log(`   📝 App records sample (first 2):`, JSON.stringify(appRecords.slice(0, 2), null, 2));
+        devLog.log(`   📝 App records sample (first 2):`, JSON.stringify(appRecords.slice(0, 2), null, 2));
 
         try {
           await db.insert(DeviceAppUsage).values(appRecords);
           syncedApps += appRecords.length;
-          console.log(`   ✅ Inserted ${appRecords.length} DeviceAppUsage records`);
+          devLog.log(`   ✅ Inserted ${appRecords.length} DeviceAppUsage records`);
 
           // Verify the inserts
           const verifyApps = await db
             .select()
             .from(DeviceAppUsage)
             .where(eq(DeviceAppUsage.screenTimeId, screenTimeId));
-          console.log(
+          devLog.log(
             `   🔍 Verification: Found ${verifyApps.length} app records in DB for screenTimeId ${screenTimeId}`
           );
         } catch (appError: any) {
-          console.error(`   ❌ Error inserting DeviceAppUsage:`, appError);
-          console.error(`   ❌ Error code:`, appError?.code);
-          console.error(`   ❌ Error message:`, appError?.message);
+          devLog.error(`   ❌ Error inserting DeviceAppUsage:`, appError);
+          devLog.error(`   ❌ Error code:`, appError?.code);
+          devLog.error(`   ❌ Error message:`, appError?.message);
           throw appError;
         }
       } else {
-        console.log(`   ⚠️  No apps data for this week`);
+        devLog.log(`   ⚠️  No apps data for this week`);
       }
 
       syncedWeeks++;
-      console.log(`   ✅ Completed week ${i + 1}/${weeks.length}`);
+      devLog.log(`   ✅ Completed week ${i + 1}/${weeks.length}`);
     }
 
-    console.log(
+    devLog.log(
       `\n📊 Sync Summary: ${syncedWeeks} weeks, ${syncedApps} weekly apps, ${syncedDays} days, ${syncedDailyApps} daily apps`
     );
 
     // Final verification: Query all records for this IMEI
-    console.log(`\n🔍 Final Verification: Querying all DeviceScreenTime records for IMEI: ${imeiString}`);
+    devLog.log(`\n🔍 Final Verification: Querying all DeviceScreenTime records for IMEI: ${imeiString}`);
     try {
       const allRecords = await db
         .select()
@@ -545,14 +543,14 @@ export const POST: APIRoute = async ({ request }) => {
         .where(eq(DeviceScreenTime.imei, imeiString))
         .orderBy(sql`${DeviceScreenTime.weekStartDate} DESC`)
         .limit(10);
-      console.log(`   📊 Found ${allRecords.length} total DeviceScreenTime records for this IMEI`);
+      devLog.log(`   📊 Found ${allRecords.length} total DeviceScreenTime records for this IMEI`);
       if (allRecords.length > 0) {
-        console.log(`   📋 Latest record:`, JSON.stringify(allRecords[0], null, 2));
+        devLog.log(`   📋 Latest record:`, JSON.stringify(allRecords[0], null, 2));
       } else {
-        console.warn(`   ⚠️  WARNING: No records found in database for IMEI ${imeiString} after sync!`);
+        devLog.warn(`   ⚠️  WARNING: No records found in database for IMEI ${imeiString} after sync!`);
       }
     } catch (verifyError: any) {
-      console.error(`   ❌ Error verifying records:`, verifyError);
+      devLog.error(`   ❌ Error verifying records:`, verifyError);
     }
 
     return new Response(
@@ -574,7 +572,7 @@ export const POST: APIRoute = async ({ request }) => {
     );
   } catch (error) {
     captureException(error);
-    console.error("Error syncing device stats:", error);
+    devLog.error("Error syncing device stats:", error);
     return new Response(
       JSON.stringify({
         error: "Internal server error",
@@ -596,7 +594,7 @@ export const POST: APIRoute = async ({ request }) => {
  * This handles the case where tables are missing in remote/production DB
  */
 async function createScreenTimeTables() {
-  console.log("🔨 Creating DeviceScreenTime table...");
+  devLog.log("🔨 Creating DeviceScreenTime table...");
   await db.run(sql`
     CREATE TABLE IF NOT EXISTS DeviceScreenTime (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -611,7 +609,7 @@ async function createScreenTimeTables() {
     )
   `);
 
-  console.log("🔨 Creating DeviceAppUsage table...");
+  devLog.log("🔨 Creating DeviceAppUsage table...");
   await db.run(sql`
     CREATE TABLE IF NOT EXISTS DeviceAppUsage (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -625,7 +623,7 @@ async function createScreenTimeTables() {
     )
   `);
 
-  console.log("🔨 Creating DeviceDailyScreenTime table...");
+  devLog.log("🔨 Creating DeviceDailyScreenTime table...");
   await db.run(sql`
     CREATE TABLE IF NOT EXISTS DeviceDailyScreenTime (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -637,7 +635,7 @@ async function createScreenTimeTables() {
     )
   `);
 
-  console.log("🔨 Creating DeviceDailyAppUsage table...");
+  devLog.log("🔨 Creating DeviceDailyAppUsage table...");
   await db.run(sql`
     CREATE TABLE IF NOT EXISTS DeviceDailyAppUsage (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -652,7 +650,7 @@ async function createScreenTimeTables() {
     )
   `);
 
-  console.log("🔨 Creating indexes...");
+  devLog.log("🔨 Creating indexes...");
   await db.run(sql`CREATE INDEX IF NOT EXISTS idx_device_app_usage_screen_time_id ON DeviceAppUsage(screenTimeId)`);
   await db.run(sql`CREATE INDEX IF NOT EXISTS idx_device_app_usage_imei_week ON DeviceAppUsage(imei, weekStartDate)`);
   await db.run(sql`CREATE INDEX IF NOT EXISTS idx_device_daily_screen_time_id ON DeviceDailyScreenTime(screenTimeId)`);
@@ -673,7 +671,7 @@ async function createScreenTimeTables() {
     sql`CREATE INDEX IF NOT EXISTS idx_device_daily_app_usage_imei_week ON DeviceDailyAppUsage(imei, weekStartDate)`
   );
 
-  console.log("✅ All screen time tables and indexes created");
+  devLog.log("✅ All screen time tables and indexes created");
 }
 
 /**

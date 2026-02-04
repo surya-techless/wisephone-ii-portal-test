@@ -4,6 +4,7 @@ import { isAdmin } from "@/lib/auth/permissions";
 import { validateIsSubscribed } from "@/libs/stripe";
 import { actions } from "astro:actions";
 import { captureException } from "@sentry/astro";
+import { devLog } from "@/libs/utils";
 
 /**
  * GET /api/wisephones/[imei]/info
@@ -89,7 +90,7 @@ export const GET: APIRoute = async ({ params, locals }) => {
         });
       } catch (subscriptionError) {
         // Log but don't fail - subscription check is best effort
-        console.error("Error checking subscription status:", subscriptionError);
+        devLog.error("Error checking subscription status:", subscriptionError);
       }
     }
 
@@ -101,7 +102,7 @@ export const GET: APIRoute = async ({ params, locals }) => {
       const getInstalledAppsResult = await actions.wisephones.getInstalledApps(formData);
       installedApps = getInstalledAppsResult?.data?.apps || [];
     } catch (appsError) {
-      console.error("Error getting installed apps:", appsError);
+      devLog.error("Error getting installed apps:", appsError);
       // Continue without apps - don't fail the entire request
     }
 
@@ -128,7 +129,7 @@ export const GET: APIRoute = async ({ params, locals }) => {
     );
   } catch (error) {
     captureException(error);
-    console.error("Error fetching device info:", error);
+    devLog.error("Error fetching device info:", error);
     return new Response(
       JSON.stringify({
         error: "Internal server error",

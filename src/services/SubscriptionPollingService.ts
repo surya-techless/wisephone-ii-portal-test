@@ -71,12 +71,9 @@ export class SubscriptionPollingService {
    */
   startPolling(devices: Device[]): void {
     if (this.isPolling) {
-      console.log("[SubscriptionPolling] Already polling, adding devices to existing poll");
       devices.forEach((device) => this.addDevice(device));
       return;
     }
-
-    console.log("[SubscriptionPolling] Starting polling for", devices.length, "devices");
 
     // Add all devices to polling list
     devices.forEach((device) => {
@@ -99,8 +96,6 @@ export class SubscriptionPollingService {
    * Stop polling completely
    */
   stopPolling(): void {
-    console.log("[SubscriptionPolling] Stopping polling");
-
     if (this.pollingIntervalId !== null) {
       clearInterval(this.pollingIntervalId);
       this.pollingIntervalId = null;
@@ -123,11 +118,8 @@ export class SubscriptionPollingService {
     const normalizedImei = this.normalizeImei(device.imei);
 
     if (this.devices.has(normalizedImei)) {
-      console.log("[SubscriptionPolling] Device already in polling list:", normalizedImei);
       return;
     }
-
-    console.log("[SubscriptionPolling] Adding device to polling list:", normalizedImei);
     this.devices.set(normalizedImei, {
       imei: normalizedImei,
       phoneNumber: device.phoneNumber
@@ -145,9 +137,7 @@ export class SubscriptionPollingService {
   removeDevice(imei: string): void {
     const normalizedImei = this.normalizeImei(imei);
 
-    if (this.devices.delete(normalizedImei)) {
-      console.log("[SubscriptionPolling] Removed device from polling list:", normalizedImei);
-    }
+    this.devices.delete(normalizedImei);
 
     // If no devices left, stop polling
     if (this.devices.size === 0) {
@@ -161,7 +151,6 @@ export class SubscriptionPollingService {
   pausePolling(): void {
     if (this.isPaused) return;
 
-    console.log("[SubscriptionPolling] Pausing polling");
     this.isPaused = true;
 
     if (this.pollingTimeoutId !== null) {
@@ -176,7 +165,6 @@ export class SubscriptionPollingService {
   resumePolling(): void {
     if (!this.isPaused || !this.isPolling) return;
 
-    console.log("[SubscriptionPolling] Resuming polling");
     this.isPaused = false;
 
     // Immediately check devices when resuming
@@ -207,7 +195,6 @@ export class SubscriptionPollingService {
     }
 
     const devicesToCheck = Array.from(this.devices.values());
-    console.log("[SubscriptionPolling] Checking", devicesToCheck.length, "devices");
 
     // Use requestIdleCallback if available for non-blocking execution
     if (typeof requestIdleCallback !== "undefined") {
@@ -232,7 +219,6 @@ export class SubscriptionPollingService {
     // Check all devices in parallel (non-blocking)
     const checkPromises = devices.map((device) =>
       this.checkDeviceSubscription(device).catch((error) => {
-        console.error("[SubscriptionPolling] Error checking device:", device.imei, error);
         if (this.config.onError) {
           this.config.onError(device, error);
         }
@@ -248,13 +234,9 @@ export class SubscriptionPollingService {
    */
   private async checkDeviceSubscription(device: Device): Promise<boolean> {
     try {
-      console.log("[SubscriptionPolling] Checking subscription for device:", device.imei);
-
       const isSubscribed = await this.config.checkSubscription(device.imei, device.phoneNumber);
 
       if (isSubscribed) {
-        console.log("[SubscriptionPolling] ✅ Subscription detected for device:", device.imei);
-
         // Remove from polling list
         this.removeDevice(device.imei);
 
@@ -271,7 +253,6 @@ export class SubscriptionPollingService {
 
       return false;
     } catch (error) {
-      console.error("[SubscriptionPolling] Error checking subscription for device:", device.imei, error);
       if (this.config.onError) {
         this.config.onError(device, error instanceof Error ? error : new Error(String(error)));
       }

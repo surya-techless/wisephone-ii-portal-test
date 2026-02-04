@@ -1,5 +1,6 @@
 import { OTTOGRID_API_KEY } from "astro:env/server";
 import { db, OttogridCache, eq, desc, sql } from "astro:db";
+import { devLog } from "./utils";
 
 const BASE_ID = "kNd55fD3";
 export const CACHE_KEY = "ottogrid_data";
@@ -53,11 +54,11 @@ async function fetchOttogridData(forceRefresh = false): Promise<ToolData> {
     const freshData = await fetchFreshData();
 
     // After fetching fresh data, clean up old cache entries
-    cleanupOldCacheEntries().catch((err) => console.error("Error cleaning up old cache entries:", err));
+    cleanupOldCacheEntries().catch((err) => devLog.error("Error cleaning up old cache entries:", err));
 
     return freshData;
   } catch (error) {
-    console.error("Error in fetchOttogridData:", error);
+    devLog.error("Error in fetchOttogridData:", error);
     // If anything fails, return empty data with fallback
     return getFallbackData();
   }
@@ -79,13 +80,13 @@ async function getLatestValidCache(): Promise<ToolData | null> {
       .limit(1);
 
     if (cacheEntries.length > 0) {
-      console.log("Cache hit - using cached Ottogrid data from:", cacheEntries[0].createdAt);
+      devLog.log("Cache hit - using cached Ottogrid data from:", cacheEntries[0].createdAt);
       return cacheEntries[0].data as ToolData;
     }
 
     return null;
   } catch (error) {
-    console.error("Error fetching from cache:", error);
+    devLog.error("Error fetching from cache:", error);
     return null;
   }
 }
@@ -140,19 +141,19 @@ async function fetchFreshData(): Promise<ToolData> {
         expiresAt: expiresAt
       });
 
-      console.log("Cache miss - fetched and cached fresh Ottogrid data");
+      devLog.log("Cache miss - fetched and cached fresh Ottogrid data");
       return processedData;
     } catch (fetchError) {
       clearTimeout(timeoutId);
       throw fetchError; // Rethrow to be handled by the parent try/catch
     }
   } catch (error) {
-    console.error("Error fetching fresh Ottogrid data:", error);
+    devLog.error("Error fetching fresh Ottogrid data:", error);
 
     // On error, try to get any cached data, even if expired
     const fallbackCache = await getLastCacheEntry();
     if (fallbackCache) {
-      console.warn("Using expired cache as fallback after fetch error");
+      devLog.warn("Using expired cache as fallback after fetch error");
       return fallbackCache as ToolData;
     }
 
@@ -174,7 +175,7 @@ async function getLastCacheEntry(): Promise<ToolData | null> {
 
     return null;
   } catch (error) {
-    console.error("Error getting last cache entry:", error);
+    devLog.error("Error getting last cache entry:", error);
     return null;
   }
 }
@@ -209,10 +210,10 @@ async function cleanupOldCacheEntries(): Promise<void> {
         await db.delete(OttogridCache).where(eq(OttogridCache.id, entry.id));
       }
 
-      console.log(`Cleaned up ${entriesToDelete.length} old cache entries`);
+      devLog.log(`Cleaned up ${entriesToDelete.length} old cache entries`);
     }
   } catch (error) {
-    console.error("Error cleaning up cache entries:", error);
+    devLog.error("Error cleaning up cache entries:", error);
   }
 }
 

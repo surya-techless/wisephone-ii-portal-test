@@ -147,10 +147,10 @@ const serializedData = screenTimeData.map((week) => {
               }));
             }
           } else {
-            console.error("Failed to fetch screen time data:", response.status, response.statusText);
+            devLog.error("Failed to fetch screen time data:", response.status, response.statusText);
           }
         } catch (error) {
-          console.error("Error fetching screen time data:", error);
+          devLog.error("Error fetching screen time data:", error);
         } finally {
           this.isLoading = false;
         }
@@ -420,3 +420,11 @@ const serializedData = screenTimeData.map((week) => {
     </div>
   </template>
 </div>
+
+<script>
+  import { devLog } from "@/libs/utils";
+  // Make devLog available globally for Alpine.js inline expressions
+  if (typeof window !== "undefined") {
+    (window as any).devLog = devLog;
+  }
+</script>

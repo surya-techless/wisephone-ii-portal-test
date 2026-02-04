@@ -1,15 +1,16 @@
 import type { APIRoute } from "astro";
 import { fetchOttogridData } from "@/libs/ottogrid";
+import { devLog } from "@/libs/utils";
 
 export const GET: APIRoute = async () => {
   try {
-    console.log("Force refreshing Ottogrid data cache...");
+    devLog.log("Force refreshing Ottogrid data cache...");
 
     // Force refresh the data (this will bypass any existing cache)
     const data = await fetchOttogridData(true);
 
     if (!data || !Array.isArray(data.rows) || data.rows.length === 0) {
-      console.error("Forced refresh returned empty or invalid data");
+      devLog.error("Forced refresh returned empty or invalid data");
       return new Response(
         JSON.stringify({
           success: false,
@@ -42,7 +43,7 @@ export const GET: APIRoute = async () => {
       }
     );
   } catch (error) {
-    console.error("Error in force-refresh-ottogrid endpoint:", error);
+    devLog.error("Error in force-refresh-ottogrid endpoint:", error);
 
     return new Response(
       JSON.stringify({

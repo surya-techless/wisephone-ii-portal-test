@@ -1,5 +1,6 @@
 import type { APIRoute } from "astro";
 import { OTTOGRID_API_KEY } from "astro:env/server";
+import { devLog } from "@/libs/utils";
 
 interface DiagnosticData {
   statusCode: number;
@@ -36,7 +37,7 @@ export const GET: APIRoute = async ({ request }) => {
       ottogridApiUrl.searchParams.set("apiKey", OTTOGRID_API_KEY);
     }
 
-    console.log(`Debug: Testing Ottogrid API URL with ${authType} auth:`, ottogridApiUrl.toString());
+    devLog.log(`Debug: Testing Ottogrid API URL with ${authType} auth:`, ottogridApiUrl.toString());
 
     // Add timeout to prevent hanging requests
     const controller = new AbortController();
@@ -123,7 +124,7 @@ export const GET: APIRoute = async ({ request }) => {
       );
     }
   } catch (error: unknown) {
-    console.error("Error in debug-ottogrid API route:", error);
+    devLog.error("Error in debug-ottogrid API route:", error);
     return new Response(
       JSON.stringify({
         error: "General error",

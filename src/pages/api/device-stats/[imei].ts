@@ -2,6 +2,7 @@ import type { APIRoute } from "astro";
 import { db, DeviceScreenTime, DeviceAppUsage, Wisephone, eq, desc, sql, and } from "astro:db";
 import { isAdmin } from "@/lib/auth/permissions";
 import { captureException } from "@sentry/astro";
+import { devLog } from "@/libs/utils";
 
 /**
  * GET /api/device-stats/[imei]
@@ -149,7 +150,7 @@ export const GET: APIRoute = async ({ params, locals, request }) => {
     );
   } catch (error) {
     captureException(error);
-    console.error("Error fetching device stats:", error);
+    devLog.error("Error fetching device stats:", error);
     return new Response(
       JSON.stringify({
         error: "Internal server error",

@@ -156,7 +156,7 @@ const { activeLink = "devices" } = Astro.props;
 
           <button
             type="button"
-            @click="console.log('🔵 Mobile Support clicked, showSupportPopup:', showSupportPopup); showSupportPopup = true; console.log('After click, showSupportPopup:', showSupportPopup)"
+            @click="devLog.log('🔵 Mobile Support clicked, showSupportPopup:', showSupportPopup); showSupportPopup = true; devLog.log('After click, showSupportPopup:', showSupportPopup)"
             class="flex items-center w-full px-4 py-3 text-sm text-gray-600 hover:bg-gray-50 rounded-lg text-left"
           >
             <img src="/assets/portal-icons/support.svg" alt="" class="w-5 h-5" />
@@ -239,8 +239,8 @@ const { activeLink = "devices" } = Astro.props;
     x-show="showSupportPopup"
     x-cloak
     x-transition.opacity
-    x-init="console.log('🟡 Mobile popup initialized, showSupportPopup:', showSupportPopup)"
-    x-effect="console.log('🟡 Mobile popup effect, showSupportPopup:', showSupportPopup); console.log('Element computed styles:', window.getComputedStyle($el).display, window.getComputedStyle($el).visibility)"
+    x-init="devLog.log('🟡 Mobile popup initialized, showSupportPopup:', showSupportPopup)"
+    x-effect="devLog.log('🟡 Mobile popup effect, showSupportPopup:', showSupportPopup); devLog.log('Element computed styles:', window.getComputedStyle($el).display, window.getComputedStyle($el).visibility)"
     class="md:fixed md:bottom-[136px] md:left-2 md:w-56 fixed bottom-[200px] right-0 z-[60] w-64"
     @click.outside="showSupportPopup = false"
   >
@@ -319,3 +319,11 @@ const { activeLink = "devices" } = Astro.props;
     </div>
   </div>
 </div>
+
+<script>
+  import { devLog } from "@/libs/utils";
+  // Make devLog available globally for Alpine.js inline expressions
+  if (typeof window !== "undefined") {
+    (window as any).devLog = devLog;
+  }
+</script>

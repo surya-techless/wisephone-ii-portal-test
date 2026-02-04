@@ -5,6 +5,7 @@ import Header from "@/components/Header.astro";
 import Layout from "@/layouts/Layout.astro";
 import Footer from "@/components/Footer.astro";
 import { isAdmin } from "@/lib/auth/permissions";
+import { devLog } from "@/libs/utils";
 
 if (!Astro.locals.auth().userId) {
   return Astro.redirect("/");
@@ -504,6 +505,7 @@ const success = [result?.data?.success as string].filter(Boolean).join("\n");
   <script>
     import { actions } from "astro:actions";
     import Alpine from "alpinejs";
+    import { devLog } from "@/libs/utils";
 
     // Define TypeScript interfaces for our components
     interface Wisephone {
@@ -592,7 +594,7 @@ const success = [result?.data?.success as string].filter(Boolean).join("\n");
             await this.fetchAllBypassStatuses();
           } catch (err) {
             this.error = err instanceof Error ? err.message : "Failed to load wisephones";
-            console.error("Error fetching wisephones:", err);
+            devLog.error("Error fetching wisephones:", err);
           } finally {
             this.isLoading = false;
             // @ts-ignore - Alpine methods
@@ -617,7 +619,7 @@ const success = [result?.data?.success as string].filter(Boolean).join("\n");
               phone.bypassReason = bypass?.reason || "";
             }
           } catch (err) {
-            console.error("Error fetching bypass statuses:", err);
+            devLog.error("Error fetching bypass statuses:", err);
             // Set default values for bypass status if the API call fails
             for (const phone of this.wisephones) {
               phone.bypassSubscription = false;
@@ -674,7 +676,7 @@ const success = [result?.data?.success as string].filter(Boolean).join("\n");
             this.showEditModal = false;
           } catch (err) {
             this.error = err instanceof Error ? err.message : "Failed to update wisephone";
-            console.error("Error updating wisephone:", err);
+            devLog.error("Error updating wisephone:", err);
           } finally {
             this.isLoading = false;
             // @ts-ignore - Alpine methods
@@ -716,7 +718,7 @@ const success = [result?.data?.success as string].filter(Boolean).join("\n");
             this.wisephoneToDelete = null;
           } catch (err) {
             this.error = err instanceof Error ? err.message : "Failed to delete wisephone";
-            console.error("Error deleting wisephone:", err);
+            devLog.error("Error deleting wisephone:", err);
           } finally {
             this.isLoading = false;
             // @ts-ignore - Alpine methods
@@ -813,7 +815,7 @@ const success = [result?.data?.success as string].filter(Boolean).join("\n");
             this.isSubscribed = result.isSubscribed || false;
             this.hasBeenSubmitted = true;
           } catch (error) {
-            console.error("Subscription check failed:", error);
+            devLog.error("Subscription check failed:", error);
             this.subscriptionError =
               error instanceof Error ? error.message : "Failed to check subscription. Please try again.";
           } finally {

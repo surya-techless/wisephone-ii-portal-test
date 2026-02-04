@@ -1,14 +1,12 @@
 import Stripe from "stripe";
 import { STRIPE_SECRET_KEY, GIGS_API_KEY } from "astro:env/server";
 import { type SubscriptionList, type DeviceList, type Subscription } from "./types";
+import { devLog } from "./utils";
 
-export const stripe = new Stripe(
-  import.meta.env.PROD ? STRIPE_SECRET_KEY : STRIPE_SECRET_KEY,
-  {
-    apiVersion: "2025-02-24.acacia",
-    typescript: true
-  }
-);
+export const stripe = new Stripe(import.meta.env.PROD ? STRIPE_SECRET_KEY : STRIPE_SECRET_KEY, {
+  apiVersion: "2025-02-24.acacia",
+  typescript: true
+});
 
 const API_CONFIG = {
   gigs: {
@@ -21,45 +19,45 @@ export async function validateSubscription(
   provider: "stripe" | "gigs",
   params: { imei?: string; phoneNumber?: string }
 ): Promise<boolean> {
-  console.log("PAY DEBUG: [L1] validateSubscription function called");
-  console.log("PAY DEBUG: [L1.1] provider:", provider);
-  console.log("PAY DEBUG: [L1.2] params:", params);
+  devLog.log("PAY DEBUG: [L1] validateSubscription function called");
+  devLog.log("PAY DEBUG: [L1.1] provider:", provider);
+  devLog.log("PAY DEBUG: [L1.2] params:", params);
 
   const { imei, phoneNumber } = params;
 
   if (provider === "stripe" && imei) {
-    console.log("PAY DEBUG: [L1.3] Searching Stripe customers by IMEI metadata");
-    console.log("PAY DEBUG: [L1.4] Search query:", `metadata['imei']:'${imei}'`);
+    devLog.log("PAY DEBUG: [L1.3] Searching Stripe customers by IMEI metadata");
+    devLog.log("PAY DEBUG: [L1.4] Search query:", `metadata['imei']:'${imei}'`);
 
     const customers = await stripe.customers.search({
       query: `metadata['imei']:'${imei}'`
     });
 
-    console.log("PAY DEBUG: [L1.5] Stripe customer search result - found:", customers.data.length, "customers");
+    devLog.log("PAY DEBUG: [L1.5] Stripe customer search result - found:", customers.data.length, "customers");
 
     if (!customers.data.length) {
-      console.log("PAY DEBUG: [L1.6] No customers found with IMEI metadata, returning false");
+      devLog.log("PAY DEBUG: [L1.6] No customers found with IMEI metadata, returning false");
       return false;
     }
 
     // For each customer, because sometimes there are dupilicates,
     // we need to check if the customer has an active subscription
-    console.log("PAY DEBUG: [L1.7] Checking subscriptions for", customers.data.length, "customers");
+    devLog.log("PAY DEBUG: [L1.7] Checking subscriptions for", customers.data.length, "customers");
     for (const customer of customers.data) {
-      console.log("PAY DEBUG: [L1.8] Checking customer:", customer.id);
+      devLog.log("PAY DEBUG: [L1.8] Checking customer:", customer.id);
       const subscriptions = await stripe.subscriptions.list({
         customer: customer.id,
         status: "active"
       });
 
-      console.log("PAY DEBUG: [L1.9] Customer", customer.id, "has", subscriptions.data.length, "active subscriptions");
+      devLog.log("PAY DEBUG: [L1.9] Customer", customer.id, "has", subscriptions.data.length, "active subscriptions");
       if (subscriptions.data.length > 0) {
-        console.log("PAY DEBUG: [L1.10] Found active subscription, returning true");
+        devLog.log("PAY DEBUG: [L1.10] Found active subscription, returning true");
         return true;
       }
     }
 
-    console.log("PAY DEBUG: [L1.11] No active subscriptions found for any customer, returning false");
+    devLog.log("PAY DEBUG: [L1.11] No active subscriptions found for any customer, returning false");
     return false;
   }
 
@@ -84,7 +82,7 @@ export async function validateSubscription(
       });
 
       const subscriptions = (await subscriptionResponse.json()) as SubscriptionList;
-      console.log(subscriptions);
+      devLog.log(subscriptions);
       isSubscribed = subscriptions?.items?.some((sub) => ["active", "pending"].includes(sub.status));
     }
 
@@ -137,30 +135,30 @@ export async function validateIsSubscribed({
   imei: string;
   phoneNumber: string;
 }): Promise<boolean> {
-  console.log("PAY DEBUG: [L2] validateIsSubscribed function called");
-  console.log("PAY DEBUG: [L2.1] imei:", imei);
-  console.log("PAY DEBUG: [L2.2] phoneNumber:", phoneNumber);
+  devLog.log("PAY DEBUG: [L2] validateIsSubscribed function called");
+  devLog.log("PAY DEBUG: [L2.1] imei:", imei);
+  devLog.log("PAY DEBUG: [L2.2] phoneNumber:", phoneNumber);
 
   try {
     if (imei) {
-      console.log("PAY DEBUG: [L2.3] Checking Stripe subscription first by IMEI");
+      devLog.log("PAY DEBUG: [L2.3] Checking Stripe subscription first by IMEI");
       const stripeResult = await validateSubscription("stripe", { imei });
-      console.log("PAY DEBUG: [L2.4] Stripe subscription check result:", stripeResult);
+      devLog.log("PAY DEBUG: [L2.4] Stripe subscription check result:", stripeResult);
 
       if (stripeResult) {
-        console.log("PAY DEBUG: [L2.5] Stripe subscription found, returning true");
+        devLog.log("PAY DEBUG: [L2.5] Stripe subscription found, returning true");
         return true;
       }
     }
 
-    console.log("PAY DEBUG: [L2.6] Stripe check returned false, checking Gigs subscription");
+    devLog.log("PAY DEBUG: [L2.6] Stripe check returned false, checking Gigs subscription");
     const gigsResult = await validateSubscription("gigs", { imei, phoneNumber });
-    console.log("PAY DEBUG: [L2.7] Gigs subscription check result:", gigsResult);
-    console.log("PAY DEBUG: [L2.8] Final result:", gigsResult);
+    devLog.log("PAY DEBUG: [L2.7] Gigs subscription check result:", gigsResult);
+    devLog.log("PAY DEBUG: [L2.8] Final result:", gigsResult);
 
     return gigsResult;
   } catch (err: any) {
-    console.error("PAY DEBUG: [L2.9] ERROR validating subscription:", err);
+    devLog.error("PAY DEBUG: [L2.9] ERROR validating subscription:", err);
     // Return false on error - device will be assigned to unpaid group
     // This prevents unsubscribed devices from getting subscribed features due to API errors
     return false;

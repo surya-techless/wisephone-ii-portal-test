@@ -11,7 +11,7 @@ import Layout from "@/layouts/Layout.astro";
 import Header from "@/components/Header.astro";
 import Footer from "@/components/Footer.astro";
 import TechlessSubscriptionButton from "@/components/TechlessSubscriptionButton.astro";
-import { FEATURES, FAITH_TOOLS_APPS, getPackageNameFromPlayStoreUrl, isValidIMEI } from "@/libs/utils";
+import { FEATURES, FAITH_TOOLS_APPS, getPackageNameFromPlayStoreUrl, isValidIMEI, devLog } from "@/libs/utils";
 import { isAdmin } from "@/lib/auth/permissions";
 import type { AppsList } from "@/types/apps";
 
@@ -100,26 +100,26 @@ if (!user) {
     .limit(1);
 
   isSubscribed = bypassTechlessSubscription.length > 0;
-  console.log(`[Device Page] Bypass subscription check: ${isSubscribed}`);
+  devLog.log(`[Device Page] Bypass subscription check: ${isSubscribed}`);
 
   if (!isSubscribed && wisephone?.phoneNumber) {
     try {
       const imeiForCheck = String(wisephone?.imei || "");
       const phoneForCheck = `${wisephone?.phoneNumber?.replace(/[^0-9+]/g, "") || ""}`;
-      console.log(`[Device Page] Checking subscription - IMEI: ${imeiForCheck}, Phone: ${phoneForCheck}`);
+      devLog.log(`[Device Page] Checking subscription - IMEI: ${imeiForCheck}, Phone: ${phoneForCheck}`);
 
       isSubscribed = await validateIsSubscribed({
         imei: imeiForCheck,
         phoneNumber: phoneForCheck
       });
-      console.log(`[Device Page] Subscription check result: ${isSubscribed}`);
+      devLog.log(`[Device Page] Subscription check result: ${isSubscribed}`);
     } catch (subscriptionError) {
-      console.error("[Device Page] Error checking subscription status:", subscriptionError);
+      devLog.error("[Device Page] Error checking subscription status:", subscriptionError);
       // Continue with isSubscribed = false instead of crashing
     }
   }
 
-  console.log(`[Device Page] Final isSubscribed value being passed to client: ${isSubscribed}`);
+  devLog.log(`[Device Page] Final isSubscribed value being passed to client: ${isSubscribed}`);
 
   // Retrieve admin user data with proper error handling
   if (userIsAdmin) {
@@ -128,10 +128,10 @@ if (!user) {
       if (wisephone?.userId && typeof wisephone.userId === "string") {
         user = await getUser(wisephone.userId);
       } else {
-        console.warn("No valid userId found for wisephone:", wisephone);
+        devLog.warn("No valid userId found for wisephone:", wisephone);
       }
     } catch (userError) {
-      console.error("Error retrieving user data:", userError);
+      devLog.error("Error retrieving user data:", userError);
       // Keep user = current user as fallback
     }
   }
@@ -170,7 +170,7 @@ if (!user) {
     const getInstalledAppsResult = await Astro.callAction(actions.wisephones.getInstalledApps, formData);
     installedApps = getInstalledAppsResult?.data?.apps || [];
   } catch (appsError) {
-    console.error("Error getting installed apps:", appsError);
+    devLog.error("Error getting installed apps:", appsError);
     // Continue with empty installedApps array instead of crashing
   }
 
@@ -190,18 +190,18 @@ if (!user) {
           name: app.Name || "Unknown App"
         };
       } catch (appError) {
-        console.error("Error processing Faith Tools app:", appError);
+        devLog.error("Error processing Faith Tools app:", appError);
         // Continue with next app instead of crashing
       }
     });
   } catch (faithToolsError) {
-    console.error("Error processing Faith Tools apps:", faithToolsError);
+    devLog.error("Error processing Faith Tools apps:", faithToolsError);
   }
 
   // Sort apps by name
   sortedAppsList = Object.fromEntries(Object.entries(appsList).sort(([, a], [, b]) => a.name.localeCompare(b.name)));
 } catch (error) {
-  console.error("Unexpected error in device page:", error);
+  devLog.error("Unexpected error in device page:", error);
   return Astro.redirect(
     "/dashboard?error=" + encodeURIComponent("An unexpected error occurred while loading the device. Please try again.")
   );
@@ -711,7 +711,8 @@ const userLink = user?.id
       FEATURES,
       updateUnreachableAlpineState,
       KNOX_USER_GROUPS,
-      getPackageNameFromPlayStoreUrl
+      getPackageNameFromPlayStoreUrl,
+      devLog
     } from "@/libs/utils";
     import { AppManagementService } from "@/services/AppManagementService";
     import { FeatureManagementService } from "@/services/FeatureManagementService";
@@ -884,7 +885,7 @@ const userLink = user?.id
 
             return model;
           } catch (error) {
-            console.error("Error fetching device model:", error);
+            devLog.error("Error fetching device model:", error);
             return null;
           }
         },
@@ -899,7 +900,7 @@ const userLink = user?.id
             if (model) {
               const modelUpper = model.toUpperCase();
               this.isA16Device = modelUpper.includes("A16") || modelUpper.includes("SM-A16");
-              console.log(`Device model cached: ${model}, isA16Device: ${this.isA16Device}`);
+              devLog.log(`Device model cached: ${model}, isA16Device: ${this.isA16Device}`);
             }
           }
         },
@@ -925,7 +926,7 @@ const userLink = user?.id
           try {
             const deviceModel = await this.getDeviceModelFromKnox();
             if (!deviceModel) {
-              console.warn("Could not determine device model, using default SUBSCRIBED group");
+              devLog.warn("Could not determine device model, using default SUBSCRIBED group");
               // Default to SUBSCRIBED if we can't determine model
               await this.addFeatureToDevice(KNOX_USER_GROUPS.SUBSCRIBED);
               this.features.push(KNOX_USER_GROUPS.SUBSCRIBED);
@@ -936,17 +937,17 @@ const userLink = user?.id
 
             // Check if device is A16
             if (modelUpper.includes("A16") || modelUpper.includes("SM-A16")) {
-              console.log(`Device model detected as A16: ${deviceModel}, assigning to A16_SUBSCRIBED group`);
+              devLog.log(`Device model detected as A16: ${deviceModel}, assigning to A16_SUBSCRIBED group`);
               await this.addFeatureToDevice(KNOX_USER_GROUPS.A16_SUBSCRIBED);
               this.features.push(KNOX_USER_GROUPS.A16_SUBSCRIBED);
             } else {
               // Default to SUBSCRIBED for A15 and all other devices
-              console.log(`Device model: ${deviceModel}, assigning to SUBSCRIBED group`);
+              devLog.log(`Device model: ${deviceModel}, assigning to SUBSCRIBED group`);
               await this.addFeatureToDevice(KNOX_USER_GROUPS.SUBSCRIBED);
               this.features.push(KNOX_USER_GROUPS.SUBSCRIBED);
             }
           } catch (error) {
-            console.error("Error assigning subscription group by device model:", error);
+            devLog.error("Error assigning subscription group by device model:", error);
             // Fallback to default SUBSCRIBED group on error
             await this.addFeatureToDevice(KNOX_USER_GROUPS.SUBSCRIBED);
             this.features.push(KNOX_USER_GROUPS.SUBSCRIBED);
@@ -964,17 +965,17 @@ const userLink = user?.id
             await this.cacheDeviceModel();
 
             if (this.isA16Device) {
-              console.log(`A16 device detected, assigning to A16_UNPAID group`);
+              devLog.log(`A16 device detected, assigning to A16_UNPAID group`);
               await this.addFeatureToDevice(KNOX_USER_GROUPS.A16_UNPAID);
               this.features.push(KNOX_USER_GROUPS.A16_UNPAID);
             } else {
               // Default to UNPAID for A15 and all other devices
-              console.log(`Non-A16 device, assigning to UNPAID group`);
+              devLog.log(`Non-A16 device, assigning to UNPAID group`);
               await this.addFeatureToDevice(KNOX_USER_GROUPS.UNPAID);
               this.features.push(KNOX_USER_GROUPS.UNPAID);
             }
           } catch (error) {
-            console.error("Error assigning unpaid group by device model:", error);
+            devLog.error("Error assigning unpaid group by device model:", error);
             // Fallback to default UNPAID group on error
             await this.addFeatureToDevice(KNOX_USER_GROUPS.UNPAID);
             this.features.push(KNOX_USER_GROUPS.UNPAID);
@@ -1061,7 +1062,7 @@ const userLink = user?.id
               `Your device is being updated. ${feature.name} will be ${!currentEnabled ? "enabled" : "disabled"} shortly.`
             );
           } catch (error) {
-            console.error("Feature toggle failed:", error);
+            devLog.error("Feature toggle failed:", error);
             this.showErrorToast(error instanceof Error ? error.message : "Feature update failed");
             switchElement.checked = currentEnabled;
           }
@@ -1213,7 +1214,7 @@ const userLink = user?.id
             this.appsList[packageName].installed = true;
             this.showSuccessToast(`${this.appsList[packageName].name} will be installed shortly`);
           } catch (error) {
-            console.error("App installation failed:", error);
+            devLog.error("App installation failed:", error);
             this.showErrorToast("Failed to install app");
           }
         },
@@ -1224,7 +1225,7 @@ const userLink = user?.id
             this.appsList[packageName].installed = false;
             this.showSuccessToast(`${this.appsList[packageName].name} will be uninstalled shortly`);
           } catch (error) {
-            console.error("App uninstallation failed:", error);
+            devLog.error("App uninstallation failed:", error);
             this.showErrorToast("Failed to uninstall app");
           }
         },
@@ -1265,7 +1266,7 @@ const userLink = user?.id
                       name: row.cells["Tool Name"] || "Unknown App"
                     };
                   } catch (error) {
-                    console.error("Error processing app row:", error);
+                    devLog.error("Error processing app row:", error);
                   }
                 });
 
@@ -1273,7 +1274,7 @@ const userLink = user?.id
               this.isToolDrawerLoaded = true;
             }
           } catch (error) {
-            console.error("Error loading Tool Drawer:", error);
+            devLog.error("Error loading Tool Drawer:", error);
             this.showErrorToast("Failed to load Tool Drawer apps");
           } finally {
             this.isToolDrawerLoading = false;
@@ -1322,7 +1323,7 @@ const userLink = user?.id
                 this.validateStripeSession();
               }
             } catch (error) {
-              console.error("Failed to load features:", error);
+              devLog.error("Failed to load features:", error);
             } finally {
               this.isLoading = false;
             }

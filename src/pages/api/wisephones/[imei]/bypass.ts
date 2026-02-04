@@ -2,6 +2,7 @@ import type { APIRoute } from "astro";
 import { db, BypassTechlessSubscription, sql } from "astro:db";
 import { isAdmin } from "@/lib/auth/permissions";
 import { captureException } from "@sentry/astro";
+import { devLog } from "@/libs/utils";
 
 export const GET: APIRoute = async ({ locals, params }) => {
   try {
@@ -51,7 +52,7 @@ export const GET: APIRoute = async ({ locals, params }) => {
     });
   } catch (error) {
     captureException(error);
-    console.error("Error fetching bypass status:", error);
+    devLog.error("Error fetching bypass status:", error);
     return new Response(
       JSON.stringify({
         error: "Internal Server Error",

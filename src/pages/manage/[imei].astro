@@ -24,7 +24,7 @@ import Layout from "@/layouts/Layout.astro";
 import TechlessSubscriptionButton from "@/components/TechlessSubscriptionButton.astro";
 import DashboardSidebar from "@/components/DashboardSidebar.astro";
 import ScreenTimeStats from "@/components/ScreenTimeStats.astro";
-import { FEATURES, getPackageNameFromPlayStoreUrl, isValidIMEI, type Feature } from "@/libs/utils";
+import { FEATURES, getPackageNameFromPlayStoreUrl, isValidIMEI, type Feature, devLog } from "@/libs/utils";
 import { isAdmin } from "@/lib/auth/permissions";
 import type { AppsList } from "@/types/apps";
 import { DEFAULT_SYSTEM_APPS, getSystemAppPackageNames } from "@/utils/system-apps";
@@ -34,7 +34,7 @@ import { isFeatureEnabled } from "@/config/feature-flags";
 
 // Helper function to create screen time tables if they don't exist
 async function createScreenTimeTables() {
-  console.log("🔨 Creating DeviceScreenTime table...");
+  devLog.log("🔨 Creating DeviceScreenTime table...");
   await db.run(sql`
     CREATE TABLE IF NOT EXISTS DeviceScreenTime (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -49,7 +49,7 @@ async function createScreenTimeTables() {
     )
   `);
 
-  console.log("🔨 Creating DeviceAppUsage table...");
+  devLog.log("🔨 Creating DeviceAppUsage table...");
   await db.run(sql`
     CREATE TABLE IF NOT EXISTS DeviceAppUsage (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -63,11 +63,11 @@ async function createScreenTimeTables() {
     )
   `);
 
-  console.log("🔨 Creating indexes...");
+  devLog.log("🔨 Creating indexes...");
   await db.run(sql`CREATE INDEX IF NOT EXISTS idx_device_app_usage_screen_time_id ON DeviceAppUsage(screenTimeId)`);
   await db.run(sql`CREATE INDEX IF NOT EXISTS idx_device_app_usage_imei_week ON DeviceAppUsage(imei, weekStartDate)`);
 
-  console.log("✅ Screen time tables created");
+  devLog.log("✅ Screen time tables created");
 }
 
 // Initialize variables
@@ -89,9 +89,9 @@ try {
   const appsJsonPath = join(process.cwd(), "apps.json");
   const appsJsonContent = readFileSync(appsJsonPath, "utf-8");
   appsJsonData = JSON.parse(appsJsonContent);
-  console.log(`✅ Loaded ${appsJsonData.rows?.length || 0} apps from apps.json`);
+  devLog.log(`✅ Loaded ${appsJsonData.rows?.length || 0} apps from apps.json`);
 } catch (error) {
-  console.error("❌ Failed to load apps.json:", error);
+  devLog.error("❌ Failed to load apps.json:", error);
   // Continue with empty apps list
 }
 
@@ -149,21 +149,21 @@ try {
   }
 
   // Check subscription status
-  console.log("PAY DEBUG: [S1] Server-side subscription check for IMEI:", imei);
-  console.log("PAY DEBUG: [S1.0] Full URL:", Astro.url.toString());
-  console.log("PAY DEBUG: [S1.0.1] All URL params:", Object.fromEntries(Astro.url.searchParams.entries()));
+  devLog.log("PAY DEBUG: [S1] Server-side subscription check for IMEI:", imei);
+  devLog.log("PAY DEBUG: [S1.0] Full URL:", Astro.url.toString());
+  devLog.log("PAY DEBUG: [S1.0.1] All URL params:", Object.fromEntries(Astro.url.searchParams.entries()));
 
   // Check if this is a Stripe redirect (session_id in URL)
   const sessionIdParam = Astro.url.searchParams.get("session_id");
   const paymentStatusParam = Astro.url.searchParams.get("payment_status");
 
-  console.log("PAY DEBUG: [S1.0.2] Raw session_id param:", sessionIdParam);
-  console.log("PAY DEBUG: [S1.0.3] Is placeholder?", sessionIdParam === "{CHECKOUT_SESSION_ID}");
-  console.log("PAY DEBUG: [S1.0.4] payment_status param:", paymentStatusParam);
+  devLog.log("PAY DEBUG: [S1.0.2] Raw session_id param:", sessionIdParam);
+  devLog.log("PAY DEBUG: [S1.0.3] Is placeholder?", sessionIdParam === "{CHECKOUT_SESSION_ID}");
+  devLog.log("PAY DEBUG: [S1.0.4] payment_status param:", paymentStatusParam);
 
   if (sessionIdParam && sessionIdParam !== "{CHECKOUT_SESSION_ID}") {
-    console.log("PAY DEBUG: [S1.0.5] ✅ Valid session_id found - validating payment");
-    console.log("PAY DEBUG: [S1.0.6] session_id:", sessionIdParam);
+    devLog.log("PAY DEBUG: [S1.0.5] ✅ Valid session_id found - validating payment");
+    devLog.log("PAY DEBUG: [S1.0.6] session_id:", sessionIdParam);
 
     try {
       // Validate subscription using session_id (direct validation, no metadata search needed)
@@ -172,21 +172,21 @@ try {
         imei: imei
       });
 
-      console.log("PAY DEBUG: [S1.0.3] Validation result:", validationResult);
-      console.log("PAY DEBUG: [S1.0.4] isSubscribed from validation:", validationResult?.isSubscribed);
+      devLog.log("PAY DEBUG: [S1.0.3] Validation result:", validationResult);
+      devLog.log("PAY DEBUG: [S1.0.4] isSubscribed from validation:", validationResult?.isSubscribed);
 
       if (validationResult?.isSubscribed) {
         // Payment succeeded, subscription is active
-        console.log("PAY DEBUG: [S1.0.5] ✅ Payment successful, subscription is active");
+        devLog.log("PAY DEBUG: [S1.0.5] ✅ Payment successful, subscription is active");
         isSubscribed = true;
       } else {
         // Payment failed, cancelled, or subscription not active
-        console.log("PAY DEBUG: [S1.0.6] ❌ Payment not completed or subscription not active");
-        console.log("PAY DEBUG: [S1.0.7] Redirecting to dashboard with error");
+        devLog.log("PAY DEBUG: [S1.0.6] ❌ Payment not completed or subscription not active");
+        devLog.log("PAY DEBUG: [S1.0.7] Redirecting to dashboard with error");
         return Astro.redirect("/dashboard?error=" + encodeURIComponent("Payment was not completed. Please try again."));
       }
     } catch (validationError) {
-      console.error("PAY DEBUG: [S1.0.8] ERROR validating Stripe session:", validationError);
+      devLog.error("PAY DEBUG: [S1.0.8] ERROR validating Stripe session:", validationError);
       // On error, redirect to dashboard with error message
       return Astro.redirect(
         "/dashboard?error=" + encodeURIComponent("Unable to verify payment. Please try again or contact support.")
@@ -195,11 +195,11 @@ try {
   } else {
     // Normal flow: no Stripe redirect, check subscription normally
     if (sessionIdParam) {
-      console.log("PAY DEBUG: [S1.1] session_id is placeholder or invalid - running normal subscription check");
-      console.log("PAY DEBUG: [S1.1.0] session_id value:", sessionIdParam);
-      console.log("PAY DEBUG: [S1.1.1] This means Stripe hasn't replaced the placeholder yet or payment was cancelled");
+      devLog.log("PAY DEBUG: [S1.1] session_id is placeholder or invalid - running normal subscription check");
+      devLog.log("PAY DEBUG: [S1.1.0] session_id value:", sessionIdParam);
+      devLog.log("PAY DEBUG: [S1.1.1] This means Stripe hasn't replaced the placeholder yet or payment was cancelled");
     } else {
-      console.log("PAY DEBUG: [S1.1] No Stripe session_id in URL - running normal subscription check");
+      devLog.log("PAY DEBUG: [S1.1] No Stripe session_id in URL - running normal subscription check");
     }
 
     const bypassTechlessSubscription = await db
@@ -209,18 +209,18 @@ try {
       .limit(1);
 
     isSubscribed = bypassTechlessSubscription.length > 0;
-    console.log("PAY DEBUG: [S1.2] Bypass subscription check result:", isSubscribed);
-    console.log("PAY DEBUG: [S1.2.1] wisephone exists:", !!wisephone);
-    console.log("PAY DEBUG: [S1.2.2] wisephone phoneNumber:", wisephone?.phoneNumber);
+    devLog.log("PAY DEBUG: [S1.2] Bypass subscription check result:", isSubscribed);
+    devLog.log("PAY DEBUG: [S1.2.1] wisephone exists:", !!wisephone);
+    devLog.log("PAY DEBUG: [S1.2.2] wisephone phoneNumber:", wisephone?.phoneNumber);
 
     if (!isSubscribed && wisephone?.phoneNumber) {
       try {
         const imeiForCheck = String(wisephone?.imei || "");
         const phoneForCheck = `${wisephone?.phoneNumber?.replace(/[^0-9+]/g, "") || ""}`;
-        console.log("PAY DEBUG: [S1.3] ✅ Running validateIsSubscribed");
-        console.log("PAY DEBUG: [S1.4]   - IMEI:", imeiForCheck);
-        console.log("PAY DEBUG: [S1.5]   - Phone:", phoneForCheck);
-        console.log("PAY DEBUG: [S1.5.1] Calling validateIsSubscribed function...");
+        devLog.log("PAY DEBUG: [S1.3] ✅ Running validateIsSubscribed");
+        devLog.log("PAY DEBUG: [S1.4]   - IMEI:", imeiForCheck);
+        devLog.log("PAY DEBUG: [S1.5]   - Phone:", phoneForCheck);
+        devLog.log("PAY DEBUG: [S1.5.1] Calling validateIsSubscribed function...");
 
         const startTime = Date.now();
         isSubscribed = await validateIsSubscribed({
@@ -230,42 +230,42 @@ try {
         const endTime = Date.now();
         const duration = endTime - startTime;
 
-        console.log("PAY DEBUG: [S1.6] ✅ validateIsSubscribed completed");
-        console.log("PAY DEBUG: [S1.6.1] Result:", isSubscribed);
-        console.log("PAY DEBUG: [S1.6.2] Duration:", duration, "ms");
+        devLog.log("PAY DEBUG: [S1.6] ✅ validateIsSubscribed completed");
+        devLog.log("PAY DEBUG: [S1.6.1] Result:", isSubscribed);
+        devLog.log("PAY DEBUG: [S1.6.2] Duration:", duration, "ms");
       } catch (subscriptionError) {
-        console.error("PAY DEBUG: [S1.7] ❌ ERROR checking subscription status:", subscriptionError);
-        console.error(
+        devLog.error("PAY DEBUG: [S1.7] ❌ ERROR checking subscription status:", subscriptionError);
+        devLog.error(
           "PAY DEBUG: [S1.7.1] Error details:",
           subscriptionError instanceof Error ? subscriptionError.message : subscriptionError
         );
       }
     } else {
-      console.log("PAY DEBUG: [S1.3] ⚠️ Skipping validateIsSubscribed");
+      devLog.log("PAY DEBUG: [S1.3] ⚠️ Skipping validateIsSubscribed");
       if (isSubscribed) {
-        console.log("PAY DEBUG: [S1.3.1] Reason: Bypass subscription found");
+        devLog.log("PAY DEBUG: [S1.3.1] Reason: Bypass subscription found");
       }
       if (!wisephone?.phoneNumber) {
-        console.log("PAY DEBUG: [S1.3.2] Reason: No phone number available");
-        console.log("PAY DEBUG: [S1.3.3] wisephone:", wisephone ? "exists" : "null");
+        devLog.log("PAY DEBUG: [S1.3.2] Reason: No phone number available");
+        devLog.log("PAY DEBUG: [S1.3.3] wisephone:", wisephone ? "exists" : "null");
       }
     }
   }
 
-  console.log("PAY DEBUG: [S1.8] Final server-side isSubscribed:", isSubscribed);
+  devLog.log("PAY DEBUG: [S1.8] Final server-side isSubscribed:", isSubscribed);
 
   // const formData = new FormData();
   // formData.append("imei", String(wisephone?.imei || ""));
   // try {
   //   const getInstalledAppsResult = await Astro.callAction(actions.wisephones.getInstalledApps, formData);
   //   installedApps = getInstalledAppsResult?.data?.apps || [];
-  //   console.log("[DEBUG] getInstalledApps installed Appsresult", installedApps);
+  //   devLog.log("[DEBUG] getInstalledApps installed Appsresult", installedApps);
   //   // Printing every item in the installedApps array
   //   installedApps.forEach((app) => {
-  //     console.log("[DEBUG] getInstalledApps installed Appsitem", app.packageName);
+  //     devLog.log("[DEBUG] getInstalledApps installed Appsitem", app.packageName);
   //   });
   // } catch (appsError) {
-  //   console.error("Error getting installed apps:", appsError);
+  //   devLog.error("Error getting installed apps:", appsError);
   // }
 
   // Check feature flag for screen time
@@ -275,15 +275,15 @@ try {
   let screenTimeRecords: any[] = [];
 
   if (enableScreenTime) {
-    console.log("📊 Fetching device screentime for IMEI:", imei);
+    devLog.log("📊 Fetching device screentime for IMEI:", imei);
 
     // Check which database we're using
     const dbUrl = import.meta.env.ASTRO_DB_REMOTE_URL || import.meta.env.TURSO_DATABASE_URL;
     if (dbUrl) {
-      console.log("🌍 Using REMOTE database (Turso)");
+      devLog.log("🌍 Using REMOTE database (Turso)");
     } else {
-      console.log("⚠️ Using LOCAL database - data may not be synced!");
-      console.log("💡 To use remote DB, run: npm run dev:remote");
+      devLog.log("⚠️ Using LOCAL database - data may not be synced!");
+      devLog.log("💡 To use remote DB, run: npm run dev:remote");
     }
     try {
       screenTimeRecords = await db
@@ -295,10 +295,10 @@ try {
     } catch (error: any) {
       // Handle case where table doesn't exist yet - create tables automatically
       if (error?.code === "SQLITE_UNKNOWN" || error?.message?.includes("no such table")) {
-        console.warn("⚠️ DeviceScreenTime table does not exist yet. Creating tables...");
+        devLog.warn("⚠️ DeviceScreenTime table does not exist yet. Creating tables...");
         try {
           await createScreenTimeTables();
-          console.log("✅ Screen time tables created successfully");
+          devLog.log("✅ Screen time tables created successfully");
           // Retry the query after creating tables
           screenTimeRecords = await db
             .select()
@@ -306,7 +306,7 @@ try {
             .where(eq(DeviceScreenTime.imei, imei))
             .orderBy(desc(DeviceScreenTime.weekStartDate));
         } catch (createError) {
-          console.error("❌ Failed to create tables:", createError);
+          devLog.error("❌ Failed to create tables:", createError);
           screenTimeRecords = [];
         }
       } else {
@@ -314,13 +314,13 @@ try {
       }
     }
 
-    console.log("📊 DeviceScreenTime records found:", screenTimeRecords.length);
+    devLog.log("📊 DeviceScreenTime records found:", screenTimeRecords.length);
 
     // Log raw records to see what we're getting from DB
     if (screenTimeRecords.length > 0) {
-      console.log("📊 Raw first record from DB:", JSON.stringify(screenTimeRecords[0], null, 2));
+      devLog.log("📊 Raw first record from DB:", JSON.stringify(screenTimeRecords[0], null, 2));
       screenTimeRecords.forEach((record, idx) => {
-        console.log(`📊 Raw record ${idx}:`, {
+        devLog.log(`📊 Raw record ${idx}:`, {
           id: record.id,
           imei: record.imei,
           dailyAverageMs: record.dailyAverageMs,
@@ -346,14 +346,14 @@ try {
           // CRITICAL: Ensure dailyAverageMs is NEVER null/undefined
           let dailyAverageMs = record.dailyAverageMs;
           if (dailyAverageMs === null || dailyAverageMs === undefined) {
-            console.warn(`⚠️ Record ${record.id} has null/undefined dailyAverageMs, attempting to calculate...`);
+            devLog.warn(`⚠️ Record ${record.id} has null/undefined dailyAverageMs, attempting to calculate...`);
             // Try to calculate from totalScreenTimeMs if available
             if (record.totalScreenTimeMs && record.totalScreenTimeMs > 0) {
               dailyAverageMs = Math.round(record.totalScreenTimeMs / 7);
-              console.log(`✅ Calculated dailyAverageMs from totalScreenTimeMs: ${dailyAverageMs}`);
+              devLog.log(`✅ Calculated dailyAverageMs from totalScreenTimeMs: ${dailyAverageMs}`);
             } else {
               dailyAverageMs = 0;
-              console.warn(`⚠️ Could not calculate dailyAverageMs, defaulting to 0`);
+              devLog.warn(`⚠️ Could not calculate dailyAverageMs, defaulting to 0`);
             }
           }
 
@@ -419,19 +419,16 @@ try {
 
           // Final validation - this should never fail now
           if (weekData.dailyAverageMs === null || weekData.dailyAverageMs === undefined) {
-            console.error(
-              `❌ CRITICAL: Record ${record.id} STILL has null/undefined dailyAverageMs after processing!`,
-              {
-                original: record.dailyAverageMs,
-                processed: weekData.dailyAverageMs,
-                record: record
-              }
-            );
+            devLog.error(`❌ CRITICAL: Record ${record.id} STILL has null/undefined dailyAverageMs after processing!`, {
+              original: record.dailyAverageMs,
+              processed: weekData.dailyAverageMs,
+              record: record
+            });
             // Force it to 0 as last resort
             weekData.dailyAverageMs = 0;
           }
 
-          console.log(
+          devLog.log(
             `✅ Processed week ${record.id}: dailyAverageMs = ${weekData.dailyAverageMs} (type: ${typeof weekData.dailyAverageMs})`
           );
 
@@ -439,11 +436,11 @@ try {
         })
       );
 
-      console.log("📊 Device Screentime Details:", JSON.stringify(screenTimeData, null, 2));
+      devLog.log("📊 Device Screentime Details:", JSON.stringify(screenTimeData, null, 2));
 
       // Final validation check
       screenTimeData.forEach((week, index) => {
-        console.log(`📊 Week ${index} final check:`, {
+        devLog.log(`📊 Week ${index} final check:`, {
           id: week?.id,
           imei: week?.imei,
           weekStartDate: week?.weekStartDate,
@@ -457,17 +454,17 @@ try {
         });
 
         if (week.dailyAverageMs === null || week.dailyAverageMs === undefined) {
-          console.error(`❌ Week ${index} STILL has null/undefined dailyAverageMs after processing:`, week);
+          devLog.error(`❌ Week ${index} STILL has null/undefined dailyAverageMs after processing:`, week);
         }
         if (week.totalScreenTimeMs === null || week.totalScreenTimeMs === undefined) {
-          console.warn(`⚠️ Week ${index} has null/undefined totalScreenTimeMs:`, week);
+          devLog.warn(`⚠️ Week ${index} has null/undefined totalScreenTimeMs:`, week);
         }
       });
     } else {
-      console.log("📊 No screentime data found for IMEI:", imei);
+      devLog.log("📊 No screentime data found for IMEI:", imei);
     }
   } else {
-    console.log("📊 Screen time feature is disabled (ENABLE_SCREEN_TIME=false)");
+    devLog.log("📊 Screen time feature is disabled (ENABLE_SCREEN_TIME=false)");
     screenTimeData = [];
   }
 
@@ -477,7 +474,7 @@ try {
   appsList = {};
   sortedAppsList = {};
 } catch (error) {
-  console.error("Unexpected error in manage page:", error);
+  devLog.error("Unexpected error in manage page:", error);
   return Astro.redirect(
     "/dashboard?error=" + encodeURIComponent("An unexpected error occurred while loading the device. Please try again.")
   );
@@ -1375,7 +1372,8 @@ try {
               updateUnreachableAlpineState,
               getPackageNameFromPlayStoreUrl,
               STRIPE_PUBLIC_KEY,
-              type Feature
+              type Feature,
+              devLog
             } from "@/libs/utils";
             import { loadStripe, type Stripe } from "@stripe/stripe-js";
             import { AppManagementService } from "@/services/AppManagementService";
@@ -1457,7 +1455,7 @@ try {
                     try {
                       localStorage.setItem(`totalApps_${this.imei}`, String(total));
                     } catch (error) {
-                      console.error("Failed to save total apps to localStorage:", error);
+                      devLog.error("Failed to save total apps to localStorage:", error);
                     }
                   }
                 },
@@ -1469,7 +1467,7 @@ try {
                         this.cachedTotalApps = parseInt(cached, 10) || 0;
                       }
                     } catch (error) {
-                      console.error("Failed to load total apps from localStorage:", error);
+                      devLog.error("Failed to load total apps from localStorage:", error);
                     }
                   }
                 },
@@ -1586,7 +1584,7 @@ try {
 
                 async getFeatures() {
                   if (!this.imei) {
-                    console.error("IMEI is not set, cannot fetch features");
+                    devLog.error("IMEI is not set, cannot fetch features");
                     this.isLoading = false;
                     return;
                   }
@@ -1618,7 +1616,7 @@ try {
                       this.deviceInfo = data.deviceInfo || null;
                     }
                   } catch (error) {
-                    console.error("Error fetching features:", error);
+                    devLog.error("Error fetching features:", error);
                     this.showErrorToast("Failed to load device features. Please try again.");
                   } finally {
                     // Set loading to false after all operations complete
@@ -1680,7 +1678,7 @@ try {
 
                     return model;
                   } catch (error) {
-                    console.error("Error fetching device model:", error);
+                    devLog.error("Error fetching device model:", error);
                     return null;
                   }
                 },
@@ -1704,7 +1702,7 @@ try {
                   try {
                     const deviceModel = await this.getDeviceModelFromKnox();
                     if (!deviceModel) {
-                      console.warn("Could not determine device model, using default SUBSCRIBED group");
+                      devLog.warn("Could not determine device model, using default SUBSCRIBED group");
                       // Default to SUBSCRIBED if we can't determine model
                       await this.addFeatureToDevice(KNOX_USER_GROUPS.SUBSCRIBED);
                       this.features.push(KNOX_USER_GROUPS.SUBSCRIBED);
@@ -1715,17 +1713,17 @@ try {
 
                     // Check if device is A16
                     if (modelUpper.includes("A16") || modelUpper.includes("SM-A16")) {
-                      console.log(`Device model detected as A16: ${deviceModel}, assigning to A16_SUBSCRIBED group`);
+                      devLog.log(`Device model detected as A16: ${deviceModel}, assigning to A16_SUBSCRIBED group`);
                       await this.addFeatureToDevice(KNOX_USER_GROUPS.A16_SUBSCRIBED);
                       this.features.push(KNOX_USER_GROUPS.A16_SUBSCRIBED);
                     } else {
                       // Default to SUBSCRIBED for A15 and all other devices
-                      console.log(`Device model: ${deviceModel}, assigning to SUBSCRIBED group`);
+                      devLog.log(`Device model: ${deviceModel}, assigning to SUBSCRIBED group`);
                       await this.addFeatureToDevice(KNOX_USER_GROUPS.SUBSCRIBED);
                       this.features.push(KNOX_USER_GROUPS.SUBSCRIBED);
                     }
                   } catch (error) {
-                    console.error("Error assigning subscription group by device model:", error);
+                    devLog.error("Error assigning subscription group by device model:", error);
                     // Fallback to default SUBSCRIBED group on error
                     await this.addFeatureToDevice(KNOX_USER_GROUPS.SUBSCRIBED);
                     this.features.push(KNOX_USER_GROUPS.SUBSCRIBED);
@@ -1741,7 +1739,7 @@ try {
                   try {
                     const deviceModel = await this.getDeviceModelFromKnox();
                     if (!deviceModel) {
-                      console.warn("Could not determine device model, using default UNPAID group");
+                      devLog.warn("Could not determine device model, using default UNPAID group");
                       await this.addFeatureToDevice(KNOX_USER_GROUPS.UNPAID);
                       this.features.push(KNOX_USER_GROUPS.UNPAID);
                       return;
@@ -1750,17 +1748,17 @@ try {
                     const modelUpper = deviceModel.toUpperCase();
 
                     if (modelUpper.includes("A16") || modelUpper.includes("SM-A16")) {
-                      console.log(`A16 device detected, assigning to A16_UNPAID group`);
+                      devLog.log(`A16 device detected, assigning to A16_UNPAID group`);
                       await this.addFeatureToDevice(KNOX_USER_GROUPS.A16_UNPAID);
                       this.features.push(KNOX_USER_GROUPS.A16_UNPAID);
                     } else {
                       // Default to UNPAID for A15 and all other devices
-                      console.log(`Non-A16 device, assigning to UNPAID group`);
+                      devLog.log(`Non-A16 device, assigning to UNPAID group`);
                       await this.addFeatureToDevice(KNOX_USER_GROUPS.UNPAID);
                       this.features.push(KNOX_USER_GROUPS.UNPAID);
                     }
                   } catch (error) {
-                    console.error("Error assigning unpaid group by device model:", error);
+                    devLog.error("Error assigning unpaid group by device model:", error);
                     // Fallback to default UNPAID group on error
                     await this.addFeatureToDevice(KNOX_USER_GROUPS.UNPAID);
                     this.features.push(KNOX_USER_GROUPS.UNPAID);
@@ -1905,7 +1903,7 @@ try {
                   }
 
                   try {
-                    console.log("[DEBUG] Loading available apps from apps.json...");
+                    devLog.log("[DEBUG] Loading available apps from apps.json...");
                     const updatedAppsList: Record<string, Omit<AppEntry, "packageName">> = {};
 
                     // Load apps from apps.json - filter for apps where "Tool Drawer" === "Yes" OR "faith.tools"
@@ -1950,7 +1948,7 @@ try {
                           category: category || undefined
                         };
                       } catch (appError) {
-                        console.error("Error processing app from apps.json:", appError);
+                        devLog.error("Error processing app from apps.json:", appError);
                       }
                     });
 
@@ -1960,11 +1958,11 @@ try {
                     );
 
                     this.isAvailableAppsLoaded = true;
-                    console.log(
+                    devLog.log(
                       `[DEBUG] Loaded ${Object.keys(this.appsList).length} available apps from apps.json (Tool Drawer + Faith Tools)`
                     );
                   } catch (error) {
-                    console.error("Error loading available apps:", error);
+                    devLog.error("Error loading available apps:", error);
                   }
                 },
 
@@ -1989,7 +1987,7 @@ try {
                     const formData = new FormData();
                     formData.append("imei", String(this.imei));
 
-                    console.log("[TESTING] non-blocking implementation");
+                    devLog.log("[TESTING] non-blocking implementation");
                     const response = await fetch("/_actions/wisephones.getInstalledApps", {
                       method: "POST",
                       body: formData
@@ -2001,20 +1999,20 @@ try {
 
                     // Check the raw response text first to see what we're actually getting
                     const responseText = await response.text();
-                    console.log("[DEBUG] Raw response text (first 1000 chars):", responseText.substring(0, 1000));
-                    console.log("[DEBUG] Raw response text length:", responseText.length);
+                    devLog.log("[DEBUG] Raw response text (first 1000 chars):", responseText.substring(0, 1000));
+                    devLog.log("[DEBUG] Raw response text length:", responseText.length);
 
                     // Try to parse the JSON
                     let result;
                     try {
                       result = JSON.parse(responseText);
                     } catch (parseError) {
-                      console.error("[DEBUG] Failed to parse JSON:", parseError);
-                      console.error("[DEBUG] Response text:", responseText);
+                      devLog.error("[DEBUG] Failed to parse JSON:", parseError);
+                      devLog.error("[DEBUG] Response text:", responseText);
                       throw new Error("Failed to parse response as JSON");
                     }
 
-                    console.log("[DEBUG] Raw result from fetch:", {
+                    devLog.log("[DEBUG] Raw result from fetch:", {
                       resultType: typeof result,
                       isArray: Array.isArray(result),
                       resultLength: Array.isArray(result) ? result.length : null,
@@ -2025,10 +2023,10 @@ try {
 
                     // Log first few elements if result is an array
                     if (Array.isArray(result) && result.length > 0) {
-                      console.log("[DEBUG] Result is array, checking first 10 elements:");
+                      devLog.log("[DEBUG] Result is array, checking first 10 elements:");
                       for (let i = 0; i < Math.min(10, result.length); i++) {
                         const elem = result[i];
-                        console.log(`[DEBUG] result[${i}]:`, {
+                        devLog.log(`[DEBUG] result[${i}]:`, {
                           value: elem,
                           type: typeof elem,
                           isArray: Array.isArray(elem),
@@ -2047,17 +2045,17 @@ try {
 
                     if (Array.isArray(result) && result.length > 0 && result[0] && typeof result[0] === "object") {
                       const metadata = result[0];
-                      console.log("[DEBUG] Found metadata object:", metadata);
+                      devLog.log("[DEBUG] Found metadata object:", metadata);
 
                       // If metadata.apps is a number, it might be an index to the apps array
                       if (typeof metadata.apps === "number" && metadata.apps < result.length) {
                         const appsIndex = metadata.apps;
                         const appsData = result[appsIndex];
-                        console.log(`[DEBUG] metadata.apps points to result[${appsIndex}]:`, appsData);
+                        devLog.log(`[DEBUG] metadata.apps points to result[${appsIndex}]:`, appsData);
 
                         if (Array.isArray(appsData)) {
                           // appsData might be an array of indices to app objects
-                          console.log(`[DEBUG] result[${appsIndex}] is an array of ${appsData.length} items`);
+                          devLog.log(`[DEBUG] result[${appsIndex}] is an array of ${appsData.length} items`);
 
                           // Collect app objects using these indices
                           const rawApps = [];
@@ -2071,7 +2069,7 @@ try {
                             }
                           }
 
-                          console.log(`[DEBUG] Collected ${rawApps.length} raw app objects from indices`);
+                          devLog.log(`[DEBUG] Collected ${rawApps.length} raw app objects from indices`);
 
                           // Dereference numeric properties to strings
                           fetchedApps = rawApps.map(({ raw: app }) => {
@@ -2094,9 +2092,9 @@ try {
                             return dereferenced;
                           });
 
-                          console.log(`[DEBUG] Dereferenced ${fetchedApps.length} apps`);
+                          devLog.log(`[DEBUG] Dereferenced ${fetchedApps.length} apps`);
                           if (fetchedApps.length > 0) {
-                            console.log("[DEBUG] Sample dereferenced app:", {
+                            devLog.log("[DEBUG] Sample dereferenced app:", {
                               packageName: fetchedApps[0].packageName,
                               appName: fetchedApps[0].appName,
                               keys: Object.keys(fetchedApps[0])
@@ -2116,7 +2114,7 @@ try {
                       Array.isArray(result.apps)
                     ) {
                       fetchedApps = result.apps;
-                      console.log("[DEBUG] Found apps in result.apps, count:", fetchedApps.length);
+                      devLog.log("[DEBUG] Found apps in result.apps, count:", fetchedApps.length);
                     }
                     // Fallback: Check if result is an object with data.apps
                     else if (
@@ -2128,7 +2126,7 @@ try {
                       Array.isArray(result.data.apps)
                     ) {
                       fetchedApps = result.data.apps;
-                      console.log("[DEBUG] Found apps in result.data.apps, count:", fetchedApps.length);
+                      devLog.log("[DEBUG] Found apps in result.data.apps, count:", fetchedApps.length);
                     }
                     // Fallback: Check if result[2] is the apps array (based on debug output showing array structure)
                     else if (
@@ -2141,17 +2139,17 @@ try {
                       const thirdElement = result[2];
                       if (thirdElement.length > 0 && typeof thirdElement[0] === "object" && thirdElement[0] !== null) {
                         fetchedApps = thirdElement;
-                        console.log("[DEBUG] Found apps in result[2], count:", fetchedApps.length);
+                        devLog.log("[DEBUG] Found apps in result[2], count:", fetchedApps.length);
                       } else {
                         // result[2] contains numbers (likely indices), so apps might be at those indices
                         // Or apps might start from result[3] onwards
-                        console.log("[DEBUG] result[2] is array of numbers, checking if they're indices...");
-                        console.log("[DEBUG] Checking result[3], result[4], result[5] for app objects...");
+                        devLog.log("[DEBUG] result[2] is array of numbers, checking if they're indices...");
+                        devLog.log("[DEBUG] Checking result[3], result[4], result[5] for app objects...");
 
                         // result[2] contains indices to app objects: [3, 35, 47, 61, ...]
                         // Use these indices to collect all app objects
                         if (Array.isArray(result[2]) && result[2].length > 0) {
-                          console.log("[DEBUG] Using result[2] indices to collect app objects...");
+                          devLog.log("[DEBUG] Using result[2] indices to collect app objects...");
                           const appIndices = result[2];
                           const rawApps = [];
 
@@ -2165,7 +2163,7 @@ try {
                             }
                           }
 
-                          console.log(`[DEBUG] Collected ${rawApps.length} raw app objects`);
+                          devLog.log(`[DEBUG] Collected ${rawApps.length} raw app objects`);
 
                           // Now dereference numeric properties to actual strings
                           // If packageName is a number, it's an index to the actual string
@@ -2189,13 +2187,13 @@ try {
                           });
 
                           fetchedApps = dereferencedApps;
-                          console.log(`[DEBUG] Dereferenced ${fetchedApps.length} apps`);
+                          devLog.log(`[DEBUG] Dereferenced ${fetchedApps.length} apps`);
                           if (fetchedApps.length > 0) {
-                            console.log("[DEBUG] First dereferenced app:", fetchedApps[0]);
+                            devLog.log("[DEBUG] First dereferenced app:", fetchedApps[0]);
                           }
                         } else {
                           // Fallback: Check if result[3] onwards contain app objects
-                          console.log("[DEBUG] result[2] is not an array of indices, checking result[3] onwards...");
+                          devLog.log("[DEBUG] result[2] is not an array of indices, checking result[3] onwards...");
                           for (let i = 3; i < Math.min(result.length, 20); i++) {
                             const elem = result[i];
                             if (
@@ -2205,7 +2203,7 @@ try {
                               (elem.packageName || elem.appName)
                             ) {
                               // Found an app object! Check if subsequent elements are also apps
-                              console.log(`[DEBUG] Found app object at result[${i}]:`, elem);
+                              devLog.log(`[DEBUG] Found app object at result[${i}]:`, elem);
                               // Collect all app objects starting from this index
                               fetchedApps = [];
                               for (let j = i; j < result.length; j++) {
@@ -2222,7 +2220,7 @@ try {
                                   break;
                                 }
                               }
-                              console.log(`[DEBUG] Found ${fetchedApps.length} apps starting from result[${i}]`);
+                              devLog.log(`[DEBUG] Found ${fetchedApps.length} apps starting from result[${i}]`);
                               break;
                             }
                           }
@@ -2230,7 +2228,7 @@ try {
 
                         // If still not found, check if result[2] numbers are indices pointing to apps
                         if (fetchedApps.length === 0 && Array.isArray(result[2]) && result[2].length > 0) {
-                          console.log("[DEBUG] Checking if result[2] numbers are indices to app objects...");
+                          devLog.log("[DEBUG] Checking if result[2] numbers are indices to app objects...");
                           const indices = result[2];
                           const potentialApps = [];
                           for (let i = 0; i < Math.min(indices.length, 10); i++) {
@@ -2248,7 +2246,7 @@ try {
                             }
                           }
                           if (potentialApps.length > 0) {
-                            console.log(`[DEBUG] Found ${potentialApps.length} apps using result[2] indices`);
+                            devLog.log(`[DEBUG] Found ${potentialApps.length} apps using result[2] indices`);
                             // Collect all apps using all indices
                             fetchedApps = [];
                             for (let i = 0; i < indices.length; i++) {
@@ -2274,7 +2272,7 @@ try {
                       const firstItem = result[0];
                       if (firstItem && typeof firstItem === "object" && (firstItem.packageName || firstItem.appName)) {
                         fetchedApps = result;
-                        console.log("[DEBUG] Result is directly apps array, count:", fetchedApps.length);
+                        devLog.log("[DEBUG] Result is directly apps array, count:", fetchedApps.length);
                       }
                     }
                     // Check if result.data is the apps array
@@ -2282,12 +2280,12 @@ try {
                       const firstItem = result.data[0];
                       if (firstItem && typeof firstItem === "object" && (firstItem.packageName || firstItem.appName)) {
                         fetchedApps = result.data;
-                        console.log("[DEBUG] Found apps in result.data (array), count:", fetchedApps.length);
+                        devLog.log("[DEBUG] Found apps in result.data (array), count:", fetchedApps.length);
                       }
                     }
 
                     if (fetchedApps.length === 0) {
-                      console.error("[DEBUG] Could not find apps array in result", {
+                      devLog.error("[DEBUG] Could not find apps array in result", {
                         resultType: typeof result,
                         isArray: Array.isArray(result),
                         resultLength: Array.isArray(result) ? result.length : null,
@@ -2300,7 +2298,7 @@ try {
 
                     // Log first app structure to see what we're getting
                     if (fetchedApps.length > 0) {
-                      console.log("[DEBUG] First app structure:", {
+                      devLog.log("[DEBUG] First app structure:", {
                         app: fetchedApps[0],
                         appType: typeof fetchedApps[0],
                         hasPackageName: !!fetchedApps[0]?.packageName,
@@ -2315,12 +2313,12 @@ try {
                       (app: any) => app && (app.packageName || app.appName)
                     );
 
-                    console.log("[DEBUG] After filtering, installedApps count:", this.installedApps.length);
+                    devLog.log("[DEBUG] After filtering, installedApps count:", this.installedApps.length);
 
                     // Log first few apps to see structure
                     this.installedApps.slice(0, 5).forEach((app, index) => {
-                      console.log(`[DEBUG] App ${index} full object:`, app);
-                      console.log(`[DEBUG] App ${index} details:`, {
+                      devLog.log(`[DEBUG] App ${index} full object:`, app);
+                      devLog.log(`[DEBUG] App ${index} details:`, {
                         app: app,
                         appType: typeof app,
                         isArray: Array.isArray(app),
@@ -2337,7 +2335,7 @@ try {
                     // This updates the installed status of apps that were already loaded by loadAvailableApps()
                     // IMPORTANT: Installed apps should NOT appear in availableApps (they're filtered out by the getter)
                     if (this.appsList && Object.keys(this.appsList).length > 0) {
-                      console.log("[DEBUG] Updating installed status in appsList...");
+                      devLog.log("[DEBUG] Updating installed status in appsList...");
                       const updatedAppsList = { ...this.appsList };
                       let installedCount = 0;
                       Object.keys(updatedAppsList).forEach((packageName) => {
@@ -2354,12 +2352,12 @@ try {
                         }
                       });
                       this.appsList = updatedAppsList;
-                      console.log(
+                      devLog.log(
                         `[DEBUG] Updated ${Object.keys(this.appsList).length} apps in appsList: ${installedCount} installed, ${Object.keys(this.appsList).length - installedCount} available`
                       );
                     } else {
                       // If appsList is empty, load available apps first, then update installed status
-                      console.log("[DEBUG] appsList is empty, loading available apps first...");
+                      devLog.log("[DEBUG] appsList is empty, loading available apps first...");
                       this.loadAvailableApps();
                       // Update installed status after loading
                       const updatedAppsList = { ...this.appsList };
@@ -2377,7 +2375,7 @@ try {
                         }
                       });
                       this.appsList = updatedAppsList;
-                      console.log(
+                      devLog.log(
                         `[DEBUG] Loaded and updated ${Object.keys(this.appsList).length} apps: ${installedCount} installed, ${Object.keys(this.appsList).length - installedCount} available`
                       );
                     }
@@ -2386,7 +2384,7 @@ try {
                     // Update cached total apps count after loading
                     this.updateCachedTotalApps();
                   } catch (error) {
-                    console.error("Error getting installed apps:", error);
+                    devLog.error("Error getting installed apps:", error);
                     this.showErrorToast("Failed to load installed apps. Please try again.");
                   } finally {
                     this.isAppsLoading = false;
@@ -2448,26 +2446,26 @@ try {
                       // Try postMessage first (no navigation, no localhost page)
                       // @ts-ignore - window.mobileApp is injected at runtime by InAppBrowser
                       const mobileApp = (window as any).mobileApp;
-                      if (mobileApp && typeof mobileApp.postMessage === 'function') {
+                      if (mobileApp && typeof mobileApp.postMessage === "function") {
                         const cleanedPhone = this.devicePhone.replace(/\D/g, "");
                         // CRITICAL: InAppBrowser requires messages to be wrapped in a 'detail' object
                         mobileApp.postMessage({
                           detail: {
-                            action: 'completeSetup',
+                            action: "completeSetup",
                             imei: this.imei,
                             phone: cleanedPhone,
-                            subscription: 'done'
+                            subscription: "done"
                           }
                         });
-                        console.log("✅ Setup completion sent via postMessage (no localhost navigation)");
+                        devLog.log("✅ Setup completion sent via postMessage (no localhost navigation)");
                       } else {
                         // Fallback to localhost if mobileApp not available
-                        console.log("⚠️ mobileApp not available, falling back to localhost navigation");
+                        devLog.log("⚠️ mobileApp not available, falling back to localhost navigation");
                         window.location.href = this.completeSetupUrl;
                       }
                     });
                   } catch (error) {
-                    console.error("Error during complete setup:", error);
+                    devLog.error("Error during complete setup:", error);
                     this.showErrorToast("Failed to complete setup. Please try again.");
                   }
                 },
@@ -2603,7 +2601,7 @@ try {
                         // Re-check subscription status with new phone number (reusing same logic as page load)
                         // The page load checks: 1) bypassTechlessSubscription, 2) validateIsSubscribed
                         // We use the validateIsUserSubscribed action which calls validateIsSubscribed
-                        console.log("[DEBUG] Re-checking subscription after phone number update", {
+                        devLog.log("[DEBUG] Re-checking subscription after phone number update", {
                           imei: this.imei,
                           phoneNumber: formattedPhoneNumber,
                           originalPhone: originalPhoneBeforeUpdate,
@@ -2620,7 +2618,7 @@ try {
 
                           const hasSubscription = subscriptionResult?.isSubscribed === true;
 
-                          console.log("[DEBUG] Subscription check result:", {
+                          devLog.log("[DEBUG] Subscription check result:", {
                             isSubscribed: hasSubscription,
                             subscriptionResult
                           });
@@ -2636,7 +2634,7 @@ try {
                             this.showSuccessToast("Device details updated successfully");
                           }
                         } catch (subscriptionError) {
-                          console.error("[DEBUG] Error checking subscription:", subscriptionError);
+                          devLog.error("[DEBUG] Error checking subscription:", subscriptionError);
                           // Continue anyway, subscription check failed but device was updated
                           this.showSuccessToast("Device details updated successfully");
                         }
@@ -2654,12 +2652,12 @@ try {
                           this.showErrorToast("Failed to update device. Please try again.");
                         }
                       } catch (parseError) {
-                        console.error("Failed to update device");
+                        devLog.error("Failed to update device");
                         this.showErrorToast("Failed to update device. Please try again.");
                       }
                     }
                   } catch (error) {
-                    console.error("Error updating device:", error);
+                    devLog.error("Error updating device:", error);
                     this.showErrorToast("An error occurred while updating the device.");
                   }
                 },
@@ -2684,7 +2682,7 @@ try {
                     // Show the confirmation modal
                     this.showConfirmModal = true;
                   } catch (error) {
-                    console.error("Feature toggle failed:", error);
+                    devLog.error("Feature toggle failed:", error);
                     this.showErrorToast(error instanceof Error ? error.message : "Feature update failed");
                   }
                 },
@@ -2696,7 +2694,7 @@ try {
 
                     // Safety check
                     if (!feature) {
-                      console.error("No pending feature found");
+                      devLog.error("No pending feature found");
                       this.showConfirmModal = false;
                       return;
                     }
@@ -2765,7 +2763,7 @@ try {
                     this.pendingFeature = null;
                     this.pendingFeatureEnabled = false;
                   } catch (error) {
-                    console.error("Feature toggle failed:", error);
+                    devLog.error("Feature toggle failed:", error);
                     this.showErrorToast(error instanceof Error ? error.message : "Feature update failed");
                     // Reset pending feature
                     this.pendingFeature = null;
@@ -2793,7 +2791,7 @@ try {
                     // Show confirmation modal
                     this.showAppInstallModal = true;
                   } catch (error) {
-                    console.error("Failed to show install confirmation:", error);
+                    devLog.error("Failed to show install confirmation:", error);
                     this.showErrorToast("Failed to show install confirmation");
                   }
                 },
@@ -2802,7 +2800,7 @@ try {
                   try {
                     const packageName = this.pendingAppToInstall;
 
-                    console.log("[DEBUG] confirmAppInstall called", {
+                    devLog.log("[DEBUG] confirmAppInstall called", {
                       packageName,
                       imei: this.imei,
                       imeiType: typeof this.imei,
@@ -2812,13 +2810,13 @@ try {
                     });
 
                     if (!packageName) {
-                      console.error("[DEBUG] No pending app to install");
+                      devLog.error("[DEBUG] No pending app to install");
                       this.showAppInstallModal = false;
                       return;
                     }
 
                     if (!this.imei) {
-                      console.error("[DEBUG] IMEI is not set!", {
+                      devLog.error("[DEBUG] IMEI is not set!", {
                         imei: this.imei,
                         imeiType: typeof this.imei
                       });
@@ -2832,7 +2830,7 @@ try {
 
                     // If app is not in appsList yet, add it
                     if (!this.appsList[packageName]) {
-                      console.log("[DEBUG] App not in appsList, adding it:", packageName);
+                      devLog.log("[DEBUG] App not in appsList, adding it:", packageName);
                       this.appsList[packageName] = {
                         source: "Tool Drawer",
                         installed: false,
@@ -2840,14 +2838,14 @@ try {
                       };
                     }
 
-                    console.log("[DEBUG] Calling appManagement.installApp", {
+                    devLog.log("[DEBUG] Calling appManagement.installApp", {
                       imei: this.imei,
                       packageName: packageName
                     });
 
                     await appManagement.installApp(this.imei, packageName);
 
-                    console.log("[DEBUG] appManagement.installApp completed successfully");
+                    devLog.log("[DEBUG] appManagement.installApp completed successfully");
 
                     this.appsList[packageName].installed = true;
 
@@ -2869,7 +2867,7 @@ try {
                     this.pendingAppToInstall = null;
                     this.pendingAppName = "";
                   } catch (error) {
-                    console.error("[DEBUG] App installation failed:", {
+                    devLog.error("[DEBUG] App installation failed:", {
                       error,
                       errorMessage: error instanceof Error ? error.message : String(error),
                       errorStack: error instanceof Error ? error.stack : undefined,
@@ -2905,7 +2903,7 @@ try {
                     // Show confirmation modal
                     this.showAppUninstallModal = true;
                   } catch (error) {
-                    console.error("Failed to show uninstall confirmation:", error);
+                    devLog.error("Failed to show uninstall confirmation:", error);
                     this.showErrorToast("Failed to show uninstall confirmation");
                   }
                 },
@@ -2915,7 +2913,7 @@ try {
                     const packageName = this.pendingAppToUninstall;
 
                     if (!packageName) {
-                      console.error("No pending app to uninstall");
+                      devLog.error("No pending app to uninstall");
                       this.showAppUninstallModal = false;
                       return;
                     }
@@ -2939,7 +2937,7 @@ try {
                     this.pendingAppToUninstall = null;
                     this.pendingAppToUninstallName = "";
                   } catch (error) {
-                    console.error("App uninstallation failed:", error);
+                    devLog.error("App uninstallation failed:", error);
                     this.showErrorToast("Failed to uninstall app");
                   }
                 },
@@ -2986,7 +2984,7 @@ try {
                               name: row.cells["Tool Name"] || "Unknown App"
                             };
                           } catch (error) {
-                            console.error("Error processing app row:", error);
+                            devLog.error("Error processing app row:", error);
                           }
                         });
 
@@ -2994,7 +2992,7 @@ try {
                       this.isToolDrawerLoaded = true;
                     }
                   } catch (error) {
-                    console.error("Error loading Tool Drawer:", error);
+                    devLog.error("Error loading Tool Drawer:", error);
                     this.showErrorToast("Failed to load Tool Drawer apps");
                   } finally {
                     this.isToolDrawerLoading = false;
@@ -3041,14 +3039,14 @@ try {
                 },
 
                 async checkSubscriptionByImei() {
-                  console.log(
+                  devLog.log(
                     "PAY DEBUG: [M0.5] checkSubscriptionByImei called - checking subscription directly by IMEI"
                   );
-                  console.log("PAY DEBUG: [M0.5.1] IMEI:", this.imei);
-                  console.log("PAY DEBUG: [M0.5.2] Device Phone:", this.devicePhone);
+                  devLog.log("PAY DEBUG: [M0.5.1] IMEI:", this.imei);
+                  devLog.log("PAY DEBUG: [M0.5.2] Device Phone:", this.devicePhone);
 
                   if (!this.imei) {
-                    console.log("PAY DEBUG: [M0.5.3] No IMEI available, skipping check");
+                    devLog.log("PAY DEBUG: [M0.5.3] No IMEI available, skipping check");
                     return;
                   }
 
@@ -3060,108 +3058,108 @@ try {
                         ? `${cleanedPhone.slice(0, 3)}-${cleanedPhone.slice(3, 6)}-${cleanedPhone.slice(6)}`
                         : cleanedPhone;
 
-                    console.log("PAY DEBUG: [M0.5.4] Formatted phone number:", formattedPhoneNumber);
-                    console.log("PAY DEBUG: [M0.5.5] Calling validateIsUserSubscribed action");
+                    devLog.log("PAY DEBUG: [M0.5.4] Formatted phone number:", formattedPhoneNumber);
+                    devLog.log("PAY DEBUG: [M0.5.5] Calling validateIsUserSubscribed action");
 
                     const subscriptionResult = await actions.wisephones.validateIsUserSubscribed.orThrow({
                       imei: this.imei,
                       phoneNumber: formattedPhoneNumber
                     });
 
-                    console.log("PAY DEBUG: [M0.5.6] Subscription check result:", subscriptionResult);
-                    console.log("PAY DEBUG: [M0.5.7] isSubscribed from result:", subscriptionResult?.isSubscribed);
+                    devLog.log("PAY DEBUG: [M0.5.6] Subscription check result:", subscriptionResult);
+                    devLog.log("PAY DEBUG: [M0.5.7] isSubscribed from result:", subscriptionResult?.isSubscribed);
 
                     const hasSubscription = subscriptionResult?.isSubscribed === true;
-                    console.log("PAY DEBUG: [M0.5.8] Final hasSubscription:", hasSubscription);
+                    devLog.log("PAY DEBUG: [M0.5.8] Final hasSubscription:", hasSubscription);
 
                     if (hasSubscription) {
-                      console.log("PAY DEBUG: [M0.5.9] ✅ SUBSCRIPTION FOUND! Updating isSubscribed to true");
+                      devLog.log("PAY DEBUG: [M0.5.9] ✅ SUBSCRIPTION FOUND! Updating isSubscribed to true");
                       this.isSubscribed = true;
 
                       // Assign subscription group
                       await this.assignSubscriptionGroupByDeviceModel();
-                      console.log("PAY DEBUG: [M0.5.10] Subscription group assigned");
+                      devLog.log("PAY DEBUG: [M0.5.10] Subscription group assigned");
 
                       return true;
                     } else {
-                      console.log("PAY DEBUG: [M0.5.11] ❌ No subscription found for IMEI");
+                      devLog.log("PAY DEBUG: [M0.5.11] ❌ No subscription found for IMEI");
                       return false;
                     }
                   } catch (error) {
-                    console.error("PAY DEBUG: [M0.5.12] ERROR checking subscription by IMEI:", error);
+                    devLog.error("PAY DEBUG: [M0.5.12] ERROR checking subscription by IMEI:", error);
                     return false;
                   }
                 },
 
                 async validateStripeSession() {
-                  console.log("PAY DEBUG: [M1] validateStripeSession called on device page");
-                  console.log("PAY DEBUG: [M1.0] Current IMEI in component:", this.imei);
+                  devLog.log("PAY DEBUG: [M1] validateStripeSession called on device page");
+                  devLog.log("PAY DEBUG: [M1.0] Current IMEI in component:", this.imei);
 
                   const urlParams = new URLSearchParams(window.location.search);
                   const validatedParam = urlParams.get("validated");
                   let sessionId = urlParams.get("session_id");
-                  console.log("PAY DEBUG: [M1.1] validated param:", validatedParam, "session_id from URL:", sessionId);
+                  devLog.log("PAY DEBUG: [M1.1] validated param:", validatedParam, "session_id from URL:", sessionId);
 
                   // Ensure IMEI is available - extract from URL if still missing
                   if (!this.imei) {
                     const pathMatch = window.location.pathname.match(/\/manage\/([^/?]+)/);
                     if (pathMatch && pathMatch[1]) {
                       this.imei = pathMatch[1];
-                      console.log("PAY DEBUG: [M1.1.1] Extracted IMEI from URL in validateStripeSession:", this.imei);
+                      devLog.log("PAY DEBUG: [M1.1.1] Extracted IMEI from URL in validateStripeSession:", this.imei);
                     } else {
-                      console.log("PAY DEBUG: [M1.1.1] ERROR: Cannot extract IMEI from URL, cannot validate");
+                      devLog.log("PAY DEBUG: [M1.1.1] ERROR: Cannot extract IMEI from URL, cannot validate");
                       return;
                     }
                   }
 
                   // Priority 1: If validated=true is present, trust it and set isSubscribed immediately
                   if (validatedParam === "true") {
-                    console.log(
+                    devLog.log(
                       "PAY DEBUG: [M1.2] ✅ validated=true found in URL - subscription already validated on dashboard"
                     );
-                    console.log("PAY DEBUG: [M1.2.1] Current isSubscribed before update:", this.isSubscribed);
+                    devLog.log("PAY DEBUG: [M1.2.1] Current isSubscribed before update:", this.isSubscribed);
                     this.isSubscribed = true;
-                    console.log("PAY DEBUG: [M1.2.2] Updated isSubscribed to:", this.isSubscribed);
+                    devLog.log("PAY DEBUG: [M1.2.2] Updated isSubscribed to:", this.isSubscribed);
 
                     // Still need to get session_id for group assignment if not already present
                     if (!sessionId || sessionId === "{CHECKOUT_SESSION_ID}") {
-                      console.log("PAY DEBUG: [M1.2.1] session_id missing, checking sessionStorage");
+                      devLog.log("PAY DEBUG: [M1.2.1] session_id missing, checking sessionStorage");
                       const storedSessionId = sessionStorage.getItem("stripeCheckoutSessionId");
                       const storedImei = sessionStorage.getItem("stripeCheckoutImei");
 
                       if (storedSessionId && storedImei === this.imei) {
-                        console.log("PAY DEBUG: [M1.2.2] Found session ID in sessionStorage:", storedSessionId);
+                        devLog.log("PAY DEBUG: [M1.2.2] Found session ID in sessionStorage:", storedSessionId);
                         sessionId = storedSessionId;
                       }
                     }
 
                     // Assign subscription group
                     await this.assignSubscriptionGroupByDeviceModel();
-                    console.log("PAY DEBUG: [M1.2.3] Subscription group assigned");
+                    devLog.log("PAY DEBUG: [M1.2.3] Subscription group assigned");
 
                     // Clean up URL params and sessionStorage
                     const cleanUrl = new URL(window.location.href);
                     cleanUrl.searchParams.delete("validated");
                     cleanUrl.searchParams.delete("session_id");
                     window.history.replaceState({}, "", cleanUrl.toString());
-                    console.log("PAY DEBUG: [M1.2.4] Cleaned up URL params");
+                    devLog.log("PAY DEBUG: [M1.2.4] Cleaned up URL params");
 
                     // Clear sessionStorage after successful validation
                     if (sessionId) {
                       sessionStorage.removeItem("stripeCheckoutSessionId");
                       sessionStorage.removeItem("stripeCheckoutImei");
-                      console.log("PAY DEBUG: [M1.2.5] Cleared sessionStorage after validation");
+                      devLog.log("PAY DEBUG: [M1.2.5] Cleared sessionStorage after validation");
                     }
 
                     // Final verification - ensure isSubscribed is true before returning
-                    console.log("PAY DEBUG: [M1.2.6] Final isSubscribed check before return:", this.isSubscribed);
+                    devLog.log("PAY DEBUG: [M1.2.6] Final isSubscribed check before return:", this.isSubscribed);
                     if (!this.isSubscribed) {
-                      console.log(
+                      devLog.log(
                         "PAY DEBUG: [M1.2.7] ERROR: isSubscribed should be true but is false! Forcing to true"
                       );
                       this.isSubscribed = true;
                     }
-                    console.log(
+                    devLog.log(
                       "PAY DEBUG: [M1.2.8] Returning from validateStripeSession with isSubscribed:",
                       this.isSubscribed
                     );
@@ -3171,12 +3169,12 @@ try {
                   // Priority 2: Check for session_id in URL
                   // If session_id is missing or is the placeholder, try to get it from sessionStorage
                   if (!sessionId || sessionId === "{CHECKOUT_SESSION_ID}") {
-                    console.log("PAY DEBUG: [M1.3] session_id missing or is placeholder, checking sessionStorage");
+                    devLog.log("PAY DEBUG: [M1.3] session_id missing or is placeholder, checking sessionStorage");
                     const storedSessionId = sessionStorage.getItem("stripeCheckoutSessionId");
                     const storedImei = sessionStorage.getItem("stripeCheckoutImei");
 
                     if (storedSessionId && storedImei === this.imei) {
-                      console.log("PAY DEBUG: [M1.3.1] Found session ID in sessionStorage:", storedSessionId);
+                      devLog.log("PAY DEBUG: [M1.3.1] Found session ID in sessionStorage:", storedSessionId);
                       sessionId = storedSessionId;
 
                       // Update URL with actual session_id
@@ -3184,12 +3182,12 @@ try {
                       url.searchParams.set("session_id", sessionId);
                       window.history.replaceState({}, "", url.toString());
                     } else {
-                      console.log("PAY DEBUG: [M1.3.2] No matching session ID in sessionStorage");
+                      devLog.log("PAY DEBUG: [M1.3.2] No matching session ID in sessionStorage");
                     }
                   }
 
                   if (!sessionId || sessionId === "{CHECKOUT_SESSION_ID}") {
-                    console.log("PAY DEBUG: [M1.4] No valid session_id found, skipping validation");
+                    devLog.log("PAY DEBUG: [M1.4] No valid session_id found, skipping validation");
                     return;
                   }
 
@@ -3197,45 +3195,45 @@ try {
                   const url = new URL(window.location.href);
                   url.searchParams.delete("session_id");
                   window.history.replaceState({}, "", url.toString());
-                  console.log("PAY DEBUG: [M1.5] Removed session_id from URL");
+                  devLog.log("PAY DEBUG: [M1.5] Removed session_id from URL");
 
                   try {
-                    console.log("PAY DEBUG: [M1.6] Validating Stripe subscription with session_id:", sessionId);
+                    devLog.log("PAY DEBUG: [M1.6] Validating Stripe subscription with session_id:", sessionId);
                     const session = await actions.stripe.validateSubscription.orThrow({
                       sessionId,
                       imei: this.imei
                     });
 
-                    console.log("PAY DEBUG: [M1.7] Validation result:", session);
-                    console.log("PAY DEBUG: [M1.8] isSubscribed:", session?.isSubscribed);
+                    devLog.log("PAY DEBUG: [M1.7] Validation result:", session);
+                    devLog.log("PAY DEBUG: [M1.8] isSubscribed:", session?.isSubscribed);
 
                     if (session?.isSubscribed) {
-                      console.log(
+                      devLog.log(
                         "PAY DEBUG: [M1.9] ✅ Subscription validated via session_id! Updating isSubscribed to true"
                       );
-                      console.log("PAY DEBUG: [M1.9.1] Current isSubscribed before update:", this.isSubscribed);
+                      devLog.log("PAY DEBUG: [M1.9.1] Current isSubscribed before update:", this.isSubscribed);
                       this.isSubscribed = true;
-                      console.log("PAY DEBUG: [M1.9.2] Updated isSubscribed to:", this.isSubscribed);
+                      devLog.log("PAY DEBUG: [M1.9.2] Updated isSubscribed to:", this.isSubscribed);
                       // Assign appropriate subscription group based on device model
                       await this.assignSubscriptionGroupByDeviceModel();
-                      console.log("PAY DEBUG: [M1.10] Subscription group assigned");
+                      devLog.log("PAY DEBUG: [M1.10] Subscription group assigned");
 
                       // Clear sessionStorage only after successful validation
                       sessionStorage.removeItem("stripeCheckoutSessionId");
                       sessionStorage.removeItem("stripeCheckoutImei");
-                      console.log("PAY DEBUG: [M1.11] Cleared sessionStorage after successful validation");
+                      devLog.log("PAY DEBUG: [M1.11] Cleared sessionStorage after successful validation");
                     } else {
-                      console.log("PAY DEBUG: [M1.12] Subscription validation returned false");
+                      devLog.log("PAY DEBUG: [M1.12] Subscription validation returned false");
                     }
                   } catch (error) {
-                    console.error("PAY DEBUG: [M1.13] ERROR validating Stripe session:", error);
+                    devLog.error("PAY DEBUG: [M1.13] ERROR validating Stripe session:", error);
                   }
                 },
 
                 fallbackPollingInterval: null as number | null,
 
                 startFallbackPolling() {
-                  console.log("PAY DEBUG: [M2] Starting fallback polling for subscription status");
+                  devLog.log("PAY DEBUG: [M2] Starting fallback polling for subscription status");
 
                   // Clear any existing polling
                   this.stopFallbackPolling();
@@ -3245,10 +3243,10 @@ try {
 
                   const poll = async () => {
                     attempts++;
-                    console.log(`PAY DEBUG: [M2.1] Fallback polling attempt ${attempts}/${maxAttempts}`);
+                    devLog.log(`PAY DEBUG: [M2.1] Fallback polling attempt ${attempts}/${maxAttempts}`);
 
                     if (!this.imei || !this.devicePhone) {
-                      console.log("PAY DEBUG: [M2.2] Missing IMEI or phone number, stopping polling");
+                      devLog.log("PAY DEBUG: [M2.2] Missing IMEI or phone number, stopping polling");
                       this.stopFallbackPolling();
                       return;
                     }
@@ -3268,36 +3266,36 @@ try {
                       });
 
                       const hasSubscription = subscriptionResult?.isSubscribed === true;
-                      console.log("PAY DEBUG: [M2.3] Poll result - isSubscribed:", hasSubscription);
+                      devLog.log("PAY DEBUG: [M2.3] Poll result - isSubscribed:", hasSubscription);
 
                       if (hasSubscription) {
-                        console.log("PAY DEBUG: [M2.4] Subscription detected via polling! Updating status");
+                        devLog.log("PAY DEBUG: [M2.4] Subscription detected via polling! Updating status");
                         this.isSubscribed = true;
                         this.stopFallbackPolling();
 
                         // Assign subscription group
                         this.assignSubscriptionGroupByDeviceModel();
-                        console.log("PAY DEBUG: [M2.5] Subscription group assigned");
+                        devLog.log("PAY DEBUG: [M2.5] Subscription group assigned");
 
                         // Clear sessionStorage
                         sessionStorage.removeItem("stripeCheckoutSessionId");
                         sessionStorage.removeItem("stripeCheckoutImei");
-                        console.log("PAY DEBUG: [M2.6] Cleared sessionStorage");
+                        devLog.log("PAY DEBUG: [M2.6] Cleared sessionStorage");
                         return;
                       }
 
                       if (attempts >= maxAttempts) {
-                        console.log("PAY DEBUG: [M2.7] Fallback polling timeout reached");
+                        devLog.log("PAY DEBUG: [M2.7] Fallback polling timeout reached");
                         this.stopFallbackPolling();
                         // Don't reload - just show the current state
-                        console.log("PAY DEBUG: [M2.8] Subscription not detected after polling, keeping current state");
+                        devLog.log("PAY DEBUG: [M2.8] Subscription not detected after polling, keeping current state");
                         return;
                       }
 
                       // Continue polling
                       this.fallbackPollingInterval = window.setTimeout(poll, 2000);
                     } catch (error) {
-                      console.error("PAY DEBUG: [M2.9] ERROR during fallback polling:", error);
+                      devLog.error("PAY DEBUG: [M2.9] ERROR during fallback polling:", error);
                       this.stopFallbackPolling();
                     }
                   };
@@ -3310,25 +3308,25 @@ try {
                   if (this.fallbackPollingInterval !== null) {
                     clearTimeout(this.fallbackPollingInterval);
                     this.fallbackPollingInterval = null;
-                    console.log("PAY DEBUG: [M2.10] Stopped fallback polling");
+                    devLog.log("PAY DEBUG: [M2.10] Stopped fallback polling");
                   }
                 },
 
                 async init() {
-                  console.log("PAY DEBUG: [M0] Device page init() called");
-                  console.log("PAY DEBUG: [M0.1] Initial isSubscribed (from server):", this.isSubscribed);
-                  console.log("PAY DEBUG: [M0.2] IMEI (from x-init):", this.imei);
-                  console.log("PAY DEBUG: [M0.3] Device Phone (from x-init):", this.devicePhone);
-                  console.log("PAY DEBUG: [M0.4] Current URL:", window.location.href);
+                  devLog.log("PAY DEBUG: [M0] Device page init() called");
+                  devLog.log("PAY DEBUG: [M0.1] Initial isSubscribed (from server):", this.isSubscribed);
+                  devLog.log("PAY DEBUG: [M0.2] IMEI (from x-init):", this.imei);
+                  devLog.log("PAY DEBUG: [M0.3] Device Phone (from x-init):", this.devicePhone);
+                  devLog.log("PAY DEBUG: [M0.4] Current URL:", window.location.href);
 
                   // Extract IMEI from URL pathname as fallback if not set by x-init
                   if (!this.imei) {
                     const pathMatch = window.location.pathname.match(/\/manage\/([^/?]+)/);
                     if (pathMatch && pathMatch[1]) {
                       this.imei = pathMatch[1];
-                      console.log("PAY DEBUG: [M0.5] Extracted IMEI from URL pathname:", this.imei);
+                      devLog.log("PAY DEBUG: [M0.5] Extracted IMEI from URL pathname:", this.imei);
                     } else {
-                      console.log("PAY DEBUG: [M0.5] Could not extract IMEI from URL pathname");
+                      devLog.log("PAY DEBUG: [M0.5] Could not extract IMEI from URL pathname");
                     }
                   }
 
@@ -3339,16 +3337,16 @@ try {
                     const phoneParam = urlParams.get("phone");
                     if (phoneParam) {
                       this.devicePhone = phoneParam;
-                      console.log("PAY DEBUG: [M0.6] Extracted phone from URL params:", this.devicePhone);
+                      devLog.log("PAY DEBUG: [M0.6] Extracted phone from URL params:", this.devicePhone);
                     } else {
-                      console.log(
+                      devLog.log(
                         "PAY DEBUG: [M0.6] Phone not in URL params, will use fallback or skip phone-based checks"
                       );
                     }
                   }
 
-                  console.log("PAY DEBUG: [M0.7] Final IMEI after extraction:", this.imei);
-                  console.log("PAY DEBUG: [M0.8] Final Device Phone after extraction:", this.devicePhone);
+                  devLog.log("PAY DEBUG: [M0.7] Final IMEI after extraction:", this.imei);
+                  devLog.log("PAY DEBUG: [M0.8] Final Device Phone after extraction:", this.devicePhone);
 
                   // Check URL params to determine flow
                   const urlParams = new URLSearchParams(window.location.search);
@@ -3357,41 +3355,41 @@ try {
 
                   // If session_id is in URL, server already validated - trust server value
                   if (sessionId && sessionId !== "{CHECKOUT_SESSION_ID}") {
-                    console.log("PAY DEBUG: [M0.9] Stripe redirect detected - server already validated subscription");
-                    console.log("PAY DEBUG: [M0.9.1] session_id:", sessionId);
-                    console.log("PAY DEBUG: [M0.9.2] payment_status:", paymentStatus);
-                    console.log("PAY DEBUG: [M0.9.3] Trusting server-side isSubscribed value:", this.isSubscribed);
+                    devLog.log("PAY DEBUG: [M0.9] Stripe redirect detected - server already validated subscription");
+                    devLog.log("PAY DEBUG: [M0.9.1] session_id:", sessionId);
+                    devLog.log("PAY DEBUG: [M0.9.2] payment_status:", paymentStatus);
+                    devLog.log("PAY DEBUG: [M0.9.3] Trusting server-side isSubscribed value:", this.isSubscribed);
 
                     // Clean up URL params (remove session_id and payment_status)
                     const cleanUrl = new URL(window.location.href);
                     cleanUrl.searchParams.delete("session_id");
                     cleanUrl.searchParams.delete("payment_status");
                     window.history.replaceState({}, "", cleanUrl.toString());
-                    console.log("PAY DEBUG: [M0.9.4] Cleaned up URL params");
+                    devLog.log("PAY DEBUG: [M0.9.4] Cleaned up URL params");
 
                     // Clear sessionStorage if present
                     sessionStorage.removeItem("stripeCheckoutSessionId");
                     sessionStorage.removeItem("stripeCheckoutImei");
-                    console.log("PAY DEBUG: [M0.9.5] Cleared sessionStorage");
+                    devLog.log("PAY DEBUG: [M0.9.5] Cleared sessionStorage");
 
                     // If subscribed, assign subscription group (if not already assigned)
                     if (this.isSubscribed && this.imei) {
-                      console.log("PAY DEBUG: [M0.9.6] Subscription confirmed, assigning subscription group");
+                      devLog.log("PAY DEBUG: [M0.9.6] Subscription confirmed, assigning subscription group");
                       await this.assignSubscriptionGroupByDeviceModel();
-                      console.log("PAY DEBUG: [M0.9.7] Subscription group assigned");
+                      devLog.log("PAY DEBUG: [M0.9.7] Subscription group assigned");
                     }
                   } else if (sessionId === "{CHECKOUT_SESSION_ID}" && paymentStatus === "checking") {
                     // Stripe redirect with placeholder session_id (embedded checkout doesn't replace it)
                     // Use stored session_id from sessionStorage to validate
-                    console.log("PAY DEBUG: [M0.9] Stripe redirect detected but session_id is placeholder");
-                    console.log("PAY DEBUG: [M0.9.1] Reading real session_id from sessionStorage");
+                    devLog.log("PAY DEBUG: [M0.9] Stripe redirect detected but session_id is placeholder");
+                    devLog.log("PAY DEBUG: [M0.9.1] Reading real session_id from sessionStorage");
 
                     const storedSessionId = sessionStorage.getItem("stripeCheckoutSessionId");
                     const storedImei = sessionStorage.getItem("stripeCheckoutImei");
 
                     if (storedSessionId && this.imei && storedImei === this.imei) {
-                      console.log("PAY DEBUG: [M0.9.2] Found matching session_id in sessionStorage:", storedSessionId);
-                      console.log("PAY DEBUG: [M0.9.3] Calling validateSubscription action to set customer metadata");
+                      devLog.log("PAY DEBUG: [M0.9.2] Found matching session_id in sessionStorage:", storedSessionId);
+                      devLog.log("PAY DEBUG: [M0.9.3] Calling validateSubscription action to set customer metadata");
 
                       try {
                         // Call validateSubscription action to:
@@ -3402,24 +3400,21 @@ try {
                           imei: this.imei
                         });
 
-                        console.log("PAY DEBUG: [M0.9.4] Validation result:", validationResult);
-                        console.log(
-                          "PAY DEBUG: [M0.9.5] isSubscribed from validation:",
-                          validationResult?.isSubscribed
-                        );
+                        devLog.log("PAY DEBUG: [M0.9.4] Validation result:", validationResult);
+                        devLog.log("PAY DEBUG: [M0.9.5] isSubscribed from validation:", validationResult?.isSubscribed);
 
                         if (validationResult?.isSubscribed) {
-                          console.log("PAY DEBUG: [M0.9.6] ✅ Payment successful, subscription is active");
+                          devLog.log("PAY DEBUG: [M0.9.6] ✅ Payment successful, subscription is active");
                           this.isSubscribed = true;
 
                           // Assign subscription group
                           await this.assignSubscriptionGroupByDeviceModel();
-                          console.log("PAY DEBUG: [M0.9.7] Subscription group assigned");
+                          devLog.log("PAY DEBUG: [M0.9.7] Subscription group assigned");
                         } else {
-                          console.log("PAY DEBUG: [M0.9.6] ❌ Payment not completed or subscription not active");
+                          devLog.log("PAY DEBUG: [M0.9.6] ❌ Payment not completed or subscription not active");
                         }
                       } catch (validationError) {
-                        console.error("PAY DEBUG: [M0.9.8] ERROR validating Stripe session:", validationError);
+                        devLog.error("PAY DEBUG: [M0.9.8] ERROR validating Stripe session:", validationError);
                         // Continue with normal flow - don't block the page
                       }
 
@@ -3428,17 +3423,17 @@ try {
                       cleanUrl.searchParams.delete("session_id");
                       cleanUrl.searchParams.delete("payment_status");
                       window.history.replaceState({}, "", cleanUrl.toString());
-                      console.log("PAY DEBUG: [M0.9.9] Cleaned up URL params");
+                      devLog.log("PAY DEBUG: [M0.9.9] Cleaned up URL params");
 
                       sessionStorage.removeItem("stripeCheckoutSessionId");
                       sessionStorage.removeItem("stripeCheckoutImei");
-                      console.log("PAY DEBUG: [M0.9.10] Cleared sessionStorage");
+                      devLog.log("PAY DEBUG: [M0.9.10] Cleared sessionStorage");
                     } else {
-                      console.log("PAY DEBUG: [M0.9.2] No matching session_id in sessionStorage");
-                      console.log("PAY DEBUG: [M0.9.2.1] storedSessionId:", storedSessionId ? "exists" : "missing");
-                      console.log("PAY DEBUG: [M0.9.2.2] this.imei:", this.imei);
-                      console.log("PAY DEBUG: [M0.9.2.3] storedImei:", storedImei);
-                      console.log("PAY DEBUG: [M0.9.2.4] IMEI match:", storedImei === this.imei);
+                      devLog.log("PAY DEBUG: [M0.9.2] No matching session_id in sessionStorage");
+                      devLog.log("PAY DEBUG: [M0.9.2.1] storedSessionId:", storedSessionId ? "exists" : "missing");
+                      devLog.log("PAY DEBUG: [M0.9.2.2] this.imei:", this.imei);
+                      devLog.log("PAY DEBUG: [M0.9.2.3] storedImei:", storedImei);
+                      devLog.log("PAY DEBUG: [M0.9.2.4] IMEI match:", storedImei === this.imei);
 
                       // Clean up URL params even if sessionStorage doesn't have it
                       const cleanUrl = new URL(window.location.href);
@@ -3448,28 +3443,28 @@ try {
                     }
                   } else {
                     // Normal flow: no Stripe redirect
-                    console.log("PAY DEBUG: [M0.9] Normal navigation - no Stripe redirect");
+                    devLog.log("PAY DEBUG: [M0.9] Normal navigation - no Stripe redirect");
 
                     // Check subscription directly by IMEI if phone number is available
                     if (this.imei && this.devicePhone && this.devicePhone !== "(111) 111-1111") {
-                      console.log("PAY DEBUG: [M0.10] Running IMEI-based subscription check");
+                      devLog.log("PAY DEBUG: [M0.10] Running IMEI-based subscription check");
                       const subscriptionFound = await this.checkSubscriptionByImei();
-                      console.log("PAY DEBUG: [M0.11] IMEI check result - subscriptionFound:", subscriptionFound);
-                      console.log("PAY DEBUG: [M0.12] isSubscribed after IMEI check:", this.isSubscribed);
+                      devLog.log("PAY DEBUG: [M0.11] IMEI check result - subscriptionFound:", subscriptionFound);
+                      devLog.log("PAY DEBUG: [M0.12] isSubscribed after IMEI check:", this.isSubscribed);
                     } else {
-                      console.log("PAY DEBUG: [M0.10] Skipping IMEI check - missing IMEI or valid phone number");
+                      devLog.log("PAY DEBUG: [M0.10] Skipping IMEI check - missing IMEI or valid phone number");
                     }
 
                     // Check for any leftover session_id in sessionStorage (edge case)
                     const storedSessionId = sessionStorage.getItem("stripeCheckoutSessionId");
                     if (storedSessionId && this.imei) {
-                      console.log("PAY DEBUG: [M0.13] Found leftover session_id in sessionStorage, cleaning up");
+                      devLog.log("PAY DEBUG: [M0.13] Found leftover session_id in sessionStorage, cleaning up");
                       sessionStorage.removeItem("stripeCheckoutSessionId");
                       sessionStorage.removeItem("stripeCheckoutImei");
                     }
                   }
 
-                  console.log("PAY DEBUG: [M0.15] Final isSubscribed state after all checks:", this.isSubscribed);
+                  devLog.log("PAY DEBUG: [M0.15] Final isSubscribed state after all checks:", this.isSubscribed);
 
                   // Load cached total apps count on initialization
                   this.loadCachedTotalApps();
@@ -3483,7 +3478,7 @@ try {
                         await this.getFeatures();
                       }
                     } catch (error) {
-                      console.error("Failed to load features:", error);
+                      devLog.error("Failed to load features:", error);
                       this.isLoading = false;
                     }
                   });
@@ -3549,7 +3544,7 @@ try {
                       // getFeatures() will set isLoading = false when done
                       await this.getFeatures();
                     } catch (error) {
-                      console.error("Failed to load features:", error);
+                      devLog.error("Failed to load features:", error);
                       this.isLoading = false;
                     }
                   } else {
@@ -3562,15 +3557,12 @@ try {
 
                   // Auto-trigger completeSetup if device is subscribed and not set up (mobile only)
                   const isMobile = window.innerWidth < 640; // Tailwind sm breakpoint
-                  console.log("PAY DEBUG: [M0.16] Checking deeplink trigger conditions:");
-                  console.log("PAY DEBUG: [M0.16.0] isMobile:", isMobile);
-                  console.log("PAY DEBUG: [M0.16.1] isSubscribed:", this.isSubscribed);
-                  console.log("PAY DEBUG: [M0.16.2] isPhoneSetUp:", this.isPhoneSetUp);
-                  console.log("PAY DEBUG: [M0.16.3] devicePhone:", this.devicePhone);
-                  console.log(
-                    "PAY DEBUG: [M0.16.4] devicePhone is placeholder?",
-                    this.devicePhone === "(111) 111-1111"
-                  );
+                  devLog.log("PAY DEBUG: [M0.16] Checking deeplink trigger conditions:");
+                  devLog.log("PAY DEBUG: [M0.16.0] isMobile:", isMobile);
+                  devLog.log("PAY DEBUG: [M0.16.1] isSubscribed:", this.isSubscribed);
+                  devLog.log("PAY DEBUG: [M0.16.2] isPhoneSetUp:", this.isPhoneSetUp);
+                  devLog.log("PAY DEBUG: [M0.16.3] devicePhone:", this.devicePhone);
+                  devLog.log("PAY DEBUG: [M0.16.4] devicePhone is placeholder?", this.devicePhone === "(111) 111-1111");
 
                   const condition1 = isMobile;
                   const condition2 = this.isSubscribed;
@@ -3578,22 +3570,22 @@ try {
                   const condition4 = !!this.devicePhone;
                   const condition5 = this.devicePhone !== "(111) 111-1111";
 
-                  console.log("PAY DEBUG: [M0.16.5] Condition 1 (isMobile):", condition1);
-                  console.log("PAY DEBUG: [M0.16.6] Condition 2 (isSubscribed):", condition2);
-                  console.log("PAY DEBUG: [M0.16.7] Condition 3 (!isPhoneSetUp):", condition3);
-                  console.log("PAY DEBUG: [M0.16.8] Condition 4 (devicePhone exists):", condition4);
-                  console.log("PAY DEBUG: [M0.16.9] Condition 5 (devicePhone not placeholder):", condition5);
+                  devLog.log("PAY DEBUG: [M0.16.5] Condition 1 (isMobile):", condition1);
+                  devLog.log("PAY DEBUG: [M0.16.6] Condition 2 (isSubscribed):", condition2);
+                  devLog.log("PAY DEBUG: [M0.16.7] Condition 3 (!isPhoneSetUp):", condition3);
+                  devLog.log("PAY DEBUG: [M0.16.8] Condition 4 (devicePhone exists):", condition4);
+                  devLog.log("PAY DEBUG: [M0.16.9] Condition 5 (devicePhone not placeholder):", condition5);
 
                   if (condition1 && condition2 && condition3 && condition4 && condition5) {
-                    console.log("PAY DEBUG: [M0.16.10] ✅ All conditions passed - triggering deeplink");
+                    devLog.log("PAY DEBUG: [M0.16.10] ✅ All conditions passed - triggering deeplink");
                     this.completeSetup();
                   } else {
-                    console.log("PAY DEBUG: [M0.16.10] ❌ Conditions not met - deeplink not triggered");
-                    if (!condition1) console.log("PAY DEBUG: [M0.16.11] Reason: Not mobile view (desktop/web)");
-                    if (!condition2) console.log("PAY DEBUG: [M0.16.12] Reason: Device is not subscribed");
-                    if (!condition3) console.log("PAY DEBUG: [M0.16.13] Reason: Phone is already set up");
-                    if (!condition4) console.log("PAY DEBUG: [M0.16.14] Reason: Phone number is missing");
-                    if (!condition5) console.log("PAY DEBUG: [M0.16.15] Reason: Phone number is placeholder");
+                    devLog.log("PAY DEBUG: [M0.16.10] ❌ Conditions not met - deeplink not triggered");
+                    if (!condition1) devLog.log("PAY DEBUG: [M0.16.11] Reason: Not mobile view (desktop/web)");
+                    if (!condition2) devLog.log("PAY DEBUG: [M0.16.12] Reason: Device is not subscribed");
+                    if (!condition3) devLog.log("PAY DEBUG: [M0.16.13] Reason: Phone is already set up");
+                    if (!condition4) devLog.log("PAY DEBUG: [M0.16.14] Reason: Phone number is missing");
+                    if (!condition5) devLog.log("PAY DEBUG: [M0.16.15] Reason: Phone number is placeholder");
                   }
                 },
 

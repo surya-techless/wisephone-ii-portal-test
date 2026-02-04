@@ -2,6 +2,7 @@ import type { APIRoute } from "astro";
 import { db, Wisephone, like, or, asc, sql } from "astro:db";
 import { isAdmin } from "@/lib/auth/permissions";
 import { captureException } from "@sentry/astro";
+import { devLog } from "@/libs/utils";
 export const GET: APIRoute = async ({ locals, request }) => {
   try {
     // Check if user is authenticated
@@ -88,7 +89,7 @@ export const GET: APIRoute = async ({ locals, request }) => {
     );
   } catch (error) {
     captureException(error);
-    console.error("Error fetching wisephones:", error);
+    devLog.error("Error fetching wisephones:", error);
     return new Response(
       JSON.stringify({
         error: "Internal Server Error",

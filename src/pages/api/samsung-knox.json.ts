@@ -1,6 +1,7 @@
 import type { APIRoute } from "astro";
 import { captureException } from "@sentry/astro";
 import { SamsungKnoxService } from "@/libs/samsung-knox-service";
+import { devLog } from "@/libs/utils";
 
 type GetKnoxAction = "get-token" | "get-device-groups" | "get-device-info";
 type PostKnoxAction = "apply-feature" | "remove-feature" | "install-app" | "uninstall-app";
@@ -145,7 +146,7 @@ export const POST: APIRoute = async ({ request }) => {
     }
   } catch (error) {
     captureException(error);
-    console.error(error);
+    devLog.error(error);
     return new Response(
       JSON.stringify({
         error: error instanceof Error ? error.message : "Unknown error"

@@ -2,6 +2,7 @@ import type { APIRoute } from "astro";
 import { db, Wisephone, eq, BypassTechlessSubscription, sql } from "astro:db";
 import { isAdmin } from "@/lib/auth/permissions";
 import { captureException } from "@sentry/astro";
+import { devLog } from "@/libs/utils";
 export const POST: APIRoute = async ({ locals, request }) => {
   try {
     // Check if user is authenticated
@@ -125,7 +126,7 @@ export const POST: APIRoute = async ({ locals, request }) => {
     );
   } catch (error) {
     captureException(error);
-    console.error("Error updating wisephone:", error);
+    devLog.error("Error updating wisephone:", error);
     return new Response(
       JSON.stringify({
         error: "Internal Server Error",

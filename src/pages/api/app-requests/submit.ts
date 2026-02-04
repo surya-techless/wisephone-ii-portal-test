@@ -1,5 +1,6 @@
 import type { APIRoute } from "astro";
 import { captureException } from "@sentry/astro";
+import { devLog } from "@/libs/utils";
 
 interface AppRequest {
   imei: number;
@@ -14,14 +15,14 @@ interface AppRequest {
 export const POST: APIRoute = async ({ request }) => {
   try {
     const body: AppRequest = await request.json();
-    
+
     // Validate request body
     if (!body.imei || !body.apps || !Array.isArray(body.apps) || body.apps.length === 0) {
       return new Response(
-        JSON.stringify({ 
-          error: "Invalid request", 
-          message: "IMEI and apps array are required" 
-        }), 
+        JSON.stringify({
+          error: "Invalid request",
+          message: "IMEI and apps array are required"
+        }),
         {
           status: 400,
           headers: {
@@ -36,7 +37,7 @@ export const POST: APIRoute = async ({ request }) => {
     }
 
     // Log the request for now (later you can save to database)
-    console.log(" App Request Received:", {
+    devLog.log(" App Request Received:", {
       imei: body.imei,
       appsCount: body.apps.length,
       apps: body.apps,
@@ -48,11 +49,11 @@ export const POST: APIRoute = async ({ request }) => {
     // For now, we'll just return success
 
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         success: true,
         message: "App request submitted successfully",
         requestId: `REQ-${Date.now()}` // Generate a simple request ID
-      }), 
+      }),
       {
         status: 200,
         headers: {
@@ -66,13 +67,13 @@ export const POST: APIRoute = async ({ request }) => {
     );
   } catch (error) {
     captureException(error);
-    console.error("Error in app-requests/submit API route:", error);
-    
+    devLog.error("Error in app-requests/submit API route:", error);
+
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         error: "Failed to submit app request",
         message: error instanceof Error ? error.message : "Unknown error"
-      }), 
+      }),
       {
         status: 500,
         headers: {

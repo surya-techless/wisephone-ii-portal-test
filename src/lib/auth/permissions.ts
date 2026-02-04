@@ -1,4 +1,5 @@
 import { db, eq, UserPermission } from "astro:db";
+import { devLog } from "@/libs/utils";
 
 /**
  * User permission roles
@@ -15,7 +16,7 @@ export enum UserRole {
  */
 export async function isAdmin(userId: string): Promise<boolean> {
   if (!userId) {
-    console.error("No user ID provided");
+    devLog.error("No user ID provided");
     return false;
   }
 
@@ -26,7 +27,7 @@ export async function isAdmin(userId: string): Promise<boolean> {
     // Return true if the user has admin role
     return userPermission?.role === UserRole.ADMIN;
   } catch (error) {
-    console.error("Error checking admin permissions:", error);
+    devLog.error("Error checking admin permissions:", error);
     return false;
   }
 }
@@ -52,7 +53,7 @@ export async function ensureUserPermission(userId: string, role: UserRole = User
       });
     }
   } catch (error) {
-    console.error("Error ensuring user permission:", error);
+    devLog.error("Error ensuring user permission:", error);
   }
 }
 
@@ -74,7 +75,7 @@ export async function updateUserRole(userId: string, role: UserRole): Promise<bo
       .where(eq(UserPermission.userId, userId));
     return true;
   } catch (error) {
-    console.error("Error updating user role:", error);
+    devLog.error("Error updating user role:", error);
     return false;
   }
 }

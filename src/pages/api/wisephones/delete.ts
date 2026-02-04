@@ -3,6 +3,7 @@ import type { APIRoute } from "astro";
 import { db, Wisephone, eq, sql, BypassTechlessSubscription } from "astro:db";
 import { isAdmin } from "@/lib/auth/permissions";
 import { captureException } from "@sentry/astro";
+import { devLog } from "@/libs/utils";
 
 export const POST: APIRoute = async ({ locals, request }) => {
   try {
@@ -74,7 +75,7 @@ export const POST: APIRoute = async ({ locals, request }) => {
     );
   } catch (error) {
     captureException(error);
-    console.error("Error deleting wisephone:", error);
+    devLog.error("Error deleting wisephone:", error);
     return new Response(
       JSON.stringify({
         error: "Internal Server Error",
