@@ -167,7 +167,7 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
 
         <p class="text-sm m-0 text-slate-500">
           Complete this form to add a Wisephone II to your portal account
-          {`${user?.primaryEmailAddress?.emailAddress ? `(${user?.primaryEmailAddress?.emailAddress})` : ""}`}. You'll
+          {`${user?.emailAddresses?.[0]?.emailAddress || user?.primaryEmailAddress?.emailAddress ? `(${user?.emailAddresses?.[0]?.emailAddress || user?.primaryEmailAddress?.emailAddress})` : ""}`}. You'll
           be able to manage the device's features and apps through the portal, and you can add multiple devices to the
           same portal account.
         </p>
@@ -357,7 +357,7 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
   }
 </style>
 
-<div class="dashboard-container flex h-screen w-full min-w-[360px] bg-[#f7f6f2] relative" x-data={`dashboard(${JSON.stringify({ userEmail: user?.primaryEmailAddress?.emailAddress || "", newDevice: actionResult?.data && !actionResult.error && !actionResult.data.isSubscribed && actionResult.data.wisephone?.[0] ? { imei: actionResult.data.wisephone[0].imei.toString().padEnd(15, "0"), phoneNumber: actionResult.data.wisephone[0].phoneNumber || "" } : null })})`} @activate-modal.window="openActivateModal($event.detail?.imei || $event.detail)">
+<div class="dashboard-container flex h-screen w-full min-w-[360px] bg-[#f7f6f2] relative" x-data={`dashboard(${JSON.stringify({ userEmail: user?.emailAddresses?.[0]?.emailAddress || user?.primaryEmailAddress?.emailAddress || "", newDevice: actionResult?.data && !actionResult.error && !actionResult.data.isSubscribed && actionResult.data.wisephone?.[0] ? { imei: actionResult.data.wisephone[0].imei.toString().padEnd(15, "0"), phoneNumber: actionResult.data.wisephone[0].phoneNumber || "" } : null })})`} @activate-modal.window="openActivateModal($event.detail?.imei || $event.detail)">
   <progress
     x-show="isLoading"
     x-cloak
@@ -512,7 +512,7 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
       <div class="p-6">
         <p class="text-sm text-gray-600 mb-6">
           Complete this form to add a Wisephone II to your portal account
-          {`${user?.primaryEmailAddress?.emailAddress ? `(${user?.primaryEmailAddress?.emailAddress})` : ""}`}. You'll
+          {`${user?.emailAddresses?.[0]?.emailAddress || user?.primaryEmailAddress?.emailAddress ? `(${user?.emailAddresses?.[0]?.emailAddress || user?.primaryEmailAddress?.emailAddress})` : ""}`}. You'll
           be able to manage the device's features and apps through the portal, and you can add multiple devices to the
           same portal account.
         </p>
