@@ -15,6 +15,7 @@
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
     X-XSS-Protection = "1; mode=block"
+    Content-Security-Policy = "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://*.clerk.accounts.dev https://*.clerk.com; object-src 'none'; base-uri 'self';"
 
 # CORS headers for API endpoints (to allow WiseOS devices to connect)
 [[headers]]
@@ -29,3 +30,10 @@
   node_bundler = "esbuild"
   included_files = ["node_modules/**"]
 
+# Redirect portal.getwisephone.com to portal.wisephone.com
+# This ensures Clerk authentication works correctly with production keys
+[[redirects]]
+  from = "https://portal.getwisephone.com/*"
+  to = "https://portal.wisephone.com/:splat"
+  status = 301
+  force = true
