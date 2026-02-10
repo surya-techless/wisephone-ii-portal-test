@@ -50,6 +50,8 @@ remove_duplicates.py
 tool-Drawer.csv
 toolDrawer.json
 ottogridApps.json
+apps1.json
+deduplicated_ottogridApps_updated.json
 
 # Test files (development)
 tests/byoc-activation-flow.spec.ts
