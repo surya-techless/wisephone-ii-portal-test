@@ -49,6 +49,7 @@ newApps.json
 remove_duplicates.py
 tool-Drawer.csv
 toolDrawer.json
+ottogridApps.json
 
 # Test files (development)
 tests/byoc-activation-flow.spec.ts
