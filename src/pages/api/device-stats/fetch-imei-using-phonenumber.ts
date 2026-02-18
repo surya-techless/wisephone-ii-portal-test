@@ -4,15 +4,13 @@ import { captureException } from "@sentry/astro";
 import { devLog } from "@/libs/utils";
 
 /**
- * POST /api/device-stats/fetch-imei-using-phonenumber
+ * GET /api/device-stats/fetch-imei-using-phonenumber?phoneNumber=480-287-1184
  *
  * Endpoint for WiseOS devices to fetch their IMEI using phone number.
  * Used when IMEI is missing from device but phone number is available.
  *
- * Expected payload format:
- * {
+ * Query parameters:
  *   phoneNumber: "480-287-1184"  // Must be in format XXX-XXX-XXXX (12 characters)
- * }
  *
  * Response format:
  * {
@@ -29,7 +27,7 @@ import { devLog } from "@/libs/utils";
 // CORS headers for device requests
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Methods": "GET, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
   "Access-Control-Max-Age": "86400"
 };
@@ -42,7 +40,7 @@ export const OPTIONS: APIRoute = async () => {
   });
 };
 
-export const POST: APIRoute = async ({ request }) => {
+export const GET: APIRoute = async ({ request, url }) => {
   try {
     // API key authentication - device uses a shared secret
     const authHeader = request.headers.get("Authorization");
@@ -69,14 +67,13 @@ export const POST: APIRoute = async ({ request }) => {
       });
     }
 
-    const body = await request.json();
+    // Get phone number from query parameter
+    const phoneNumber = url.searchParams.get("phoneNumber");
     devLog.log("========================================");
     devLog.log("📞 IMEI LOOKUP REQUEST (Phone Number)");
     devLog.log("========================================");
-    devLog.log("Request body:", JSON.stringify(body, null, 2));
+    devLog.log("Phone number from query:", phoneNumber);
     devLog.log("========================================");
-
-    const { phoneNumber } = body;
 
     // Validate phone number is provided
     if (!phoneNumber) {
