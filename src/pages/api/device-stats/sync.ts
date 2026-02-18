@@ -305,9 +305,9 @@ export const POST: APIRoute = async ({ request }) => {
 
     const { device, weeks, collectedAt } = body;
 
-    // Validate required fields
-    if (!device?.imei) {
-      return new Response(JSON.stringify({ error: "Missing device IMEI" }), {
+    // Validate required fields - accept either IMEI or phone number
+    if (!device?.imei && !device?.phoneNumber) {
+      return new Response(JSON.stringify({ error: "Missing device IMEI or phone number" }), {
         status: 400,
         headers: {
           "Content-Type": "application/json",
@@ -326,24 +326,55 @@ export const POST: APIRoute = async ({ request }) => {
       });
     }
 
-    // Validate IMEI exists in our system
-    // Convert IMEI to number for Wisephone table lookup (IMEI is stored as number there)
-    const imeiNumber = typeof device.imei === "string" ? parseInt(device.imei, 10) : Number(device.imei);
+    // Lookup device - try IMEI first, then phone number as fallback
+    let wisephone = null;
+    let imeiNumber: number | null = null;
+    let imeiString: string = "";
 
-    if (isNaN(imeiNumber)) {
-      return new Response(JSON.stringify({ error: "Invalid IMEI format" }), {
-        status: 400,
-        headers: {
-          "Content-Type": "application/json",
-          ...corsHeaders
-        }
-      });
+    if (device.imei) {
+      // Try IMEI lookup first (primary method)
+      imeiNumber = typeof device.imei === "string" ? parseInt(device.imei, 10) : Number(device.imei);
+
+      if (isNaN(imeiNumber)) {
+        return new Response(JSON.stringify({ error: "Invalid IMEI format" }), {
+          status: 400,
+          headers: {
+            "Content-Type": "application/json",
+            ...corsHeaders
+          }
+        });
+      }
+
+      devLog.log(`🔍 Looking up device with IMEI: ${imeiNumber} (type: ${typeof imeiNumber})`);
+      wisephone = await db.select().from(Wisephone).where(eq(Wisephone.imei, imeiNumber)).get();
+      devLog.log(`📱 Wisephone lookup result (IMEI):`, wisephone ? `Found device: ${JSON.stringify(wisephone)}` : "NOT FOUND");
     }
 
-    devLog.log(`🔍 Looking up device with IMEI: ${imeiNumber} (type: ${typeof imeiNumber})`);
-    const wisephone = await db.select().from(Wisephone).where(eq(Wisephone.imei, imeiNumber)).get();
+    // If IMEI lookup failed, try phone number lookup
+    if (!wisephone && device.phoneNumber) {
+      devLog.log(`📞 IMEI not provided or not found, trying phone number lookup: ${device.phoneNumber}`);
+      
+      // Validate phone number format (XXX-XXX-XXXX)
+      const phoneRegex = /^\d{3}-\d{3}-\d{4}$/;
+      if (!phoneRegex.test(device.phoneNumber)) {
+        return new Response(JSON.stringify({ error: `Invalid phone number format. Expected XXX-XXX-XXXX (got: "${device.phoneNumber}")` }), {
+          status: 400,
+          headers: {
+            "Content-Type": "application/json",
+            ...corsHeaders
+          }
+        });
+      }
 
-    devLog.log(`📱 Wisephone lookup result:`, wisephone ? `Found device: ${JSON.stringify(wisephone)}` : "NOT FOUND");
+      wisephone = await db.select().from(Wisephone).where(eq(Wisephone.phoneNumber, device.phoneNumber)).get();
+      devLog.log(`📱 Wisephone lookup result (Phone):`, wisephone ? `Found device: ${JSON.stringify(wisephone)}` : "NOT FOUND");
+      
+      if (wisephone) {
+        imeiNumber = wisephone.imei;
+        imeiString = String(wisephone.imei);
+        devLog.log(`✅ Found IMEI via phone number lookup: ${imeiString}`);
+      }
+    }
 
     if (!wisephone) {
       return new Response(JSON.stringify({ error: "Unknown device" }), {
@@ -355,9 +386,13 @@ export const POST: APIRoute = async ({ request }) => {
       });
     }
 
+    // Use IMEI from database (either from direct lookup or phone number lookup)
+    if (!imeiString) {
+      imeiString = String(imeiNumber || wisephone.imei);
+    }
+
     // Delete ALL existing data for this IMEI (fresh insert approach)
     // Device always sends complete 4-week snapshot, so we replace everything
-    const imeiString = String(device.imei);
     devLog.log(`🗑️  Deleting all existing data for IMEI: ${imeiString}...`);
 
     // Delete in order: child tables first, then parent
