@@ -13,6 +13,8 @@ import IsAdmin from "@/components/server-islands/IsAdmin.astro";
 import { SignOutButton } from "@clerk/astro/components";
 import { validateIsSubscribed } from "@/libs/stripe";
 import { devLog } from "@/libs/utils";
+import { isFeatureEnabled } from "@/config/feature-flags";
+import TypeformDeviceRegistration from "@/components/TypeformDeviceRegistration.astro";
 
 if (!Astro.locals.auth().userId) {
   return Astro.redirect("/");
@@ -28,6 +30,10 @@ const wisephones = await db.select().from(Wisephone).where(eq(Wisephone.userId, 
 devLog.log("Index.astro wisephones list",wisephones);
 const derivedHasNoWisephone = wisephones.length === 0;
 devLog.log(derivedHasNoWisephone);
+
+// Check if Typeform feature is enabled
+const enableTypeform = isFeatureEnabled("ENABLE_TYPEFORM");
+devLog.log("Typeform feature check:", { enableTypeform });
 
 // Check subscription status for each device
 const wisephonesWithSubscription = await Promise.all(
@@ -488,8 +494,8 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
     class="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
     @click.self="showForm = false; resetForm()"
   >
-    <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-      <div class="sticky top-0 bg-white border-b border-gray-200 p-6 flex justify-between items-center">
+    <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto flex flex-col">
+      <div class="sticky top-0 bg-white border-b border-gray-200 p-6 flex justify-between items-center flex-shrink-0">
         <h2 class="text-2xl font-semibold text-gray-800">Add a Wisephone</h2>
         <button @click="showForm = false; resetForm()" class="text-gray-400 hover:text-gray-600">
           <svg
@@ -509,7 +515,25 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
         </button>
       </div>
 
-      <div class="p-6">
+      <!-- Custom Typeform Component (when feature flag is enabled) -->
+      {enableTypeform ? (
+        <div class="px-6 pb-6 pt-0 flex flex-col items-start">
+          <form
+            method="POST"
+            action={actions.wisephones.createWisephone}
+            id="device-registration-form"
+            style="display: none;"
+          >
+            <input type="hidden" name="imei" />
+            <input type="hidden" name="imei2" />
+            <input type="hidden" name="phoneNumber" />
+            <input type="hidden" name="nickname" />
+            <input type="hidden" name="userId" value={user?.id} />
+          </form>
+          <TypeformDeviceRegistration />
+        </div>
+      ) : (
+        <div class="p-6">
         <p class="text-sm text-gray-600 mb-6">
           Complete this form to add a Wisephone II to your portal account
           {`${user?.emailAddresses?.[0]?.emailAddress || user?.primaryEmailAddress?.emailAddress ? `(${user?.emailAddresses?.[0]?.emailAddress || user?.primaryEmailAddress?.emailAddress})` : ""}`}. You'll
@@ -643,6 +667,8 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
             </button>
           </div>
         </form>
+        </div>
+      )}
       </div>
     </div>
   </div>
@@ -1510,4 +1536,5 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
     });
   });
 </script>
+
 </Layout>

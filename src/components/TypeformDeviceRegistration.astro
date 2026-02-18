@@ -1,0 +1,349 @@
+---
+// src/components/TypeformDeviceRegistration.astro
+// Custom multi-step form component similar to Typeform
+interface Props {
+  typeformId?: string;
+}
+
+const { typeformId } = Astro.props;
+---
+
+<div
+  class="typeform-container w-full"
+  x-data="typeformDeviceRegistration()"
+  x-init="init()"
+>
+  <!-- Progress Bar -->
+  <div class="mb-3 w-full">
+    <div class="w-full bg-gray-200 rounded-full h-1.5">
+      <div
+        class="bg-blue-600 h-1.5 rounded-full transition-all duration-300"
+        :style="`width: ${(currentStep / totalSteps) * 100}%`"
+      ></div>
+    </div>
+    <p class="text-xs text-gray-500 mt-1 text-center">
+      Step <span x-text="currentStep"></span> of <span x-text="totalSteps"></span>
+    </p>
+  </div>
+
+  <!-- Step 1: IMEI Fields -->
+  <div x-show="currentStep === 1" x-transition class="space-y-4 w-full">
+    <div>
+      <h3 class="text-xl font-semibold text-gray-900 mb-1">Device IMEI</h3>
+      <p class="text-sm text-gray-600 mb-4">Enter your Wisephone IMEI to get started</p>
+    </div>
+
+    <div>
+      <label for="imei1" class="block text-sm font-medium text-gray-700 mb-2">
+        Wisephone IMEI (slot 1)
+        <span class="text-red-500">*</span>
+      </label>
+      <input
+        type="text"
+        id="imei1"
+        x-model.trim="imei1"
+        x-mask="999999999999999"
+        placeholder="350XXXXXXXXXXXX"
+        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
+        :class="{ 'border-red-500': hasBlurredImei && (imei1.length !== 15 || !isImeiValid) }"
+        pattern="[0-9]{15}"
+        minlength="15"
+        maxlength="15"
+        @blur="validateImei(); hasBlurredImei = true;"
+        required
+      />
+      <div x-show="hasBlurredImei && imei1.length > 0 && (imei1.length !== 15 || !isImeiValid)" class="mt-2">
+        <p class="text-sm text-red-500" x-show="imei1.length > 0 && imei1.length !== 15">
+          IMEI must be exactly 15 digits
+        </p>
+        <p class="text-sm text-red-500" x-show="imei1.length === 15 && !isImeiValid">
+          Invalid IMEI. Please check the number and try again.
+        </p>
+      </div>
+      <p class="text-xs text-gray-500 mt-2">
+        On the WiseOS home screen, tap <strong>"Settings"</strong> → tap
+        <strong>"Open System Settings"</strong> → scroll to and tap <strong>"About phone"</strong> → hold down on
+        <strong>"IMEI (slot 1)"</strong> to copy the number.
+      </p>
+    </div>
+
+    <div>
+      <label for="imei2" class="block text-sm font-medium text-gray-700 mb-2">
+        Enter the IMEI one more time
+        <span class="text-red-500">*</span>
+      </label>
+      <input
+        type="text"
+        id="imei2"
+        x-model.trim="imei2"
+        x-mask="999999999999999"
+        placeholder="350XXXXXXXXXXXX"
+        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-lg"
+        :class="{ 'border-red-500': hasBlurredImeiVerification && (imei2.length !== 15 || imei1 !== imei2) }"
+        pattern="[0-9]{15}"
+        minlength="15"
+        maxlength="15"
+        @blur="validateImei(); hasBlurredImeiVerification = true;"
+        required
+      />
+      <div x-show="hasBlurredImei && (imei2.length > 0 && (imei2.length !== 15 || (imei2.length === 15 && imei1 !== imei2)))" class="mt-2">
+        <p class="text-sm text-red-500" x-show="imei2.length > 0 && imei2.length !== 15">
+          IMEI must be exactly 15 digits
+        </p>
+        <p class="text-sm text-red-500" x-show="imei2.length === 15 && imei1.length === 15 && imei1 !== imei2">
+          IMEIs don't match
+        </p>
+      </div>
+    </div>
+
+    <div class="flex justify-end mt-6">
+      <button
+        @click="nextStep()"
+        :disabled="!canProceedStep1()"
+        class="px-5 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+      >
+        Continue
+      </button>
+    </div>
+  </div>
+
+  <!-- Step 2: Phone Number -->
+  <div x-show="currentStep === 2" x-transition class="space-y-4 w-full">
+    <div>
+      <h3 class="text-xl font-semibold text-gray-900 mb-1">Phone Number</h3>
+      <p class="text-sm text-gray-600 mb-4">What's your Wisephone phone number?</p>
+    </div>
+
+    <div>
+      <label for="phoneNumber" class="block text-sm font-medium text-gray-700 mb-2">
+        Wisephone Phone Number
+        <span class="text-red-500">*</span>
+      </label>
+      <input
+        type="tel"
+        id="phoneNumber"
+        x-model.trim="phoneNumber"
+        x-mask="999-999-9999"
+        placeholder="XXX-XXX-XXXX"
+        pattern="[0-9]{3}-[0-9]{3}-[0-9]{4}"
+        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
+        :class="{ 'border-red-500': phoneNumber.length > 0 && phoneNumber.replace(/-/g, '').length !== 10 }"
+        required
+      />
+      <p class="text-xs text-gray-500 mt-2">
+        Enter the phone number associated with this Wisephone device.
+      </p>
+    </div>
+
+    <div class="flex justify-between mt-6">
+      <button
+        @click="prevStep()"
+        class="px-5 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+      >
+        Back
+      </button>
+      <button
+        @click="nextStep()"
+        :disabled="!canProceedStep2()"
+        class="px-5 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+      >
+        Continue
+      </button>
+    </div>
+  </div>
+
+  <!-- Step 3: Device Name -->
+  <div x-show="currentStep === 3" x-transition class="space-y-4 w-full">
+    <div>
+      <h3 class="text-xl font-semibold text-gray-900 mb-1">Device Name</h3>
+      <p class="text-sm text-gray-600 mb-4">Give this Wisephone a name or owner</p>
+    </div>
+
+    <div>
+      <label for="nickname" class="block text-sm font-medium text-gray-700 mb-2">
+        Device Name or Owner
+        <span class="text-red-500">*</span>
+      </label>
+      <input
+        id="nickname"
+        x-model.trim="nickname"
+        type="text"
+        name="nickname"
+        placeholder="John Doe"
+        maxlength="64"
+        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
+        :class="{ 'border-red-500': (nickname.length > 0 && nickname.trim().length === 0) || nickname.length > 64 }"
+        required
+      />
+      <div x-show="nickname.length > 64" class="mt-2">
+        <p class="text-sm text-red-500">
+          Name must not exceed 64 characters
+        </p>
+      </div>
+      <p class="text-xs text-gray-500 mt-2">
+        This name will help you identify this device in your portal.
+      </p>
+    </div>
+
+    <div class="flex justify-between mt-6">
+      <button
+        @click="prevStep()"
+        class="px-5 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+      >
+        Back
+      </button>
+      <button
+        @click="nextStep()"
+        :disabled="!canProceedStep3()"
+        class="px-5 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+      >
+        Continue
+      </button>
+    </div>
+  </div>
+
+  <!-- Step 4: Review & Submit -->
+  <div x-show="currentStep === 4" x-transition class="space-y-4 w-full">
+    <div>
+      <h3 class="text-xl font-semibold text-gray-900 mb-1">Review Your Information</h3>
+      <p class="text-sm text-gray-600 mb-4">Please review your information before submitting</p>
+    </div>
+
+    <div class="bg-gray-50 rounded-lg p-4 space-y-3">
+      <div>
+        <p class="text-xs font-medium text-gray-500">IMEI</p>
+        <p class="text-base text-gray-900" x-text="imei1"></p>
+      </div>
+      <div>
+        <p class="text-xs font-medium text-gray-500">Phone Number</p>
+        <p class="text-base text-gray-900" x-text="phoneNumber"></p>
+      </div>
+      <div>
+        <p class="text-xs font-medium text-gray-500">Device Name</p>
+        <p class="text-base text-gray-900" x-text="nickname"></p>
+      </div>
+    </div>
+
+    <div class="flex justify-between mt-6">
+      <button
+        @click="prevStep()"
+        class="px-5 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+      >
+        Back
+      </button>
+      <button
+        @click="submitForm()"
+        :disabled="!isFormValid()"
+        class="px-5 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+      >
+        Add Device
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+  import { isValidIMEI } from "@/libs/utils";
+
+  function typeformDeviceRegistration() {
+    return {
+      currentStep: 1,
+      totalSteps: 4,
+      imei1: "",
+      imei2: "",
+      phoneNumber: "",
+      nickname: "",
+      imeiMatch: false,
+      hasBlurredImei: false,
+      hasBlurredImeiVerification: false,
+      isImeiValid: true,
+      userId: "",
+
+      init() {
+        // Get userId from hidden input if available
+        const userIdInput = document.querySelector('input[name="userId"]');
+        if (userIdInput) {
+          this.userId = userIdInput.value;
+        }
+      },
+
+      validateImei() {
+        this.imeiMatch = this.imei1 === this.imei2;
+        if (this.imei1.length === 15) {
+          this.isImeiValid = isValidIMEI(this.imei1);
+        } else {
+          this.isImeiValid = false;
+        }
+      },
+
+      canProceedStep1() {
+        return (
+          this.imei1.length === 15 &&
+          this.imei2.length === 15 &&
+          this.imei1 === this.imei2 &&
+          this.isImeiValid
+        );
+      },
+
+      canProceedStep2() {
+        return this.phoneNumber.replace(/-/g, "").length === 10;
+      },
+
+      canProceedStep3() {
+        return this.nickname.trim().length > 0 && this.nickname.length <= 64;
+      },
+
+      isFormValid() {
+        return (
+          this.canProceedStep1() &&
+          this.canProceedStep2() &&
+          this.canProceedStep3()
+        );
+      },
+
+      nextStep() {
+        if (this.currentStep < this.totalSteps) {
+          this.currentStep++;
+        }
+      },
+
+      prevStep() {
+        if (this.currentStep > 1) {
+          this.currentStep--;
+        }
+      },
+
+      async submitForm() {
+        if (!this.isFormValid()) {
+          return;
+        }
+
+        // Find the form element by ID
+        const form = document.getElementById('device-registration-form');
+        if (!form) {
+          console.error("Form not found");
+          return;
+        }
+
+        // Set form values
+        const imeiInput = form.querySelector('input[name="imei"]');
+        const imei2Input = form.querySelector('input[name="imei2"]');
+        const phoneInput = form.querySelector('input[name="phoneNumber"]');
+        const nicknameInput = form.querySelector('input[name="nickname"]');
+
+        if (imeiInput) imeiInput.value = this.imei1;
+        if (imei2Input) imei2Input.value = this.imei2;
+        if (phoneInput) phoneInput.value = this.phoneNumber;
+        if (nicknameInput) nicknameInput.value = this.nickname;
+
+        // Submit the form
+        form.submit();
+      }
+    };
+  }
+
+  // Make function available globally for Alpine.js
+  if (typeof window !== 'undefined') {
+    (window as any).typeformDeviceRegistration = typeformDeviceRegistration;
+  }
+</script>

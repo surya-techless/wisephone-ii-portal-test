@@ -6,7 +6,12 @@ export const FEATURE_FLAGS = {
    * Enable/disable screen time functionality
    * When disabled, screen time components and database queries are hidden/skipped
    */
-  ENABLE_SCREEN_TIME: true
+  ENABLE_SCREEN_TIME: true,
+  /**
+   * Enable/disable Typeform integration for device registration
+   * When enabled, clicking "Add Device" will show a Typeform instead of the regular form
+   */
+  ENABLE_TYPEFORM: true
 } as const;
 
 export type FeatureFlag = keyof typeof FEATURE_FLAGS;
