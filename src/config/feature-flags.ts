@@ -6,7 +6,7 @@ export const FEATURE_FLAGS = {
    * Enable/disable screen time functionality
    * When disabled, screen time components and database queries are hidden/skipped
    */
-  ENABLE_SCREEN_TIME: false
+  ENABLE_SCREEN_TIME: true
 } as const;
 
 export type FeatureFlag = keyof typeof FEATURE_FLAGS;
