@@ -5,7 +5,7 @@ interface Props {
   typeformId?: string;
 }
 
-const { typeformId } = Astro.props;
+const { } = Astro.props;
 ---
 
 <div
@@ -261,7 +261,7 @@ const { typeformId } = Astro.props;
 
       init() {
         // Get userId from hidden input if available
-        const userIdInput = document.querySelector('input[name="userId"]');
+        const userIdInput = document.querySelector('input[name="userId"]') as HTMLInputElement | null;
         if (userIdInput) {
           this.userId = userIdInput.value;
         }
@@ -319,17 +319,17 @@ const { typeformId } = Astro.props;
         }
 
         // Find the form element by ID
-        const form = document.getElementById('device-registration-form');
+        const form = document.getElementById('device-registration-form') as HTMLFormElement | null;
         if (!form) {
           console.error("Form not found");
           return;
         }
 
         // Set form values
-        const imeiInput = form.querySelector('input[name="imei"]');
-        const imei2Input = form.querySelector('input[name="imei2"]');
-        const phoneInput = form.querySelector('input[name="phoneNumber"]');
-        const nicknameInput = form.querySelector('input[name="nickname"]');
+        const imeiInput = form.querySelector('input[name="imei"]') as HTMLInputElement | null;
+        const imei2Input = form.querySelector('input[name="imei2"]') as HTMLInputElement | null;
+        const phoneInput = form.querySelector('input[name="phoneNumber"]') as HTMLInputElement | null;
+        const nicknameInput = form.querySelector('input[name="nickname"]') as HTMLInputElement | null;
 
         if (imeiInput) imeiInput.value = this.imei1;
         if (imei2Input) imei2Input.value = this.imei2;
