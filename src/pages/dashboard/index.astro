@@ -517,7 +517,7 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
 
       <!-- Custom Typeform Component (when feature flag is enabled) -->
       {enableTypeform ? (
-        <div class="px-4 md:px-6 pb-4 md:pb-6 pt-0 flex flex-col items-start">
+        <div class="px-4 md:px-6 pb-4 md:pb-6 pt-4 flex flex-col items-start">
           <form
             method="POST"
             action={actions.wisephones.createWisephone}
