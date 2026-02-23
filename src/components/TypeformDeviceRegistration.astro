@@ -13,28 +13,18 @@ const { } = Astro.props;
   x-data="typeformDeviceRegistration()"
   x-init="init()"
 >
-  <!-- Progress Bar -->
-  <div class="mb-3 w-full">
-    <div class="w-full bg-gray-200 rounded-full h-1.5">
-      <div
-        class="bg-blue-600 h-1.5 rounded-full transition-all duration-300"
-        :style="`width: ${(currentStep / totalSteps) * 100}%`"
-      ></div>
-    </div>
-    <p class="text-xs text-gray-500 mt-1 text-center">
-      Step <span x-text="currentStep"></span> of <span x-text="totalSteps"></span>
-    </p>
-  </div>
-
   <!-- Step 1: IMEI Fields -->
-  <div x-show="currentStep === 1" x-transition class="space-y-4 w-full">
-    <div>
-      <h3 class="text-xl font-semibold text-gray-900 mb-1">Device IMEI</h3>
-      <p class="text-sm text-gray-600 mb-4">Enter your Wisephone IMEI to get started</p>
+  <div x-show="currentStep === 1" x-transition class="space-y-3 w-full">
+    <div class="flex items-center justify-between pt-2">
+      <div>
+        <h3 class="text-lg font-semibold text-gray-900 mb-0.5">Device IMEI</h3>
+        <p class="text-xs text-gray-600">Enter your Wisephone IMEI to get started</p>
+      </div>
+      <span class="text-xs text-gray-500 flex-shrink-0 ml-4">Step <span x-text="currentStep"></span> of <span x-text="totalSteps"></span></span>
     </div>
 
     <div>
-      <label for="imei1" class="block text-sm font-medium text-gray-700 mb-2">
+      <label for="imei1" class="block text-sm font-medium text-gray-700 mb-1.5">
         Wisephone IMEI (slot 1)
         <span class="text-red-500">*</span>
       </label>
@@ -52,23 +42,18 @@ const { } = Astro.props;
         @blur="validateImei(); hasBlurredImei = true;"
         required
       />
-      <div x-show="hasBlurredImei && imei1.length > 0 && (imei1.length !== 15 || !isImeiValid)" class="mt-2">
-        <p class="text-sm text-red-500" x-show="imei1.length > 0 && imei1.length !== 15">
+      <div x-show="hasBlurredImei && imei1.length > 0 && (imei1.length !== 15 || !isImeiValid)" class="mt-1.5">
+        <p class="text-xs text-red-500" x-show="imei1.length > 0 && imei1.length !== 15">
           IMEI must be exactly 15 digits
         </p>
-        <p class="text-sm text-red-500" x-show="imei1.length === 15 && !isImeiValid">
+        <p class="text-xs text-red-500" x-show="imei1.length === 15 && !isImeiValid">
           Invalid IMEI. Please check the number and try again.
         </p>
       </div>
-      <p class="text-xs text-gray-500 mt-2">
-        On the WiseOS home screen, tap <strong>"Settings"</strong> → tap
-        <strong>"Open System Settings"</strong> → scroll to and tap <strong>"About phone"</strong> → hold down on
-        <strong>"IMEI (slot 1)"</strong> to copy the number.
-      </p>
     </div>
 
     <div>
-      <label for="imei2" class="block text-sm font-medium text-gray-700 mb-2">
+      <label for="imei2" class="block text-sm font-medium text-gray-700 mb-1.5">
         Enter the IMEI one more time
         <span class="text-red-500">*</span>
       </label>
@@ -78,7 +63,7 @@ const { } = Astro.props;
         x-model.trim="imei2"
         x-mask="999999999999999"
         placeholder="350XXXXXXXXXXXX"
-        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-lg"
+        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
         :class="{ 'border-red-500': hasBlurredImeiVerification && (imei2.length !== 15 || imei1 !== imei2) }"
         pattern="[0-9]{15}"
         minlength="15"
@@ -86,17 +71,17 @@ const { } = Astro.props;
         @blur="validateImei(); hasBlurredImeiVerification = true;"
         required
       />
-      <div x-show="hasBlurredImei && (imei2.length > 0 && (imei2.length !== 15 || (imei2.length === 15 && imei1 !== imei2)))" class="mt-2">
-        <p class="text-sm text-red-500" x-show="imei2.length > 0 && imei2.length !== 15">
+      <div x-show="hasBlurredImei && (imei2.length > 0 && (imei2.length !== 15 || (imei2.length === 15 && imei1 !== imei2)))" class="mt-1.5">
+        <p class="text-xs text-red-500" x-show="imei2.length > 0 && imei2.length !== 15">
           IMEI must be exactly 15 digits
         </p>
-        <p class="text-sm text-red-500" x-show="imei2.length === 15 && imei1.length === 15 && imei1 !== imei2">
+        <p class="text-xs text-red-500" x-show="imei2.length === 15 && imei1.length === 15 && imei1 !== imei2">
           IMEIs don't match
         </p>
       </div>
     </div>
 
-    <div class="flex justify-end mt-6">
+    <div class="flex justify-end mt-4">
       <button
         @click="nextStep()"
         :disabled="!canProceedStep1()"
@@ -108,14 +93,17 @@ const { } = Astro.props;
   </div>
 
   <!-- Step 2: Phone Number -->
-  <div x-show="currentStep === 2" x-transition class="space-y-4 w-full">
-    <div>
-      <h3 class="text-xl font-semibold text-gray-900 mb-1">Phone Number</h3>
-      <p class="text-sm text-gray-600 mb-4">What's your Wisephone phone number?</p>
+  <div x-show="currentStep === 2" x-transition class="space-y-3 w-full">
+    <div class="flex items-center justify-between">
+      <div>
+        <h3 class="text-lg font-semibold text-gray-900 mb-0.5">Phone Number</h3>
+        <p class="text-xs text-gray-600">What's your Wisephone phone number?</p>
+      </div>
+      <span class="text-xs text-gray-500 flex-shrink-0 ml-4">Step <span x-text="currentStep"></span> of <span x-text="totalSteps"></span></span>
     </div>
 
     <div>
-      <label for="phoneNumber" class="block text-sm font-medium text-gray-700 mb-2">
+      <label for="phoneNumber" class="block text-sm font-medium text-gray-700 mb-1.5">
         Wisephone Phone Number
         <span class="text-red-500">*</span>
       </label>
@@ -130,12 +118,9 @@ const { } = Astro.props;
         :class="{ 'border-red-500': phoneNumber.length > 0 && phoneNumber.replace(/-/g, '').length !== 10 }"
         required
       />
-      <p class="text-xs text-gray-500 mt-2">
-        Enter the phone number associated with this Wisephone device.
-      </p>
     </div>
 
-    <div class="flex justify-between mt-6">
+    <div class="flex justify-between mt-4">
       <button
         @click="prevStep()"
         class="px-5 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
@@ -153,14 +138,17 @@ const { } = Astro.props;
   </div>
 
   <!-- Step 3: Device Name -->
-  <div x-show="currentStep === 3" x-transition class="space-y-4 w-full">
-    <div>
-      <h3 class="text-xl font-semibold text-gray-900 mb-1">Device Name</h3>
-      <p class="text-sm text-gray-600 mb-4">Give this Wisephone a name or owner</p>
+  <div x-show="currentStep === 3" x-transition class="space-y-3 w-full">
+    <div class="flex items-center justify-between">
+      <div>
+        <h3 class="text-lg font-semibold text-gray-900 mb-0.5">Device Name</h3>
+        <p class="text-xs text-gray-600">Give this Wisephone a name or owner</p>
+      </div>
+      <span class="text-xs text-gray-500 flex-shrink-0 ml-4">Step <span x-text="currentStep"></span> of <span x-text="totalSteps"></span></span>
     </div>
 
     <div>
-      <label for="nickname" class="block text-sm font-medium text-gray-700 mb-2">
+      <label for="nickname" class="block text-sm font-medium text-gray-700 mb-1.5">
         Device Name or Owner
         <span class="text-red-500">*</span>
       </label>
@@ -175,17 +163,14 @@ const { } = Astro.props;
         :class="{ 'border-red-500': (nickname.length > 0 && nickname.trim().length === 0) || nickname.length > 64 }"
         required
       />
-      <div x-show="nickname.length > 64" class="mt-2">
-        <p class="text-sm text-red-500">
+      <div x-show="nickname.length > 64" class="mt-1.5">
+        <p class="text-xs text-red-500">
           Name must not exceed 64 characters
         </p>
       </div>
-      <p class="text-xs text-gray-500 mt-2">
-        This name will help you identify this device in your portal.
-      </p>
     </div>
 
-    <div class="flex justify-between mt-6">
+    <div class="flex justify-between mt-4">
       <button
         @click="prevStep()"
         class="px-5 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
@@ -203,28 +188,31 @@ const { } = Astro.props;
   </div>
 
   <!-- Step 4: Review & Submit -->
-  <div x-show="currentStep === 4" x-transition class="space-y-4 w-full">
-    <div>
-      <h3 class="text-xl font-semibold text-gray-900 mb-1">Review Your Information</h3>
-      <p class="text-sm text-gray-600 mb-4">Please review your information before submitting</p>
+  <div x-show="currentStep === 4" x-transition class="space-y-3 w-full">
+    <div class="flex items-center justify-between">
+      <div>
+        <h3 class="text-lg font-semibold text-gray-900 mb-0.5">Review Your Information</h3>
+        <p class="text-xs text-gray-600">Please review your information before submitting</p>
+      </div>
+      <span class="text-xs text-gray-500 flex-shrink-0 ml-4">Step <span x-text="currentStep"></span> of <span x-text="totalSteps"></span></span>
     </div>
 
-    <div class="bg-gray-50 rounded-lg p-4 space-y-3">
+    <div class="bg-gray-50 rounded-lg p-3 space-y-2">
       <div>
         <p class="text-xs font-medium text-gray-500">IMEI</p>
-        <p class="text-base text-gray-900" x-text="imei1"></p>
+        <p class="text-sm text-gray-900" x-text="imei1"></p>
       </div>
       <div>
         <p class="text-xs font-medium text-gray-500">Phone Number</p>
-        <p class="text-base text-gray-900" x-text="phoneNumber"></p>
+        <p class="text-sm text-gray-900" x-text="phoneNumber"></p>
       </div>
       <div>
         <p class="text-xs font-medium text-gray-500">Device Name</p>
-        <p class="text-base text-gray-900" x-text="nickname"></p>
+        <p class="text-sm text-gray-900" x-text="nickname"></p>
       </div>
     </div>
 
-    <div class="flex justify-between mt-6">
+    <div class="flex justify-between mt-4">
       <button
         @click="prevStep()"
         class="px-5 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
