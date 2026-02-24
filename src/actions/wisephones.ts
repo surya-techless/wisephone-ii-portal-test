@@ -10,7 +10,7 @@ export const wisephones = {
   createWisephone: defineAction({
     accept: "form",
     input: z.object({
-      imei: z.number(),
+      imei: z.coerce.number(), // Coerce string to number (HTML forms submit strings)
       nickname: z.string().max(64).optional(),
       phoneNumber: z.string().min(12).max(12),
       userId: z.string()
@@ -55,9 +55,8 @@ export const wisephones = {
               imei: input.imei.toString(),
               phoneNumber: input.phoneNumber.replace(/[^0-9+]/g, "")
             });
-            devLog.log(`New device ${input.imei} subscription status: ${isSubscribed}`);
           } catch (error) {
-            devLog.error(`Error checking subscription for new device ${input.imei}:`, error);
+            // Error checking subscription
           }
         }
 
@@ -327,7 +326,6 @@ export const wisephones = {
       imei: z.number()
     }),
     handler: async ({ imei }) => {
-      devLog.log(`[SERVER] getInstalledApps called for IMEI: ${imei}`);
       try {
         // First verify the Wisephone exists
         const wisephone = await db
@@ -337,34 +335,22 @@ export const wisephones = {
           .get();
 
         if (!wisephone) {
-          devLog.log(`[SERVER] Wisephone not found for IMEI: ${imei}`);
           throw new ActionError({
             code: "NOT_FOUND",
             message: "Wisephone not found"
           });
         }
 
-        devLog.log(`[SERVER] Wisephone found, fetching installed apps from Samsung Knox API...`);
         // Use the SamsungKnoxService to get installed apps
         const result = await SamsungKnoxService.getInstalledApps(imei.toString());
 
         const apps = result.resultValue.appList || [];
-        devLog.log(`[SERVER] Retrieved ${apps.length} installed apps from Samsung Knox API`);
-        // devLog.log(
-        //   `[SERVER] Sample apps (first 20):`,
-        //   apps.slice(0, 20).map((app: any) => ({
-        //     packageName: app.packageName,
-        //     appName: app.appName,
-        //     isGoogleManaged: app.isGoogleManaged
-        //   }))
-        // );
 
         return {
           success: "Retrieved installed applications",
           apps: apps
         };
       } catch (error) {
-        devLog.error(`[SERVER] Error getting installed apps for IMEI ${imei}:`, error);
         throw new ActionError({
           code: "BAD_REQUEST",
           message: `Failed to get installed apps: ${error instanceof Error ? error.message : "Unknown error"}`
@@ -417,13 +403,7 @@ export const wisephones = {
       phoneNumber: z.string().min(12).max(12)
     }),
     handler: async (input) => {
-      devLog.log("PAY DEBUG: [A3] validateIsUserSubscribed action called");
-      devLog.log("PAY DEBUG: [A3.1] imei:", input.imei);
-      devLog.log("PAY DEBUG: [A3.2] phoneNumber:", input.phoneNumber);
-
-      devLog.log("PAY DEBUG: [A3.3] Calling validateIsSubscribed function");
       const isSubscribed = await validateIsSubscribed({ phoneNumber: input.phoneNumber, imei: input.imei });
-      devLog.log("PAY DEBUG: [A3.4] validateIsSubscribed result:", isSubscribed);
 
       return {
         success: "User is subscribed",

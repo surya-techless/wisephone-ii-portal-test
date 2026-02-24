@@ -1,6 +1,8 @@
 ---
 // src/components/TypeformDeviceRegistration.astro
 // Custom multi-step form component similar to Typeform
+
+
 interface Props {
   typeformId?: string;
 }
@@ -9,13 +11,13 @@ const { } = Astro.props;
 ---
 
 <div
-  class="typeform-container w-full"
+  class="typeform-container w-full pt-4"
   x-data="typeformDeviceRegistration()"
   x-init="init()"
 >
   <!-- Step 1: IMEI Fields -->
-  <div x-show="currentStep === 1" x-transition class="space-y-3 w-full">
-    <div class="flex items-center justify-between pt-2">
+  <div x-show="currentStep === 1" class="space-y-3 w-full">
+    <div class="flex items-center justify-between">
       <div>
         <h3 class="text-lg font-semibold text-gray-900 mb-0.5">Device IMEI</h3>
         <p class="text-xs text-gray-600">Enter your Wisephone IMEI to get started</p>
@@ -81,7 +83,7 @@ const { } = Astro.props;
       </div>
     </div>
 
-    <div class="flex justify-end mt-4">
+    <div class="flex justify-end mt-4 pb-4">
       <button
         @click="nextStep()"
         :disabled="!canProceedStep1()"
@@ -93,7 +95,7 @@ const { } = Astro.props;
   </div>
 
   <!-- Step 2: Phone Number -->
-  <div x-show="currentStep === 2" x-transition class="space-y-3 w-full">
+  <div x-show="currentStep === 2" class="space-y-3 w-full">
     <div class="flex items-center justify-between">
       <div>
         <h3 class="text-lg font-semibold text-gray-900 mb-0.5">Phone Number</h3>
@@ -120,7 +122,7 @@ const { } = Astro.props;
       />
     </div>
 
-    <div class="flex justify-between mt-4">
+    <div class="flex justify-between mt-4 pb-4">
       <button
         @click="prevStep()"
         class="px-5 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
@@ -138,7 +140,7 @@ const { } = Astro.props;
   </div>
 
   <!-- Step 3: Device Name -->
-  <div x-show="currentStep === 3" x-transition class="space-y-3 w-full">
+  <div x-show="currentStep === 3" class="space-y-3 w-full">
     <div class="flex items-center justify-between">
       <div>
         <h3 class="text-lg font-semibold text-gray-900 mb-0.5">Device Name</h3>
@@ -170,7 +172,7 @@ const { } = Astro.props;
       </div>
     </div>
 
-    <div class="flex justify-between mt-4">
+    <div class="flex justify-between mt-4 pb-4">
       <button
         @click="prevStep()"
         class="px-5 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
@@ -188,7 +190,7 @@ const { } = Astro.props;
   </div>
 
   <!-- Step 4: Review & Submit -->
-  <div x-show="currentStep === 4" x-transition class="space-y-3 w-full">
+  <div x-show="currentStep === 4" class="space-y-3 w-full">
     <div class="flex items-center justify-between">
       <div>
         <h3 class="text-lg font-semibold text-gray-900 mb-0.5">Review Your Information</h3>
@@ -231,7 +233,7 @@ const { } = Astro.props;
 </div>
 
 <script>
-  import { isValidIMEI } from "@/libs/utils";
+  import { devLog, isValidIMEI } from "@/libs/utils";
 
   function typeformDeviceRegistration() {
     return {
@@ -309,7 +311,6 @@ const { } = Astro.props;
         // Find the form element by ID
         const form = document.getElementById('device-registration-form') as HTMLFormElement | null;
         if (!form) {
-          console.error("Form not found");
           return;
         }
 
