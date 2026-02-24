@@ -14,7 +14,20 @@
         "Has Been Featured": ""
       }
     },
-
+    {
+      "id": "sr_Smart switch",
+      "cells": {
+        "Tool Name": "Smart Switch",
+        "Play Store URL": "https://play.google.com/store/apps/details?id=com.sec.android.easyMover",
+        "Tool Drawer": "Yes",
+        "Play Store Icon URL": "https://play-lh.googleusercontent.com/nRpKqtrvAwNfFDw4eLhSG5o_lKYmwX9WUiUWGDd644f1J5AW3bXJImX56NKhgZMMkm8",
+        "Play Store Category": "Tools",
+        "Submitter Comment": "Group: Add-on - WPII - Tool Drawer | Version: 2.2.1 | Last Assigned: 2025-02-15 | Platform: Android / Managed Google Play",
+        "Admin Comments": "",
+        "Fit for Tool Drawer?": "Yes",
+        "Has Been Featured": ""
+      }
+    },
     {
       "id": "sr_wox2kDZz6a0k8beO",
       "cells": {
