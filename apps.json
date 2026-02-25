@@ -2843,12 +2843,12 @@
       "cells": {
         "Tool Name": "Amazon Music",
         "Play Store URL": "https://play.google.com/store/apps/details?id=com.amazon.mp3",
-        "Tool Drawer": "Not Sure",
+        "Tool Drawer": "Yes",
         "Play Store Icon URL": "https://play-lh.googleusercontent.com/l2rggm768y0F1J57gCJ6e83zhuaJKOqTs5kSp2nne3XsUS7ChxiHjYB_Qyxijn6ShA",
         "Play Store Category": "Music & Audio",
         "Submitter Comment": "I already have Amazon music and free Spotify is kinda stupid .\n\nMy use case: Listen to music without ads, be able to skip songs, be able to go back to songs, be able to listen to whatever I want",
         "Admin Comments": "",
-        "Fit for Tool Drawer?": "No",
+        "Fit for Tool Drawer?": "yes",
         "Has Been Featured": ""
       }
     },
@@ -29033,20 +29033,6 @@
         "Play Store Icon URL": "https://play-lh.googleusercontent.com/3yXnnZWiZhcGCvfY2TeNdimoI01-INENgBYwRKtG2GH8MJsnCgun_syUvHqJxomETuSjm_Df2eLqkXNvCL8k",
         "Play Store Category": "Finance",
         "Submitter Comment": "Group: Add-on - WPII - Tool Drawer | Version: 16.1.0.300 | Last Assigned: 2025-01-08 | Platform: Android / Managed Google Play",
-        "Admin Comments": "",
-        "Fit for Tool Drawer?": "Yes",
-        "Has Been Featured": ""
-      }
-    },
-    {
-      "id": "sr_SA1ia98IVYAISgKQ",
-      "cells": {
-        "Tool Name": "Amazon Music",
-        "Play Store URL": "https://play.google.com/store/apps/details?id=com.amazon.music.tv",
-        "Tool Drawer": "Yes",
-        "Play Store Icon URL": "https://play-lh.googleusercontent.com/2lbycOzticoqG3LqplTHRo99FFUQN7xCs1SrJtvyzhEEO6U68mo8ehhkZd82UYrEvQ",
-        "Play Store Category": "Music & Audio",
-        "Submitter Comment": "Group: Add-on - WPII - Tool Drawer | Version: 3.4.1294.0 | Last Assigned: 2025-01-08 | Platform: Android / Managed Google Play",
         "Admin Comments": "",
         "Fit for Tool Drawer?": "Yes",
         "Has Been Featured": ""
