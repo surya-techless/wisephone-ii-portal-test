@@ -3,14 +3,11 @@
 import {
   BypassTechlessSubscription,
   Wisephone,
-  DeviceScreenTime,
-  DeviceAppUsage,
-  DeviceDailyScreenTime,
-  DeviceDailyAppUsage,
+  DeviceScreenTimeMetrics,
+  DeviceDataUsage,
   sql,
   and,
   eq,
-  desc,
   db
 } from "astro:db";
 import { getUser } from "@/libs/clerk";
@@ -32,44 +29,6 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { isFeatureEnabled } from "@/config/feature-flags";
 
-// Helper function to create screen time tables if they don't exist
-async function createScreenTimeTables() {
-  devLog.log("🔨 Creating DeviceScreenTime table...");
-  await db.run(sql`
-    CREATE TABLE IF NOT EXISTS DeviceScreenTime (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      imei TEXT NOT NULL,
-      weekStartDate TEXT NOT NULL,
-      weekEndDate TEXT NOT NULL,
-      totalScreenTimeMs INTEGER NOT NULL,
-      dailyAverageMs INTEGER NOT NULL,
-      syncedAt TEXT NOT NULL DEFAULT (datetime('now')),
-      deviceName TEXT,
-      deviceManufacturer TEXT
-    )
-  `);
-
-  devLog.log("🔨 Creating DeviceAppUsage table...");
-  await db.run(sql`
-    CREATE TABLE IF NOT EXISTS DeviceAppUsage (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      screenTimeId INTEGER NOT NULL,
-      imei TEXT NOT NULL,
-      packageName TEXT NOT NULL,
-      appName TEXT NOT NULL,
-      totalTimeMs INTEGER NOT NULL,
-      dailyAverageMs INTEGER NOT NULL,
-      weekStartDate TEXT NOT NULL
-    )
-  `);
-
-  devLog.log("🔨 Creating indexes...");
-  await db.run(sql`CREATE INDEX IF NOT EXISTS idx_device_app_usage_screen_time_id ON DeviceAppUsage(screenTimeId)`);
-  await db.run(sql`CREATE INDEX IF NOT EXISTS idx_device_app_usage_imei_week ON DeviceAppUsage(imei, weekStartDate)`);
-
-  devLog.log("✅ Screen time tables created");
-}
-
 // Initialize variables
 let imei: string | undefined = Astro.params.imei;
 let wisephone: any = null;
@@ -82,6 +41,7 @@ let sortedAppsList = {};
 let user: UserResource | User | null = null;
 let enableScreenTime = false;
 let screenTimeData: any[] = [];
+let dataUsageData: { cycleStartDate?: Date; usageDetail?: any; lastSyncedAt?: Date } | null = null;
 
 // Load apps.json file
 let appsJsonData: any = { rows: [] };
@@ -271,197 +231,118 @@ try {
   // Check feature flag for screen time
   enableScreenTime = isFeatureEnabled("ENABLE_SCREEN_TIME");
 
-  // Fetch device screentime details from DB (only if feature flag is enabled)
-  let screenTimeRecords: any[] = [];
-
+  // Fetch device screentime from DeviceScreenTimeMetrics (one row per IMEI)
   if (enableScreenTime) {
     devLog.log("📊 Fetching device screentime for IMEI:", imei);
-
-    // Check which database we're using
-    const dbUrl = import.meta.env.ASTRO_DB_REMOTE_URL || import.meta.env.TURSO_DATABASE_URL;
-    if (dbUrl) {
-      devLog.log("🌍 Using REMOTE database (Turso)");
-    } else {
-      devLog.log("⚠️ Using LOCAL database - data may not be synced!");
-      devLog.log("💡 To use remote DB, run: npm run dev:remote");
-    }
     try {
-      screenTimeRecords = await db
+      const metricsRow = await db
         .select()
-        .from(DeviceScreenTime)
-        .where(eq(DeviceScreenTime.imei, imei))
-        .orderBy(desc(DeviceScreenTime.weekStartDate))
-        .limit(4); // Limit to 4 most recent weeks
+        .from(DeviceScreenTimeMetrics)
+        .where(eq(DeviceScreenTimeMetrics.imei, imei))
+        .get();
+
+      if (metricsRow?.screenTimeDetail) {
+        const detail = metricsRow.screenTimeDetail as {
+          weeks?: Array<{
+            weekStartDate: string;
+            weekEndDate: string;
+            totalScreenTimeMs: number;
+            dailyAverageMs: number;
+            days?: Array<{
+              date: string;
+              totalScreenTimeMs: number;
+              apps?: Array<{ packageName: string; appName: string; totalTimeMs: number }>;
+            }>;
+            apps?: Array<{
+              packageName: string;
+              appName: string;
+              totalTimeMs: number;
+              dailyAverageMs: number;
+            }>;
+          }>;
+        };
+        const weeksArr = detail?.weeks ?? [];
+        devLog.log("📊 DeviceScreenTimeMetrics weeks found:", weeksArr.length);
+
+        screenTimeData = weeksArr.slice(0, 4).map((week, idx) => {
+          const weekStartDate = new Date(week.weekStartDate + "T00:00:00.000Z");
+          const weekEndDate = new Date(week.weekEndDate + "T23:59:59.999Z");
+          const totalScreenTimeMs = week.totalScreenTimeMs ?? 0;
+          const dailyAverageMs = week.dailyAverageMs ?? (totalScreenTimeMs > 0 ? Math.round(totalScreenTimeMs / 7) : 0);
+
+          const apps = (week.apps ?? [])
+            .filter((app) => (app.totalTimeMs ?? 0) > 0)
+            .map((app) => ({
+              id: null,
+              screenTimeId: null,
+              imei: imei ?? "",
+              packageName: app.packageName ?? "",
+              appName: app.appName ?? "",
+              totalTimeMs: app.totalTimeMs ?? 0,
+              dailyAverageMs: app.dailyAverageMs ?? 0,
+              weekStartDate
+            }));
+
+          const days = (week.days ?? []).map((day) => ({
+            id: null,
+            date: new Date(day.date + "T00:00:00.000Z"),
+            totalScreenTimeMs: day.totalScreenTimeMs ?? 0,
+            apps: (day.apps ?? []).map((app) => ({
+              id: null,
+              packageName: app.packageName ?? "",
+              appName: app.appName ?? "",
+              totalTimeMs: app.totalTimeMs ?? 0
+            }))
+          }));
+
+          return {
+            id: null,
+            imei: imei ?? "",
+            weekStartDate,
+            weekEndDate,
+            totalScreenTimeMs,
+            dailyAverageMs,
+            syncedAt: metricsRow.syncedAt ?? new Date(),
+            deviceName: metricsRow.deviceName ?? null,
+            deviceManufacturer: metricsRow.deviceManufacturer ?? null,
+            apps,
+            days
+          };
+        });
+        devLog.log("📊 Device Screentime Details: built", screenTimeData.length, "weeks from one row");
+      } else {
+        devLog.log("📊 No screentime data found for IMEI:", imei);
+      }
     } catch (error: any) {
-      // Handle case where table doesn't exist yet - create tables automatically
       if (error?.code === "SQLITE_UNKNOWN" || error?.message?.includes("no such table")) {
-        devLog.warn("⚠️ DeviceScreenTime table does not exist yet. Creating tables...");
-        try {
-          await createScreenTimeTables();
-          devLog.log("✅ Screen time tables created successfully");
-          // Retry the query after creating tables
-          screenTimeRecords = await db
-            .select()
-            .from(DeviceScreenTime)
-            .where(eq(DeviceScreenTime.imei, imei))
-            .orderBy(desc(DeviceScreenTime.weekStartDate));
-        } catch (createError) {
-          devLog.error("❌ Failed to create tables:", createError);
-          screenTimeRecords = [];
-        }
+        devLog.warn("⚠️ DeviceScreenTimeMetrics table does not exist — run: astro db push");
+        screenTimeData = [];
       } else {
         throw error;
       }
     }
 
-    devLog.log("📊 DeviceScreenTime records found:", screenTimeRecords.length);
-
-    // Log raw records to see what we're getting from DB
-    if (screenTimeRecords.length > 0) {
-      devLog.log("📊 Raw first record from DB:", JSON.stringify(screenTimeRecords[0], null, 2));
-      screenTimeRecords.forEach((record, idx) => {
-        devLog.log(`📊 Raw record ${idx}:`, {
-          id: record.id,
-          imei: record.imei,
-          dailyAverageMs: record.dailyAverageMs,
-          totalScreenTimeMs: record.totalScreenTimeMs,
-          dailyAverageMsType: typeof record.dailyAverageMs,
-          dailyAverageMsIsNull: record.dailyAverageMs === null,
-          dailyAverageMsIsUndefined: record.dailyAverageMs === undefined
-        });
-      });
-    }
-
-    if (screenTimeRecords.length > 0) {
-      // Fetch app usage for each week and ensure all fields are properly set
-      screenTimeData = await Promise.all(
-        screenTimeRecords.map(async (record) => {
-          const apps = await db
-            .select()
-            .from(DeviceAppUsage)
-            .where(eq(DeviceAppUsage.screenTimeId, record.id))
-            .orderBy(desc(DeviceAppUsage.totalTimeMs));
-
-          // Explicitly map all fields to ensure they exist and handle null values
-          // CRITICAL: Ensure dailyAverageMs is NEVER null/undefined
-          let dailyAverageMs = record.dailyAverageMs;
-          if (dailyAverageMs === null || dailyAverageMs === undefined) {
-            devLog.warn(`⚠️ Record ${record.id} has null/undefined dailyAverageMs, attempting to calculate...`);
-            // Try to calculate from totalScreenTimeMs if available
-            if (record.totalScreenTimeMs && record.totalScreenTimeMs > 0) {
-              dailyAverageMs = Math.round(record.totalScreenTimeMs / 7);
-              devLog.log(`✅ Calculated dailyAverageMs from totalScreenTimeMs: ${dailyAverageMs}`);
-            } else {
-              dailyAverageMs = 0;
-              devLog.warn(`⚠️ Could not calculate dailyAverageMs, defaulting to 0`);
-            }
-          }
-
-          // Ensure totalScreenTimeMs is also never null
-          const totalScreenTimeMs = record.totalScreenTimeMs ?? 0;
-
-          // Fetch daily screen time data for this week
-          const dailyRecords = await db
-            .select()
-            .from(DeviceDailyScreenTime)
-            .where(eq(DeviceDailyScreenTime.screenTimeId, record.id))
-            .orderBy(DeviceDailyScreenTime.date);
-
-          // Fetch daily app usage for each day
-          const daysWithApps = await Promise.all(
-            dailyRecords.map(async (dailyRecord) => {
-              const dailyApps = await db
-                .select()
-                .from(DeviceDailyAppUsage)
-                .where(eq(DeviceDailyAppUsage.dailyScreenTimeId, dailyRecord.id))
-                .orderBy(desc(DeviceDailyAppUsage.totalTimeMs));
-
-              return {
-                id: dailyRecord.id,
-                date: dailyRecord.date,
-                totalScreenTimeMs: dailyRecord.totalScreenTimeMs ?? 0,
-                apps: dailyApps
-                  .filter((app) => (app.totalTimeMs ?? 0) > 0)
-                  .map((app) => ({
-                    id: app.id,
-                    packageName: app.packageName,
-                    appName: app.appName,
-                    totalTimeMs: app.totalTimeMs ?? 0
-                  }))
-              };
-            })
-          );
-
-          const weekData = {
-            id: record.id ?? null,
-            imei: record.imei ?? imei ?? "",
-            weekStartDate: record.weekStartDate ?? null,
-            weekEndDate: record.weekEndDate ?? null,
-            totalScreenTimeMs: totalScreenTimeMs,
-            dailyAverageMs: dailyAverageMs, // This is now guaranteed to be a number
-            syncedAt: record.syncedAt ?? new Date(),
-            deviceName: record.deviceName ?? null,
-            deviceManufacturer: record.deviceManufacturer ?? null,
-            apps: apps
-              .filter((app) => (app.totalTimeMs ?? 0) > 0)
-              .map((app) => ({
-                id: app.id ?? null,
-                screenTimeId: app.screenTimeId ?? record.id ?? null,
-                imei: app.imei ?? imei ?? "",
-                packageName: app.packageName ?? "",
-                appName: app.appName ?? "",
-                totalTimeMs: app.totalTimeMs ?? 0,
-                dailyAverageMs: app.dailyAverageMs ?? 0,
-                weekStartDate: app.weekStartDate ?? record.weekStartDate ?? null
-              })),
-            days: daysWithApps // Add daily breakdown
-          };
-
-          // Final validation - this should never fail now
-          if (weekData.dailyAverageMs === null || weekData.dailyAverageMs === undefined) {
-            devLog.error(`❌ CRITICAL: Record ${record.id} STILL has null/undefined dailyAverageMs after processing!`, {
-              original: record.dailyAverageMs,
-              processed: weekData.dailyAverageMs,
-              record: record
-            });
-            // Force it to 0 as last resort
-            weekData.dailyAverageMs = 0;
-          }
-
-          devLog.log(
-            `✅ Processed week ${record.id}: dailyAverageMs = ${weekData.dailyAverageMs} (type: ${typeof weekData.dailyAverageMs})`
-          );
-
-          return weekData;
-        })
-      );
-
-      devLog.log("📊 Device Screentime Details:", JSON.stringify(screenTimeData, null, 2));
-
-      // Final validation check
-      screenTimeData.forEach((week, index) => {
-        devLog.log(`📊 Week ${index} final check:`, {
-          id: week?.id,
-          imei: week?.imei,
-          weekStartDate: week?.weekStartDate,
-          weekEndDate: week?.weekEndDate,
-          totalScreenTimeMs: week?.totalScreenTimeMs,
-          dailyAverageMs: week?.dailyAverageMs,
-          syncedAt: week?.syncedAt,
-          deviceName: week?.deviceName,
-          deviceManufacturer: week?.deviceManufacturer,
-          appsCount: week?.apps?.length || 0
-        });
-
-        if (week.dailyAverageMs === null || week.dailyAverageMs === undefined) {
-          devLog.error(`❌ Week ${index} STILL has null/undefined dailyAverageMs after processing:`, week);
-        }
-        if (week.totalScreenTimeMs === null || week.totalScreenTimeMs === undefined) {
-          devLog.warn(`⚠️ Week ${index} has null/undefined totalScreenTimeMs:`, week);
-        }
-      });
-    } else {
-      devLog.log("📊 No screentime data found for IMEI:", imei);
+    // Fetch data usage for this device (same feature flag as screen time)
+    try {
+      const dataUsageRow = await db
+        .select()
+        .from(DeviceDataUsage)
+        .where(eq(DeviceDataUsage.imei, imei))
+        .get();
+      if (dataUsageRow) {
+        dataUsageData = {
+          cycleStartDate: dataUsageRow.cycleStartDate ?? undefined,
+          usageDetail: dataUsageRow.usageDetail ?? undefined,
+          lastSyncedAt: dataUsageRow.lastSyncedAt ?? undefined
+        };
+        devLog.log("📊 Data usage loaded for IMEI:", imei);
+      }
+    } catch (e: any) {
+      if (e?.message?.includes("no such table")) {
+        devLog.warn("⚠️ DeviceDataUsage table does not exist");
+      } else {
+        throw e;
+      }
     }
   } else {
     devLog.log("📊 Screen time feature is disabled (ENABLE_SCREEN_TIME=false)");
@@ -1128,10 +1009,40 @@ try {
               </div>
             </div>
 
-            <!-- Right Column: Screen Time Stats (Only visible on Device Info tab and when feature flag is enabled) -->
-            <div class="mb-6 w-full h-full lg:sticky lg:top-6 lg:self-start" x-show="currentTab === 'device-info' && enableScreenTime" x-cloak>
-              <ScreenTimeStats imei={imei || ""} screenTimeData={enableScreenTime ? screenTimeData : []} />
-              
+
+              <!-- Data usage (Device Info tab, when feature flag and data available) -->
+              {enableScreenTime && dataUsageData?.usageDetail && (
+                <div class="mb-6 w-full" x-show="currentTab === 'device-info'" x-cloak>
+                  <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+                    <h3 class="text-sm font-semibold text-gray-900 mb-2">Data usage</h3>
+                    <p class="text-xs text-gray-500 mb-2">
+                      {dataUsageData.cycleStartDate
+                        ? `Since cycle start: ${new Date(dataUsageData.cycleStartDate).toLocaleDateString()}`
+                        : "Since cycle start"}
+                    </p>
+                    <p class="text-lg font-medium text-gray-900">
+                      {(dataUsageData.usageDetail as any)?.totalFormatted ?? "—"}
+                    </p>
+                    {((dataUsageData.usageDetail as any)?.mobile?.total > 0 || (dataUsageData.usageDetail as any)?.wifi?.total > 0) && (
+                      <div class="mt-2 flex gap-4 text-sm text-gray-600">
+                        {(dataUsageData.usageDetail as any)?.mobile?.total > 0 && (
+                          <span>Mobile: {(dataUsageData.usageDetail as any).mobile?.totalFormatted ?? "—"}</span>
+                        )}
+                        {(dataUsageData.usageDetail as any)?.wifi?.total > 0 && (
+                          <span>Wi‑Fi: {(dataUsageData.usageDetail as any).wifi?.totalFormatted ?? "—"}</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <!-- Right Column: Screen Time Stats (Only visible on Device Info tab and when feature flag is enabled) -->
+              <div class="mb-6 w-full h-full" x-show="currentTab === 'device-info' && enableScreenTime" x-cloak>
+                <ScreenTimeStats imei={imei || ""} screenTimeData={enableScreenTime ? screenTimeData : []} />
+              </div>
+
+
               <!-- Device Removal (Mobile View - Below Screen Time) -->
               <div class="mb-6 w-full lg:hidden mt-6" x-show="currentTab === 'device-info' && enableScreenTime" x-cloak>
                 <div class="pt-4 border-t border-gray-200">

@@ -59,7 +59,6 @@ export const wisephones = {
             // Error checking subscription
           }
         }
-
         return {
           success: "Wisephone created successfully!",
           wisephone: newWisephone,

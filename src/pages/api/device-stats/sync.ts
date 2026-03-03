@@ -1,14 +1,5 @@
 import type { APIRoute } from "astro";
-import {
-  db,
-  DeviceScreenTime,
-  DeviceAppUsage,
-  DeviceDailyScreenTime,
-  DeviceDailyAppUsage,
-  Wisephone,
-  eq,
-  sql
-} from "astro:db";
+import { db, DeviceScreenTimeMetrics, DeviceDataUsage, Wisephone, eq } from "astro:db";
 import { captureException } from "@sentry/astro";
 import { devLog } from "@/libs/utils";
 
@@ -16,103 +7,11 @@ import { devLog } from "@/libs/utils";
  * POST /api/device-stats/sync
  *
  * Endpoint for WiseOS devices to push their screen time statistics.
- * Device sends weekly app breakdown data which is upserted into the database.
+ * Only the row for this device (IMEI) is updated; no other rows are touched.
+ * Storage: DeviceScreenTimeMetrics — one row per IMEI, screenTimeDetail (JSON).
  *
- * Expected payload format (from getWeeklyAppBreakdown):
- * {
- *   device: { imei, deviceName, deviceId, manufacturer },
- *   weeks: [{
- *     weekLabel, startDateFormatted, endDateFormatted,
- *     totalScreenTime, dailyAverage,
- *     apps: [{ packageName, appName, totalTime, dailyAverage }]
- *   }]
- * }
+ * Expected payload: { device, weeks, dataUsage?: { cycleStartDate, totalBytesInCycle, totalFormatted, mobile?, wifi?, byWeek? } }
  */
-
-// Table 1: DeviceScreenTime (Weekly Summary)
-//   ┌────────────────────┬────────────────────┬────────────────────────────────────┐
-//   │       Column       │        Type        │            Description             │
-//   ├────────────────────┼────────────────────┼────────────────────────────────────┤
-//   │ id                 │ INTEGER (PK, auto) │ Unique row ID                      │
-//   ├────────────────────┼────────────────────┼────────────────────────────────────┤
-//   │ imei               │ TEXT               │ Device IMEI                        │
-//   ├────────────────────┼────────────────────┼────────────────────────────────────┤
-//   │ weekStartDate      │ DATE               │ Start of week (used as lookup key) │
-//   ├────────────────────┼────────────────────┼────────────────────────────────────┤
-//   │ weekEndDate        │ DATE               │ End of week                        │
-//   ├────────────────────┼────────────────────┼────────────────────────────────────┤
-//   │ totalScreenTimeMs  │ INTEGER            │ Total screen time in milliseconds  │
-//   ├────────────────────┼────────────────────┼────────────────────────────────────┤
-//   │ dailyAverageMs     │ INTEGER            │ Daily average in ms                │
-//   ├────────────────────┼────────────────────┼────────────────────────────────────┤
-//   │ syncedAt           │ DATE               │ When data was synced               │
-//   ├────────────────────┼────────────────────┼────────────────────────────────────┤
-//   │ deviceName         │ TEXT (optional)    │ Device model                       │
-//   ├────────────────────┼────────────────────┼────────────────────────────────────┤
-//   │ deviceManufacturer │ TEXT (optional)    │ Manufacturer                       │
-//   └────────────────────┴────────────────────┴────────────────────────────────────┘
-//   ---
-//   Table 2: DeviceAppUsage (Weekly App Breakdown)
-//   ┌────────────────┬────────────────────┬──────────────────────────────┐
-//   │     Column     │        Type        │         Description          │
-//   ├────────────────┼────────────────────┼──────────────────────────────┤
-//   │ id             │ INTEGER (PK, auto) │ Unique row ID                │
-//   ├────────────────┼────────────────────┼──────────────────────────────┤
-//   │ screenTimeId   │ INTEGER (FK)       │ Links to DeviceScreenTime.id │
-//   ├────────────────┼────────────────────┼──────────────────────────────┤
-//   │ imei           │ TEXT               │ For easier querying          │
-//   ├────────────────┼────────────────────┼──────────────────────────────┤
-//   │ packageName    │ TEXT               │ Android app package          │
-//   ├────────────────┼────────────────────┼──────────────────────────────┤
-//   │ appName        │ TEXT               │ Human-readable name          │
-//   ├────────────────┼────────────────────┼──────────────────────────────┤
-//   │ totalTimeMs    │ INTEGER            │ Total usage for the week     │
-//   ├────────────────┼────────────────────┼──────────────────────────────┤
-//   │ dailyAverageMs │ INTEGER            │ Daily average                │
-//   ├────────────────┼────────────────────┼──────────────────────────────┤
-//   │ weekStartDate  │ DATE               │ For easier querying          │
-//   └────────────────┴────────────────────┴──────────────────────────────┘
-//   ---
-//   Table 3: DeviceDailyScreenTime (Daily Breakdown)
-//   ┌───────────────────┬────────────────────┬──────────────────────────────┐
-//   │      Column       │        Type        │         Description          │
-//   ├───────────────────┼────────────────────┼──────────────────────────────┤
-//   │ id                │ INTEGER (PK, auto) │ Unique row ID                │
-//   ├───────────────────┼────────────────────┼──────────────────────────────┤
-//   │ screenTimeId      │ INTEGER (FK)       │ Links to DeviceScreenTime.id │
-//   ├───────────────────┼────────────────────┼──────────────────────────────┤
-//   │ imei              │ TEXT               │ For easier querying          │
-//   ├───────────────────┼────────────────────┼──────────────────────────────┤
-//   │ date              │ DATE               │ Specific day                 │
-//   ├───────────────────┼────────────────────┼──────────────────────────────┤
-//   │ totalScreenTimeMs │ INTEGER            │ Screen time for that day     │
-//   ├───────────────────┼────────────────────┼──────────────────────────────┤
-//   │ weekStartDate     │ DATE               │ For easier querying          │
-//   └───────────────────┴────────────────────┴──────────────────────────────┘
-//   ---
-//   Table 4: DeviceDailyAppUsage (Daily App Breakdown)
-//   ┌───────────────────┬────────────────────┬───────────────────────────────────┐
-//   │      Column       │        Type        │            Description            │
-//   ├───────────────────┼────────────────────┼───────────────────────────────────┤
-//   │ id                │ INTEGER (PK, auto) │ Unique row ID                     │
-//   ├───────────────────┼────────────────────┼───────────────────────────────────┤
-//   │ dailyScreenTimeId │ INTEGER (FK)       │ Links to DeviceDailyScreenTime.id │
-//   ├───────────────────┼────────────────────┼───────────────────────────────────┤
-//   │ screenTimeId      │ INTEGER (FK)       │ Links to DeviceScreenTime.id      │
-//   ├───────────────────┼────────────────────┼───────────────────────────────────┤
-//   │ imei              │ TEXT               │ For easier querying               │
-//   ├───────────────────┼────────────────────┼───────────────────────────────────┤
-//   │ date              │ DATE               │ Specific day                      │
-//   ├───────────────────┼────────────────────┼───────────────────────────────────┤
-//   │ packageName       │ TEXT               │ Android app package               │
-//   ├───────────────────┼────────────────────┼───────────────────────────────────┤
-//   │ appName           │ TEXT               │ Human-readable name               │
-//   ├───────────────────┼────────────────────┼───────────────────────────────────┤
-//   │ totalTimeMs       │ INTEGER            │ Usage for that day                │
-//   ├───────────────────┼────────────────────┼───────────────────────────────────┤
-//   │ weekStartDate     │ DATE               │ For easier querying               │
-//   └───────────────────┴────────────────────┴───────────────────────────────────┘
-
 // CORS headers for device sync requests
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -177,16 +76,12 @@ export const POST: APIRoute = async ({ request }) => {
         }
       }
 
-      // Count existing DeviceScreenTime records
-      const existingScreenTime = await db.select().from(DeviceScreenTime).limit(5);
-      devLog.log(`📊 Existing DeviceScreenTime records (sample): ${existingScreenTime.length}`);
-      if (existingScreenTime.length > 0) {
-        devLog.log(`   Sample IMEIs with data: ${[...new Set(existingScreenTime.map((d) => d.imei))].join(", ")}`);
+      // Count existing DeviceScreenTimeMetrics records (one row per IMEI)
+      const existingMetrics = await db.select().from(DeviceScreenTimeMetrics).limit(5);
+      devLog.log(`📊 Existing DeviceScreenTimeMetrics records (sample): ${existingMetrics.length}`);
+      if (existingMetrics.length > 0) {
+        devLog.log(`   Sample IMEIs with data: ${existingMetrics.map((d) => d.imei).join(", ")}`);
       }
-
-      // Count existing DeviceAppUsage records
-      const existingAppUsage = await db.select().from(DeviceAppUsage).limit(5);
-      devLog.log(`📱 Existing DeviceAppUsage records (sample): ${existingAppUsage.length}`);
 
       // Show database environment info
       // Astro DB uses ASTRO_DB_REMOTE_URL and ASTRO_DB_APP_TOKEN for remote connection
@@ -226,33 +121,16 @@ export const POST: APIRoute = async ({ request }) => {
 
       devLog.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
 
-      // Check if all screen time tables exist, create if any are missing
-      let tablesExist = true;
-      const tablesToCheck = [
-        { name: "DeviceScreenTime", table: DeviceScreenTime },
-        { name: "DeviceAppUsage", table: DeviceAppUsage },
-        { name: "DeviceDailyScreenTime", table: DeviceDailyScreenTime },
-        { name: "DeviceDailyAppUsage", table: DeviceDailyAppUsage }
-      ];
-
-      for (const { name, table } of tablesToCheck) {
-        try {
-          await db.select().from(table).limit(1);
-          devLog.log(`✅ ${name} table exists`);
-        } catch (tableError: any) {
-          if (tableError?.code === "SQLITE_UNKNOWN" || tableError?.message?.includes("no such table")) {
-            devLog.log(`⚠️ ${name} table missing`);
-            tablesExist = false;
-          } else {
-            throw tableError;
-          }
+      // Check if DeviceScreenTimeMetrics table exists (created from Astro DB config)
+      try {
+        await db.select().from(DeviceScreenTimeMetrics).limit(1);
+        devLog.log(`✅ DeviceScreenTimeMetrics table exists`);
+      } catch (tableError: any) {
+        if (tableError?.code === "SQLITE_UNKNOWN" || tableError?.message?.includes("no such table")) {
+          devLog.log(`⚠️ DeviceScreenTimeMetrics table missing — run: astro db push`);
+          throw tableError;
         }
-      }
-
-      if (!tablesExist) {
-        devLog.log("⚠️ Some screen time tables are missing, creating all tables...");
-        await createScreenTimeTables();
-        devLog.log("✅ All screen time tables created successfully");
+        throw tableError;
       }
     } catch (dbError) {
       devLog.error("❌ Database connection failed:", dbError);
@@ -303,7 +181,7 @@ export const POST: APIRoute = async ({ request }) => {
     devLog.log("Full payload:", JSON.stringify(body, null, 2));
     devLog.log("========================================");
 
-    const { device, weeks, collectedAt } = body;
+    const { device, weeks, collectedAt, dataUsage: dataUsagePayload } = body;
 
     // Validate required fields - accept either IMEI or phone number
     if (!device?.imei && !device?.phoneNumber) {
@@ -386,216 +264,169 @@ export const POST: APIRoute = async ({ request }) => {
       });
     }
 
-    // Use IMEI from database (either from direct lookup or phone number lookup)
-    if (!imeiString) {
-      imeiString = String(imeiNumber || wisephone.imei);
-    }
+    const imeiString = String(device.imei);
+    devLog.log(`📊 Building screenTimeDetail for IMEI: ${imeiString} (${weeks.length} weeks) — only this device's row will be updated`);
 
-    // Delete ALL existing data for this IMEI (fresh insert approach)
-    // Device always sends complete 4-week snapshot, so we replace everything
-    devLog.log(`🗑️  Deleting all existing data for IMEI: ${imeiString}...`);
 
-    // Delete in order: child tables first, then parent
-    await db.delete(DeviceDailyAppUsage).where(eq(DeviceDailyAppUsage.imei, imeiString));
-    await db.delete(DeviceDailyScreenTime).where(eq(DeviceDailyScreenTime.imei, imeiString));
-    await db.delete(DeviceAppUsage).where(eq(DeviceAppUsage.imei, imeiString));
-    await db.delete(DeviceScreenTime).where(eq(DeviceScreenTime.imei, imeiString));
-    devLog.log(`✅ Deleted existing data for IMEI: ${imeiString}`);
+    // Build screenTimeDetail from payload (same structure as before, stored in one JSON column)
+    const screenTimeDetailWeeks: Array<{
+      weekStartDate: string;
+      weekEndDate: string;
+      totalScreenTimeMs: number;
+      dailyAverageMs: number;
+      days?: Array<{
+        date: string;
+        totalScreenTimeMs: number;
+        apps?: Array<{ packageName: string; appName: string; totalTimeMs: number }>;
+      }>;
+      apps: Array<{
+        packageName: string;
+        appName: string;
+        totalTimeMs: number;
+        dailyAverageMs: number;
+      }>;
+    }> = [];
 
-    let syncedWeeks = 0;
-    let syncedApps = 0;
-    let syncedDays = 0;
-    let syncedDailyApps = 0;
-
-    devLog.log(`📊 Processing ${weeks.length} weeks of data...`);
-
-    // Process each week's data (always INSERT since we deleted everything)
     for (let i = 0; i < weeks.length; i++) {
       const week = weeks[i];
-      devLog.log(`\n📅 Processing week ${i + 1}/${weeks.length}: ${week.weekLabel || "Unknown"}`);
-
-      // Parse dates - new format uses "YYYY-MM-DD" strings, old format uses formatted strings
       let weekStart: Date | null = null;
       let weekEnd: Date | null = null;
 
       if (week.startDate && week.endDate) {
-        // New format: "YYYY-MM-DD" strings
-        devLog.log(`   📅 New format detected: startDate="${week.startDate}", endDate="${week.endDate}"`);
         weekStart = new Date(week.startDate + "T00:00:00.000Z");
         weekEnd = new Date(week.endDate + "T23:59:59.999Z");
       } else if (week.startDateFormatted && week.endDateFormatted) {
-        // Old format: formatted strings like "Dec 9"
-        devLog.log(
-          `   📅 Old format detected: startDateFormatted="${week.startDateFormatted}", endDateFormatted="${week.endDateFormatted}"`
-        );
         weekStart = parseWeekDate(week.startDateFormatted);
         weekEnd = parseWeekDate(week.endDateFormatted);
       }
-
-      devLog.log(`   Parsed start date: ${weekStart ? weekStart.toISOString() : "NULL"}`);
-      devLog.log(`   Parsed end date: ${weekEnd ? weekEnd.toISOString() : "NULL"}`);
 
       if (!weekStart || !weekEnd) {
         devLog.warn(`⚠️  Skipping week ${i + 1} with invalid dates`);
         continue;
       }
 
-      // Insert new DeviceScreenTime record (we already deleted all old data for this IMEI)
-      devLog.log(`   ➕ Inserting DeviceScreenTime record...`);
-      const insertData = {
-        imei: imeiString,
-        weekStartDate: weekStart,
-        weekEndDate: weekEnd,
-        totalScreenTimeMs: week.totalScreenTime || week.totalScreenTimeMs || 0,
-        dailyAverageMs: week.dailyAverage || week.dailyAverageMs || 0,
-        syncedAt: new Date(),
-        deviceName: device.deviceName || device.deviceId,
-        deviceManufacturer: device.manufacturer
-      };
+      const totalScreenTimeMs = week.totalScreenTime ?? week.totalScreenTimeMs ?? 0;
+      const dailyAverageMs = week.dailyAverage ?? week.dailyAverageMs ?? 0;
 
-      let screenTimeId: number;
-      try {
-        const result = await db.insert(DeviceScreenTime).values(insertData);
-        screenTimeId = Number(result.lastInsertRowid);
-        devLog.log(`   ✅ Inserted DeviceScreenTime record (ID: ${screenTimeId})`);
-      } catch (insertError: any) {
-        devLog.error(`   ❌ Error inserting DeviceScreenTime:`, insertError);
-        throw insertError;
-      }
+      const days =
+        week.days && Array.isArray(week.days)
+          ? week.days.map((day: any) => ({
+              date: day.date,
+              totalScreenTimeMs: day.totalScreenTime ?? 0,
+              apps: (day.apps || []).map((app: any) => ({
+                packageName: app.packageName ?? "",
+                appName: app.appName ?? "",
+                totalTimeMs: app.totalTime ?? 0
+              }))
+            }))
+          : undefined;
 
-      // Insert daily breakdown data (new format)
-      if (week.days && Array.isArray(week.days) && week.days.length > 0) {
-        devLog.log(`   📅 Inserting ${week.days.length} daily screen time records...`);
-        let weekSyncedDays = 0;
-        let weekSyncedDailyApps = 0;
+      const apps = (week.apps || []).map((app: any) => ({
+        packageName: app.packageName ?? "",
+        appName: app.appName ?? "",
+        totalTimeMs: app.totalTime ?? app.totalTimeMs ?? 0,
+        dailyAverageMs: app.dailyAverage ?? app.dailyAverageMs ?? 0
+      }));
 
-        for (const day of week.days) {
-          const dayDate = new Date(day.date + "T00:00:00.000Z");
-          const dayScreenTimeMs = day.totalScreenTime || 0;
-
-          // Insert daily screen time record
-          let dailyScreenTimeId: number;
-          try {
-            const dailyResult = await db.insert(DeviceDailyScreenTime).values({
-              screenTimeId,
-              imei: imeiString,
-              date: dayDate,
-              totalScreenTimeMs: dayScreenTimeMs,
-              weekStartDate: weekStart
-            });
-
-            dailyScreenTimeId = Number(dailyResult.lastInsertRowid);
-            weekSyncedDays++;
-            devLog.log(`   📅 Inserted daily record ID: ${dailyScreenTimeId} for date: ${dayDate.toISOString()}`);
-          } catch (dailyError: any) {
-            devLog.error(`   ❌ Error inserting DeviceDailyScreenTime for date ${dayDate}:`, dailyError);
-            throw dailyError;
-          }
-
-          // Insert daily app usage
-          if (day.apps && Array.isArray(day.apps) && day.apps.length > 0) {
-            const dailyAppRecords = day.apps.map((app: any) => ({
-              dailyScreenTimeId,
-              screenTimeId,
-              imei: imeiString,
-              date: dayDate,
-              packageName: app.packageName,
-              appName: app.appName,
-              totalTimeMs: app.totalTime || 0,
-              weekStartDate: weekStart
-            }));
-
-            try {
-              await db.insert(DeviceDailyAppUsage).values(dailyAppRecords);
-              weekSyncedDailyApps += dailyAppRecords.length;
-              devLog.log(
-                `   📱 Inserted ${dailyAppRecords.length} daily app records for date: ${dayDate.toISOString()}`
-              );
-            } catch (dailyAppError: any) {
-              devLog.error(`   ❌ Error inserting DeviceDailyAppUsage for date ${dayDate}:`, dailyAppError);
-              throw dailyAppError;
-            }
-          }
-        }
-
-        syncedDays += weekSyncedDays;
-        syncedDailyApps += weekSyncedDailyApps;
-        devLog.log(`   ✅ Inserted ${weekSyncedDays} daily records and ${weekSyncedDailyApps} daily app usage records`);
-      }
-
-      // Insert weekly app usage data (for backward compatibility and weekly aggregates)
-      if (week.apps && Array.isArray(week.apps) && week.apps.length > 0) {
-        devLog.log(`   📱 Inserting ${week.apps.length} weekly app usage records...`);
-        const appRecords = week.apps.map((app: any) => ({
-          screenTimeId,
-          imei: imeiString,
-          packageName: app.packageName,
-          appName: app.appName,
-          totalTimeMs: app.totalTime || app.totalTimeMs || 0,
-          dailyAverageMs: app.dailyAverage || app.dailyAverageMs || 0,
-          weekStartDate: weekStart
-        }));
-
-        devLog.log(`   📝 App records sample (first 2):`, JSON.stringify(appRecords.slice(0, 2), null, 2));
-
-        try {
-          await db.insert(DeviceAppUsage).values(appRecords);
-          syncedApps += appRecords.length;
-          devLog.log(`   ✅ Inserted ${appRecords.length} DeviceAppUsage records`);
-
-          // Verify the inserts
-          const verifyApps = await db
-            .select()
-            .from(DeviceAppUsage)
-            .where(eq(DeviceAppUsage.screenTimeId, screenTimeId));
-          devLog.log(
-            `   🔍 Verification: Found ${verifyApps.length} app records in DB for screenTimeId ${screenTimeId}`
-          );
-        } catch (appError: any) {
-          devLog.error(`   ❌ Error inserting DeviceAppUsage:`, appError);
-          devLog.error(`   ❌ Error code:`, appError?.code);
-          devLog.error(`   ❌ Error message:`, appError?.message);
-          throw appError;
-        }
-      } else {
-        devLog.log(`   ⚠️  No apps data for this week`);
-      }
-
-      syncedWeeks++;
-      devLog.log(`   ✅ Completed week ${i + 1}/${weeks.length}`);
+      screenTimeDetailWeeks.push({
+        weekStartDate: weekStart.toISOString().slice(0, 10),
+        weekEndDate: weekEnd.toISOString().slice(0, 10),
+        totalScreenTimeMs,
+        dailyAverageMs,
+        ...(days && { days }),
+        apps
+      });
     }
 
-    devLog.log(
-      `\n📊 Sync Summary: ${syncedWeeks} weeks, ${syncedApps} weekly apps, ${syncedDays} days, ${syncedDailyApps} daily apps`
-    );
+    const screenTimeDetail = { weeks: screenTimeDetailWeeks };
+    const syncedAt = new Date();
+    const deviceName = device.deviceName ?? device.deviceId ?? null;
+    const deviceManufacturer = device.manufacturer ?? null;
 
-    // Final verification: Query all records for this IMEI
-    devLog.log(`\n🔍 Final Verification: Querying all DeviceScreenTime records for IMEI: ${imeiString}`);
-    try {
-      const allRecords = await db
+    // Upsert: update only this IMEI's row (or insert if first sync). No other rows are touched.
+    const existingRow = await db
+      .select()
+      .from(DeviceScreenTimeMetrics)
+      .where(eq(DeviceScreenTimeMetrics.imei, imeiString))
+      .get();
+
+    if (existingRow) {
+      await db
+        .update(DeviceScreenTimeMetrics)
+        .set({
+          syncedAt,
+          deviceName,
+          deviceManufacturer,
+          screenTimeDetail
+        })
+        .where(eq(DeviceScreenTimeMetrics.imei, imeiString));
+      devLog.log(`   ✅ Updated existing row for IMEI: ${imeiString}`);
+    } else {
+      await db.insert(DeviceScreenTimeMetrics).values({
+        imei: imeiString,
+        syncedAt,
+        deviceName,
+        deviceManufacturer,
+        screenTimeDetail
+      });
+      devLog.log(`   ✅ Inserted new row for IMEI: ${imeiString}`);
+    }
+
+    // Upsert data usage for this IMEI when provided (same sync request)
+    if (dataUsagePayload && typeof dataUsagePayload === "object") {
+      const cycleStartDate =
+        dataUsagePayload.cycleStartDate != null
+          ? new Date(dataUsagePayload.cycleStartDate)
+          : undefined;
+      const usageDetail = {
+        totalBytesInCycle: dataUsagePayload.totalBytesInCycle ?? 0,
+        totalFormatted: dataUsagePayload.totalFormatted ?? null,
+        mobile: dataUsagePayload.mobile ?? null,
+        wifi: dataUsagePayload.wifi ?? null,
+        byWeek: dataUsagePayload.byWeek ?? []
+      };
+      const lastSyncedAt = new Date();
+      const existingDataUsage = await db
         .select()
-        .from(DeviceScreenTime)
-        .where(eq(DeviceScreenTime.imei, imeiString))
-        .orderBy(sql`${DeviceScreenTime.weekStartDate} DESC`)
-        .limit(10);
-      devLog.log(`   📊 Found ${allRecords.length} total DeviceScreenTime records for this IMEI`);
-      if (allRecords.length > 0) {
-        devLog.log(`   📋 Latest record:`, JSON.stringify(allRecords[0], null, 2));
+        .from(DeviceDataUsage)
+        .where(eq(DeviceDataUsage.imei, imeiString))
+        .get();
+      if (existingDataUsage) {
+        await db
+          .update(DeviceDataUsage)
+          .set({ cycleStartDate, usageDetail, lastSyncedAt })
+          .where(eq(DeviceDataUsage.imei, imeiString));
+        devLog.log(`   ✅ Updated DeviceDataUsage row for IMEI: ${imeiString}`);
       } else {
-        devLog.warn(`   ⚠️  WARNING: No records found in database for IMEI ${imeiString} after sync!`);
+        await db.insert(DeviceDataUsage).values({
+          imei: imeiString,
+          cycleStartDate,
+          usageDetail,
+          lastSyncedAt
+        });
+        devLog.log(`   ✅ Inserted DeviceDataUsage row for IMEI: ${imeiString}`);
       }
-    } catch (verifyError: any) {
-      devLog.error(`   ❌ Error verifying records:`, verifyError);
+    }
+
+    devLog.log(`\n📊 Sync Summary: ${screenTimeDetailWeeks.length} weeks — single row updated for IMEI ${imeiString}`);
+
+    // Verify only this device's row exists and was updated
+    const verifyRow = await db
+      .select()
+      .from(DeviceScreenTimeMetrics)
+      .where(eq(DeviceScreenTimeMetrics.imei, imeiString))
+      .get();
+    if (verifyRow) {
+      devLog.log(`   📋 Verified: row for IMEI ${imeiString} has ${(verifyRow.screenTimeDetail as any)?.weeks?.length ?? 0} weeks`);
+    } else {
+      devLog.warn(`   ⚠️  WARNING: No row found for IMEI ${imeiString} after sync!`);
     }
 
     return new Response(
       JSON.stringify({
         success: true,
-        syncedWeeks,
-        syncedApps,
-        syncedDays,
-        syncedDailyApps,
-        timestamp: new Date().toISOString()
+        syncedWeeks: screenTimeDetailWeeks.length,
+        timestamp: syncedAt.toISOString()
       }),
       {
         status: 200,
@@ -623,91 +454,6 @@ export const POST: APIRoute = async ({ request }) => {
     );
   }
 };
-
-/**
- * Create screen time tables if they don't exist
- * This handles the case where tables are missing in remote/production DB
- */
-async function createScreenTimeTables() {
-  devLog.log("🔨 Creating DeviceScreenTime table...");
-  await db.run(sql`
-    CREATE TABLE IF NOT EXISTS DeviceScreenTime (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      imei TEXT NOT NULL,
-      weekStartDate TEXT NOT NULL,
-      weekEndDate TEXT NOT NULL,
-      totalScreenTimeMs INTEGER NOT NULL,
-      dailyAverageMs INTEGER NOT NULL,
-      syncedAt TEXT NOT NULL DEFAULT (datetime('now')),
-      deviceName TEXT,
-      deviceManufacturer TEXT
-    )
-  `);
-
-  devLog.log("🔨 Creating DeviceAppUsage table...");
-  await db.run(sql`
-    CREATE TABLE IF NOT EXISTS DeviceAppUsage (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      screenTimeId INTEGER NOT NULL,
-      imei TEXT NOT NULL,
-      packageName TEXT NOT NULL,
-      appName TEXT NOT NULL,
-      totalTimeMs INTEGER NOT NULL,
-      dailyAverageMs INTEGER NOT NULL,
-      weekStartDate TEXT NOT NULL
-    )
-  `);
-
-  devLog.log("🔨 Creating DeviceDailyScreenTime table...");
-  await db.run(sql`
-    CREATE TABLE IF NOT EXISTS DeviceDailyScreenTime (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      screenTimeId INTEGER NOT NULL,
-      imei TEXT NOT NULL,
-      date TEXT NOT NULL,
-      totalScreenTimeMs INTEGER NOT NULL,
-      weekStartDate TEXT NOT NULL
-    )
-  `);
-
-  devLog.log("🔨 Creating DeviceDailyAppUsage table...");
-  await db.run(sql`
-    CREATE TABLE IF NOT EXISTS DeviceDailyAppUsage (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      dailyScreenTimeId INTEGER NOT NULL,
-      screenTimeId INTEGER NOT NULL,
-      imei TEXT NOT NULL,
-      date TEXT NOT NULL,
-      packageName TEXT NOT NULL,
-      appName TEXT NOT NULL,
-      totalTimeMs INTEGER NOT NULL,
-      weekStartDate TEXT NOT NULL
-    )
-  `);
-
-  devLog.log("🔨 Creating indexes...");
-  await db.run(sql`CREATE INDEX IF NOT EXISTS idx_device_app_usage_screen_time_id ON DeviceAppUsage(screenTimeId)`);
-  await db.run(sql`CREATE INDEX IF NOT EXISTS idx_device_app_usage_imei_week ON DeviceAppUsage(imei, weekStartDate)`);
-  await db.run(sql`CREATE INDEX IF NOT EXISTS idx_device_daily_screen_time_id ON DeviceDailyScreenTime(screenTimeId)`);
-  await db.run(
-    sql`CREATE INDEX IF NOT EXISTS idx_device_daily_screen_time_imei_date ON DeviceDailyScreenTime(imei, date)`
-  );
-  await db.run(
-    sql`CREATE INDEX IF NOT EXISTS idx_device_daily_screen_time_imei_week ON DeviceDailyScreenTime(imei, weekStartDate)`
-  );
-  await db.run(
-    sql`CREATE INDEX IF NOT EXISTS idx_device_daily_app_usage_daily_id ON DeviceDailyAppUsage(dailyScreenTimeId)`
-  );
-  await db.run(
-    sql`CREATE INDEX IF NOT EXISTS idx_device_daily_app_usage_screen_time_id ON DeviceDailyAppUsage(screenTimeId)`
-  );
-  await db.run(sql`CREATE INDEX IF NOT EXISTS idx_device_daily_app_usage_imei_date ON DeviceDailyAppUsage(imei, date)`);
-  await db.run(
-    sql`CREATE INDEX IF NOT EXISTS idx_device_daily_app_usage_imei_week ON DeviceDailyAppUsage(imei, weekStartDate)`
-  );
-
-  devLog.log("✅ All screen time tables and indexes created");
-}
 
 /**
  * Parse a short date format (e.g., "Dec 9") into a full Date object.

@@ -1,6 +1,7 @@
 // db/migrate.ts
-// Manual migration script to create tables in the correct order
+// One-time migration: drop old screen time tables (clear data), create new one-row-per-IMEI tables.
 // Run with: astro db execute db/migrate.ts --remote
+// Ensure config has DeviceScreenTimeMetrics and DeviceDataUsage; then run: astro db push
 
 import { db, sql } from "astro:db";
 
@@ -10,90 +11,37 @@ export default async function migrate() {
   console.log("========================================");
 
   try {
-    // Create DeviceScreenTime table first (parent table)
-    console.log("📊 Creating DeviceScreenTime table...");
+    // 1. Drop old screen time tables (child tables first). This clears all existing screen time data.
+    console.log("🗑️  Dropping old screen time tables...");
+    await db.run(sql`DROP TABLE IF EXISTS DeviceDailyAppUsage`);
+    await db.run(sql`DROP TABLE IF EXISTS DeviceDailyScreenTime`);
+    await db.run(sql`DROP TABLE IF EXISTS DeviceAppUsage`);
+    await db.run(sql`DROP TABLE IF EXISTS DeviceScreenTime`);
+    console.log("✅ Old tables dropped (data cleared)");
+
+    // 2. Create new one-row-per-IMEI tables (if not already created by astro db push)
+    console.log("📊 Creating DeviceScreenTimeMetrics table...");
     await db.run(sql`
-      CREATE TABLE IF NOT EXISTS DeviceScreenTime (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        imei TEXT NOT NULL,
-        weekStartDate TEXT NOT NULL,
-        weekEndDate TEXT NOT NULL,
-        totalScreenTimeMs INTEGER NOT NULL,
-        dailyAverageMs INTEGER NOT NULL,
+      CREATE TABLE IF NOT EXISTS DeviceScreenTimeMetrics (
+        imei TEXT PRIMARY KEY NOT NULL,
         syncedAt TEXT NOT NULL DEFAULT (datetime('now')),
         deviceName TEXT,
-        deviceManufacturer TEXT
+        deviceManufacturer TEXT,
+        screenTimeDetail TEXT
       )
     `);
-    console.log("✅ DeviceScreenTime table created");
+    console.log("✅ DeviceScreenTimeMetrics table ready");
 
-    // Create DeviceAppUsage table (depends on DeviceScreenTime)
-    console.log("📱 Creating DeviceAppUsage table...");
+    console.log("📊 Creating DeviceDataUsage table...");
     await db.run(sql`
-      CREATE TABLE IF NOT EXISTS DeviceAppUsage (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        screenTimeId INTEGER NOT NULL,
-        imei TEXT NOT NULL,
-        packageName TEXT NOT NULL,
-        appName TEXT NOT NULL,
-        totalTimeMs INTEGER NOT NULL,
-        dailyAverageMs INTEGER NOT NULL,
-        weekStartDate TEXT NOT NULL
+      CREATE TABLE IF NOT EXISTS DeviceDataUsage (
+        imei TEXT PRIMARY KEY NOT NULL,
+        cycleStartDate TEXT,
+        usageDetail TEXT,
+        lastSyncedAt TEXT NOT NULL DEFAULT (datetime('now'))
       )
     `);
-    console.log("✅ DeviceAppUsage table created");
-
-    // Create indexes for DeviceAppUsage
-    console.log("📇 Creating indexes for DeviceAppUsage...");
-    await db.run(sql`CREATE INDEX IF NOT EXISTS idx_device_app_usage_screen_time_id ON DeviceAppUsage(screenTimeId)`);
-    await db.run(sql`CREATE INDEX IF NOT EXISTS idx_device_app_usage_imei_week ON DeviceAppUsage(imei, weekStartDate)`);
-    console.log("✅ DeviceAppUsage indexes created");
-
-    // Create DeviceDailyScreenTime table (depends on DeviceScreenTime)
-    console.log("📅 Creating DeviceDailyScreenTime table...");
-    await db.run(sql`
-      CREATE TABLE IF NOT EXISTS DeviceDailyScreenTime (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        screenTimeId INTEGER NOT NULL,
-        imei TEXT NOT NULL,
-        date TEXT NOT NULL,
-        totalScreenTimeMs INTEGER NOT NULL,
-        weekStartDate TEXT NOT NULL
-      )
-    `);
-    console.log("✅ DeviceDailyScreenTime table created");
-
-    // Create indexes for DeviceDailyScreenTime
-    console.log("📇 Creating indexes for DeviceDailyScreenTime...");
-    await db.run(sql`CREATE INDEX IF NOT EXISTS idx_device_daily_screen_time_screen_time_id ON DeviceDailyScreenTime(screenTimeId)`);
-    await db.run(sql`CREATE INDEX IF NOT EXISTS idx_device_daily_screen_time_imei_date ON DeviceDailyScreenTime(imei, date)`);
-    await db.run(sql`CREATE INDEX IF NOT EXISTS idx_device_daily_screen_time_imei_week ON DeviceDailyScreenTime(imei, weekStartDate)`);
-    console.log("✅ DeviceDailyScreenTime indexes created");
-
-    // Create DeviceDailyAppUsage table (depends on DeviceDailyScreenTime and DeviceScreenTime)
-    console.log("📱 Creating DeviceDailyAppUsage table...");
-    await db.run(sql`
-      CREATE TABLE IF NOT EXISTS DeviceDailyAppUsage (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        dailyScreenTimeId INTEGER NOT NULL,
-        screenTimeId INTEGER NOT NULL,
-        imei TEXT NOT NULL,
-        date TEXT NOT NULL,
-        packageName TEXT NOT NULL,
-        appName TEXT NOT NULL,
-        totalTimeMs INTEGER NOT NULL,
-        weekStartDate TEXT NOT NULL
-      )
-    `);
-    console.log("✅ DeviceDailyAppUsage table created");
-
-    // Create indexes for DeviceDailyAppUsage
-    console.log("📇 Creating indexes for DeviceDailyAppUsage...");
-    await db.run(sql`CREATE INDEX IF NOT EXISTS idx_device_daily_app_usage_daily_screen_time_id ON DeviceDailyAppUsage(dailyScreenTimeId)`);
-    await db.run(sql`CREATE INDEX IF NOT EXISTS idx_device_daily_app_usage_screen_time_id ON DeviceDailyAppUsage(screenTimeId)`);
-    await db.run(sql`CREATE INDEX IF NOT EXISTS idx_device_daily_app_usage_imei_date ON DeviceDailyAppUsage(imei, date)`);
-    await db.run(sql`CREATE INDEX IF NOT EXISTS idx_device_daily_app_usage_imei_week ON DeviceDailyAppUsage(imei, weekStartDate)`);
-    console.log("✅ DeviceDailyAppUsage indexes created");
+    console.log("✅ DeviceDataUsage table ready");
 
     console.log("========================================");
     console.log("🎉 Migration completed successfully!");
@@ -105,4 +53,3 @@ export default async function migrate() {
     throw error;
   }
 }
-
