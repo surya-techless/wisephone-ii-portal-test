@@ -1,5 +1,5 @@
 import type { APIRoute } from "astro";
-import { db, DeviceScreenTime, DeviceAppUsage, Wisephone, eq, desc, sql, and } from "astro:db";
+import { db, DeviceScreenTimeMetrics, DeviceDataUsage, Wisephone, eq, sql, and } from "astro:db";
 import { isAdmin } from "@/lib/auth/permissions";
 import { captureException } from "@sentry/astro";
 import { devLog } from "@/libs/utils";
@@ -69,15 +69,30 @@ export const GET: APIRoute = async ({ params, locals, request }) => {
     const url = new URL(request.url);
     const weeksCount = Math.min(parseInt(url.searchParams.get("weeks") || "4"), 12); // Max 12 weeks
 
-    // Fetch screen time records for this device, ordered by most recent first
-    const screenTimeRecords = await db
+    // One row per IMEI: fetch the single metrics row for this device
+    const row = await db
       .select()
-      .from(DeviceScreenTime)
-      .where(eq(DeviceScreenTime.imei, imei))
-      .orderBy(desc(DeviceScreenTime.weekStartDate))
-      .limit(weeksCount);
+      .from(DeviceScreenTimeMetrics)
+      .where(eq(DeviceScreenTimeMetrics.imei, imei))
+      .get();
 
-    if (screenTimeRecords.length === 0) {
+    // Fetch data usage (one row per IMEI) regardless of screen time
+    const dataUsageRow = await db
+      .select()
+      .from(DeviceDataUsage)
+      .where(eq(DeviceDataUsage.imei, imei))
+      .get();
+
+    const dataUsage =
+      dataUsageRow != null
+        ? {
+            cycleStartDate: dataUsageRow.cycleStartDate,
+            usageDetail: dataUsageRow.usageDetail,
+            lastSyncedAt: dataUsageRow.lastSyncedAt
+          }
+        : null;
+
+    if (!row || !row.screenTimeDetail) {
       return new Response(
         JSON.stringify({
           device: {
@@ -87,6 +102,7 @@ export const GET: APIRoute = async ({ params, locals, request }) => {
             lastSynced: null
           },
           weeks: [],
+          dataUsage,
           message: "No screen time data available. Device has not synced yet."
         }),
         {
@@ -96,52 +112,52 @@ export const GET: APIRoute = async ({ params, locals, request }) => {
       );
     }
 
-    // Get device info from the most recent record
-    const latestRecord = screenTimeRecords[0];
     const deviceInfo = {
       imei,
-      deviceName: latestRecord.deviceName,
-      deviceManufacturer: latestRecord.deviceManufacturer,
-      lastSynced: latestRecord.syncedAt
+      deviceName: row.deviceName ?? null,
+      deviceManufacturer: row.deviceManufacturer ?? null,
+      lastSynced: row.syncedAt
     };
 
-    // Fetch app usage for each week and format the response
-    const weeks = await Promise.all(
-      screenTimeRecords.map(async (record) => {
-        const apps = await db
-          .select()
-          .from(DeviceAppUsage)
-          .where(eq(DeviceAppUsage.screenTimeId, record.id))
-          .orderBy(desc(DeviceAppUsage.totalTimeMs));
+    const detail = row.screenTimeDetail as { weeks?: Array<{
+      weekStartDate: string;
+      weekEndDate: string;
+      totalScreenTimeMs: number;
+      dailyAverageMs: number;
+      apps?: Array<{ packageName: string; appName: string; totalTimeMs: number; dailyAverageMs?: number }>;
+    }> };
+    const weeksData = (detail?.weeks ?? []).slice(0, weeksCount);
 
-        return {
-          id: record.id,
-          weekStartDate: record.weekStartDate,
-          weekEndDate: record.weekEndDate,
-          weekLabel: getWeekLabel(record.weekStartDate),
-          totalScreenTimeMs: record.totalScreenTimeMs,
-          dailyAverageMs: record.dailyAverageMs,
-          totalScreenTimeFormatted: formatDuration(record.totalScreenTimeMs),
-          dailyAverageFormatted: formatDuration(record.dailyAverageMs),
-          syncedAt: record.syncedAt,
-          apps: apps
-            .filter((app) => (app.totalTimeMs ?? 0) > 0)
-            .map((app) => ({
-              packageName: app.packageName,
-              appName: app.appName,
-              totalTimeMs: app.totalTimeMs,
-              dailyAverageMs: app.dailyAverageMs,
-              totalTimeFormatted: formatDuration(app.totalTimeMs),
-              dailyAverageFormatted: formatDuration(app.dailyAverageMs)
-            }))
-        };
-      })
-    );
+    const weeks = weeksData.map((week) => {
+      const weekStartDate = new Date(week.weekStartDate + "T00:00:00.000Z");
+      const apps = (week.apps ?? [])
+        .filter((app) => (app.totalTimeMs ?? 0) > 0)
+        .map((app) => ({
+          packageName: app.packageName,
+          appName: app.appName,
+          totalTimeMs: app.totalTimeMs ?? 0,
+          dailyAverageMs: app.dailyAverageMs ?? 0,
+          totalTimeFormatted: formatDuration(app.totalTimeMs ?? 0),
+          dailyAverageFormatted: formatDuration(app.dailyAverageMs ?? 0)
+        }));
+      return {
+        weekStartDate,
+        weekEndDate: new Date(week.weekEndDate + "T23:59:59.999Z"),
+        weekLabel: getWeekLabel(weekStartDate),
+        totalScreenTimeMs: week.totalScreenTimeMs ?? 0,
+        dailyAverageMs: week.dailyAverageMs ?? 0,
+        totalScreenTimeFormatted: formatDuration(week.totalScreenTimeMs ?? 0),
+        dailyAverageFormatted: formatDuration(week.dailyAverageMs ?? 0),
+        syncedAt: row.syncedAt,
+        apps
+      };
+    });
 
     return new Response(
       JSON.stringify({
         device: deviceInfo,
-        weeks
+        weeks,
+        dataUsage
       }),
       {
         status: 200,

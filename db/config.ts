@@ -44,79 +44,25 @@ const OttogridCache = defineTable({
   }
 });
 
-// Screen time snapshot per device per week (synced from WiseOS)
-const DeviceScreenTime = defineTable({
+// One row per IMEI: screen time metrics (synced from WiseOS).
+const DeviceScreenTimeMetrics = defineTable({
   columns: {
-    id: column.number({ primaryKey: true, autoIncrement: true }),
-    imei: column.text(),                                    // Device IMEI
-    weekStartDate: column.date(),                           // Start of the week
-    weekEndDate: column.date(),                             // End of the week
-    totalScreenTimeMs: column.number(),                     // Total screen time in milliseconds
-    dailyAverageMs: column.number(),                        // Daily average in ms
-    syncedAt: column.date({ default: new Date() }),         // When this data was synced
+    imei: column.text({ primaryKey: true }),
+    syncedAt: column.date({ default: new Date() }),
     deviceName: column.text({ optional: true }),
-    deviceManufacturer: column.text({ optional: true })
-  },
-  indexes: [
-    // Temporarily disabled to allow cleanup of duplicates
-    // { on: ["imei", "weekStartDate"], unique: true }         // One record per device per week
-  ]
+    deviceManufacturer: column.text({ optional: true }),
+    screenTimeDetail: column.json()
+  }
 });
 
-// Per-app usage within a week (child of DeviceScreenTime)
-const DeviceAppUsage = defineTable({
+// One row per IMEI: data usage (future use).
+const DeviceDataUsage = defineTable({
   columns: {
-    id: column.number({ primaryKey: true, autoIncrement: true }),
-    screenTimeId: column.number(),                          // References DeviceScreenTime.id
-    imei: column.text(),                                    // For easier querying
-    packageName: column.text(),
-    appName: column.text(),
-    totalTimeMs: column.number(),                           // Total usage in ms
-    dailyAverageMs: column.number(),
-    weekStartDate: column.date()                            // For easier querying
-  },
-  indexes: [
-    { on: ["screenTimeId"] },
-    { on: ["imei", "weekStartDate"] }
-  ]
-});
-
-// Daily screen time breakdown (new format from WiseOS)
-const DeviceDailyScreenTime = defineTable({
-  columns: {
-    id: column.number({ primaryKey: true, autoIncrement: true }),
-    screenTimeId: column.number(),                          // References DeviceScreenTime.id
-    imei: column.text(),                                    // For easier querying
-    date: column.date(),                                    // The specific day
-    totalScreenTimeMs: column.number(),                     // Screen time for this day in ms
-    weekStartDate: column.date()                            // For easier querying
-  },
-  indexes: [
-    { on: ["screenTimeId"] },
-    { on: ["imei", "date"] },
-    { on: ["imei", "weekStartDate"] }
-  ]
-});
-
-// Per-app usage per day (new format from WiseOS)
-const DeviceDailyAppUsage = defineTable({
-  columns: {
-    id: column.number({ primaryKey: true, autoIncrement: true }),
-    dailyScreenTimeId: column.number(),                    // References DeviceDailyScreenTime.id
-    screenTimeId: column.number(),                          // References DeviceScreenTime.id (for easier querying)
-    imei: column.text(),                                    // For easier querying
-    date: column.date(),                                    // The specific day
-    packageName: column.text(),
-    appName: column.text(),
-    totalTimeMs: column.number(),                           // Usage for this day in ms
-    weekStartDate: column.date()                            // For easier querying
-  },
-  indexes: [
-    { on: ["dailyScreenTimeId"] },
-    { on: ["screenTimeId"] },
-    { on: ["imei", "date"] },
-    { on: ["imei", "weekStartDate"] }
-  ]
+    imei: column.text({ primaryKey: true }),
+    cycleStartDate: column.date({ optional: true }),
+    usageDetail: column.json({ optional: true }),
+    lastSyncedAt: column.date({ default: new Date() })
+  }
 });
 
 export default defineDb({
@@ -126,9 +72,7 @@ export default defineDb({
     Wisephone,
     UserPermission,
     OttogridCache,
-    DeviceScreenTime,
-    DeviceAppUsage,
-    DeviceDailyScreenTime,
-    DeviceDailyAppUsage
+    DeviceScreenTimeMetrics,
+    DeviceDataUsage
   }
 });

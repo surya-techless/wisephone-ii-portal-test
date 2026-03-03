@@ -60,7 +60,6 @@ export const wisephones = {
             devLog.error(`Error checking subscription for new device ${input.imei}:`, error);
           }
         }
-
         return {
           success: "Wisephone created successfully!",
           wisephone: newWisephone,
