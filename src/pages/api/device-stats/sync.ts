@@ -264,7 +264,7 @@ export const POST: APIRoute = async ({ request }) => {
       });
     }
 
-    const imeiString = String(device.imei);
+    imeiString = String(imeiNumber ?? device.imei ?? "");
     devLog.log(`📊 Building screenTimeDetail for IMEI: ${imeiString} (${weeks.length} weeks) — only this device's row will be updated`);
 
 
