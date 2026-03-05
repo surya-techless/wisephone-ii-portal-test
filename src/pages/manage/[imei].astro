@@ -271,7 +271,7 @@ try {
           const dailyAverageMs = week.dailyAverageMs ?? (totalScreenTimeMs > 0 ? Math.round(totalScreenTimeMs / 7) : 0);
 
           const apps = (week.apps ?? [])
-            .filter((app) => (app.totalTimeMs ?? 0) > 0)
+            .filter((app) => (app.totalTimeMs ?? 0) >= 60 * 1000) // only show apps with >= 1 minute
             .map((app) => ({
               id: null,
               screenTimeId: null,

@@ -77,7 +77,7 @@ const serializedData = screenTimeData.map((week) => {
     weekEndDate,
     syncedAt,
     apps: (week.apps || [])
-      .filter((app) => (app.totalTimeMs || 0) > 0)
+      .filter((app) => (app.totalTimeMs || 0) >= 60 * 1000) // only show apps with >= 1 minute
       .map((app) => {
         let appWeekStartDate = app.weekStartDate;
         if (appWeekStartDate instanceof Date) {
@@ -104,7 +104,7 @@ const serializedData = screenTimeData.map((week) => {
       return {
         ...day,
         date: dayDate,
-        apps: (day.apps || []).filter((app) => (app.totalTimeMs || 0) > 0)
+        apps: (day.apps || []).filter((app) => (app.totalTimeMs || 0) >= 60 * 1000) // only show apps with >= 1 minute
       };
     })
   };
