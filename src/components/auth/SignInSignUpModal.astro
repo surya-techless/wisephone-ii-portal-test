@@ -1,0 +1,435 @@
+---
+/**
+ * Custom Sign In / Sign Up modal component.
+ * UI is fully custom; auth and API calls use Clerk via the client script.
+ *
+ * Usage: Wrap in a container that controls open state, e.g.:
+ *   <div x-data="{ authModalOpen: false }">
+ *     <button @click="authModalOpen = true">Sign in</button>
+ *     <SignInSignUpModal openBinding="authModalOpen" redirectUrl="/dashboard" />
+ *   </div>
+ *
+ * Open from outside: document.getElementById('auth-modal')?.showModal()
+ */
+interface Props {
+  /** Redirect URL after successful sign in or sign up. Default: /dashboard */
+  redirectUrl?: string;
+  /** Publishable key for Clerk (client). Pass from server so the script can load Clerk. */
+  publishableKey: string;
+  /** URL for Terms of Service (linked from sign-up checkbox). */
+  termsUrl?: string;
+  /** URL for Privacy Policy (linked from sign-up checkbox). */
+  privacyUrl?: string;
+}
+
+const { redirectUrl = "/dashboard", publishableKey, termsUrl = "#", privacyUrl = "#" } = Astro.props;
+---
+
+<dialog
+  id="auth-modal"
+  class="modal"
+  x-data={`authModal({
+    redirectUrl: ${JSON.stringify(redirectUrl)},
+    publishableKey: ${JSON.stringify(publishableKey)}
+  })`}
+  x-init="init()"
+>
+  <div class="modal-box max-w-md w-full mx-4">
+    <form method="dialog" class="absolute right-4 top-4">
+      <button type="submit" class="btn btn-ghost btn-sm btn-circle" aria-label="Close">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+    </form>
+
+    <h3 class="text-lg font-bold mb-2 pr-8" x-text="tab === 'signin' ? (signInCodeStep ? 'Verify your identity' : 'Sign in to Wisephone Portal') : (signUpCodeStep ? 'Verify your email' : 'Create your account')"></h3>
+    <p class="text-sm text-[var(--text-secondary)] mb-4" x-show="tab === 'signin' && !signInCodeStep" x-cloak>Welcome back! Please sign in to continue.</p>
+    <p class="text-sm text-[var(--text-secondary)] mb-4" x-show="tab === 'signup' && !signUpCodeStep" x-cloak>Welcome! Please fill in the details to get started.</p>
+    <p class="text-sm text-[var(--text-secondary)] mb-4" x-show="tab === 'signup' && signUpCodeStep" x-cloak>We sent a verification code to your email. Enter it below.</p>
+
+    <!-- Error message -->
+    <div
+      x-show="errorMessage"
+      x-cloak
+      class="alert alert-error text-sm mb-4"
+      x-transition
+    >
+      <span x-text="errorMessage"></span>
+    </div>
+
+    <!-- Sign In: Step 1 – Email or Phone -->
+    <form
+      x-show="tab === 'signin' && !signInCodeStep"
+      x-cloak
+      class="space-y-4"
+      @submit.prevent="handleSignInContinue()"
+    >
+      <div class="flex gap-2 mb-3">
+        <button type="button" class="btn btn-sm" :class="signInMethod === 'email' ? 'btn-primary' : 'btn-ghost'" @click="signInMethod = 'email'">Email address</button>
+        <button type="button" class="btn btn-sm" :class="signInMethod === 'phone' ? 'btn-primary' : 'btn-ghost'" @click="signInMethod = 'phone'">Phone number</button>
+      </div>
+      <div class="form-control" x-show="signInMethod === 'email'">
+        <label class="label" for="auth-email-signin"><span class="label-text">Email address</span></label>
+        <input
+          id="auth-email-signin"
+          type="email"
+          class="input input-bordered w-full"
+          placeholder="Enter your email address"
+          x-model="email"
+          autocomplete="email"
+        />
+      </div>
+      <div class="form-control" x-show="signInMethod === 'phone'" x-cloak>
+        <label class="label" for="auth-phone-signin"><span class="label-text">Phone number</span></label>
+        <div class="flex gap-2">
+          <select class="select select-bordered w-24 shrink-0" x-model="phoneCountryCode" aria-label="Country code">
+            <option value="+1">US +1</option>
+            <option value="+44">UK +44</option>
+            <option value="+91">IN +91</option>
+            <option value="+61">AU +61</option>
+          </select>
+          <input
+            id="auth-phone-signin"
+            type="tel"
+            class="input input-bordered flex-1"
+            placeholder="Enter your phone number"
+            x-model="phoneNumber"
+            autocomplete="tel"
+          />
+        </div>
+      </div>
+      <button type="submit" class="btn btn-primary w-full" :disabled="loading" x-bind:disabled="loading">
+        <span x-show="!loading">Continue</span>
+        <span x-show="loading" x-cloak>Sending code…</span>
+      </button>
+      <p class="text-sm text-center text-[var(--text-secondary)]">Don't have an account? <button type="button" class="link link-primary font-semibold" @click="tab = 'signup'; errorMessage = ''">Sign up</button></p>
+    </form>
+
+    <!-- Sign In: Step 2 – Verification code -->
+    <form
+      x-show="tab === 'signin' && signInCodeStep"
+      x-cloak
+      class="space-y-4"
+      @submit.prevent="handleSignInVerify()"
+    >
+      <div class="form-control">
+        <label class="label"><span class="label-text">Verification code</span></label>
+        <input
+          type="text"
+          class="input input-bordered w-full"
+          placeholder="Enter the code we sent"
+          x-model="verificationCode"
+          autocomplete="one-time-code"
+        />
+      </div>
+      <button type="submit" class="btn btn-primary w-full" :disabled="loading" x-bind:disabled="loading">
+        <span x-show="!loading">Verify</span>
+        <span x-show="loading" x-cloak>Verifying…</span>
+      </button>
+      <button type="button" class="btn btn-ghost btn-sm w-full" @click="signInCodeStep = false; errorMessage = ''">Use a different email or phone</button>
+    </form>
+
+    <!-- Sign Up: Step 2 – Email verification code -->
+    <form
+      x-show="tab === 'signup' && signUpCodeStep"
+      x-cloak
+      class="space-y-4"
+      @submit.prevent="handleSignUpVerify()"
+    >
+      <div class="form-control">
+        <label class="label"><span class="label-text">Verification code</span></label>
+        <input
+          type="text"
+          class="input input-bordered w-full"
+          placeholder="Enter the code from your email"
+          x-model="verificationCode"
+          autocomplete="one-time-code"
+        />
+      </div>
+      <button type="submit" class="btn btn-primary w-full" :disabled="loading" x-bind:disabled="loading">
+        <span x-show="!loading">Verify email</span>
+        <span x-show="loading" x-cloak>Verifying…</span>
+      </button>
+      <button type="button" class="btn btn-ghost btn-sm w-full" @click="signUpCodeStep = false; errorMessage = ''">Use a different email</button>
+    </form>
+
+    <!-- Sign Up: Step 1 – Create account form -->
+    <form
+      x-show="tab === 'signup' && !signUpCodeStep"
+      x-cloak
+      class="space-y-4"
+      @submit.prevent="handleSignUp()"
+    >
+      <div class="form-control">
+        <label class="label" for="auth-firstname"><span class="label-text">First name</span><span class="label-text-alt text-[var(--text-secondary)]">Optional</span></label>
+        <input id="auth-firstname" type="text" class="input input-bordered w-full" placeholder="First name" x-model="firstName" autocomplete="given-name" />
+      </div>
+      <div class="form-control">
+        <label class="label" for="auth-lastname"><span class="label-text">Last name</span><span class="label-text-alt text-[var(--text-secondary)]">Optional</span></label>
+        <input id="auth-lastname" type="text" class="input input-bordered w-full" placeholder="Last name" x-model="lastName" autocomplete="family-name" />
+      </div>
+      <div class="form-control">
+        <label class="label" for="auth-email-signup"><span class="label-text">Email address</span></label>
+        <input
+          id="auth-email-signup"
+          type="email"
+          class="input input-bordered w-full"
+          placeholder="Enter your email address"
+          x-model="email"
+          required
+          autocomplete="email"
+        />
+      </div>
+      <div class="form-control">
+        <label class="label" for="auth-phone-signup"><span class="label-text">Phone number</span></label>
+        <p class="label-text-alt text-[var(--text-secondary)] mb-1">This will be the account owner's phone #</p>
+        <div class="flex gap-2">
+          <select class="select select-bordered w-24 shrink-0" x-model="phoneCountryCode" aria-label="Country code">
+            <option value="+1">US +1</option>
+            <option value="+44">UK +44</option>
+            <option value="+91">IN +91</option>
+            <option value="+61">AU +61</option>
+          </select>
+          <input
+            id="auth-phone-signup"
+            type="tel"
+            class="input input-bordered flex-1"
+            placeholder="Enter your phone number"
+            x-model="phoneNumber"
+            required
+            autocomplete="tel"
+          />
+        </div>
+      </div>
+      <div class="form-control">
+        <label class="flex items-start gap-3 cursor-pointer label justify-start">
+          <input type="checkbox" class="checkbox checkbox-primary border-2 border-[var(--surface-tertiary)] mt-0.5" x-model="termsAgreed" />
+          <span class="label-text">I agree to the <a href={termsUrl} target="_blank" rel="noopener noreferrer" class="link link-primary underline">Terms of Service</a> and <a href={privacyUrl} target="_blank" rel="noopener noreferrer" class="link link-primary underline">Privacy Policy</a>.</span>
+        </label>
+      </div>
+      <!-- Clerk bot protection: required for custom sign-up when Attack Protection is enabled (https://clerk.com/docs/custom-flows/bot-sign-up-protection) -->
+      <div id="clerk-captcha" data-cl-theme="light" data-cl-size="normal" class="min-h-[78px] my-2" aria-hidden="false"></div>
+      <button
+        type="submit"
+        class="btn btn-primary w-full"
+        :disabled="loading"
+        x-bind:disabled="loading || !termsAgreed"
+      >
+        <span x-show="!loading">Continue</span>
+        <span x-show="loading" x-cloak>Creating account…</span>
+      </button>
+      <p class="text-sm text-center text-[var(--text-secondary)]">Already have an account? <button type="button" class="link link-primary font-semibold" @click="tab = 'signin'; signInCodeStep = false; signUpCodeStep = false; errorMessage = ''">Sign in</button></p>
+    </form>
+  </div>
+  <form method="dialog" class="modal-backdrop bg-black/50">
+    <button type="submit">close</button>
+  </form>
+</dialog>
+
+<script>
+  // @ts-nocheck - Alpine/Clerk are runtime globals; @clerk/clerk-js is dynamically imported
+  document.addEventListener("alpine:init", () => {
+    const Alpine = window.Alpine;
+    Alpine.data("authModal", (config) => ({
+      redirectUrl: config?.redirectUrl ?? "/dashboard",
+      publishableKey: config?.publishableKey ?? "",
+      tab: "signin",
+      email: "",
+      password: "",
+      firstName: "",
+      lastName: "",
+      phoneCountryCode: "+1",
+      phoneNumber: "",
+      termsAgreed: false,
+      signInMethod: "email",
+      signInCodeStep: false,
+      signUpCodeStep: false,
+      verificationCode: "",
+      loading: false,
+      errorMessage: "",
+      clerk: null,
+
+      async init() {
+        console.log("[AuthModal] init() started");
+        const dialog = this.$el;
+        window.addEventListener("auth-modal-open", (e) => {
+          this.tab = e.detail?.tab ?? "signin";
+          this.errorMessage = "";
+          this.signInCodeStep = false;
+          this.signUpCodeStep = false;
+          if (dialog && typeof dialog.showModal === "function") dialog.showModal();
+          console.log("[AuthModal] modal opened, tab:", this.tab, "clerk ready:", !!this.clerk);
+        });
+
+        const key = this.publishableKey;
+        const keyPreview = key ? `${key.slice(0, 10)}...${key.slice(-4)}` : "(empty)";
+        console.log("[AuthModal] publishableKey:", keyPreview, "length:", key?.length ?? 0);
+        if (!key) {
+          console.warn("[AuthModal] Skipping Clerk load: no publishableKey");
+          return;
+        }
+        try {
+          console.log("[AuthModal] Importing @clerk/clerk-js...");
+          const mod = await import("@clerk/clerk-js");
+          const ClerkClass = mod.Clerk ?? mod.default;
+          console.log("[AuthModal] Import done. Clerk:", typeof ClerkClass, "keys:", mod ? Object.keys(mod) : "none");
+          if (typeof ClerkClass !== "function") {
+            throw new Error("Clerk is not a constructor. Export: " + JSON.stringify(Object.keys(mod)));
+          }
+          const clerkInstance = new ClerkClass(key);
+          console.log("[AuthModal] Clerk instance created, calling load()...");
+          await clerkInstance.load();
+          this.clerk = clerkInstance;
+          console.log("[AuthModal] Clerk load() done. client:", !!this.clerk?.client, "signIn:", typeof this.clerk?.client?.signIn, "signUp:", typeof this.clerk?.client?.signUp);
+        } catch (e) {
+          console.error("[AuthModal] Clerk load failed:", e);
+          console.error("[AuthModal] Error name:", e?.name, "message:", e?.message, "stack:", e?.stack);
+          this.errorMessage = "Unable to load sign-in. Please refresh the page.";
+        }
+      },
+
+      setError(msg) {
+        this.errorMessage = msg || "Something went wrong. Please try again.";
+        this.loading = false;
+      },
+
+      getSignInIdentifier() {
+        if (this.signInMethod === "phone") {
+          const digits = (this.phoneNumber || "").replace(/\D/g, "");
+          return this.phoneCountryCode + digits;
+        }
+        return this.email;
+      },
+
+      async handleSignInContinue() {
+        const clerk = this.clerk;
+        const signIn = clerk?.client?.signIn;
+        if (!signIn) {
+          this.setError("Sign-in is not ready. Please refresh.");
+          return;
+        }
+        const identifier = this.getSignInIdentifier();
+        if (!identifier || (this.signInMethod === "phone" && !this.phoneNumber)) {
+          this.setError(this.signInMethod === "email" ? "Enter your email address." : "Enter your phone number.");
+          return;
+        }
+        this.loading = true;
+        this.errorMessage = "";
+        try {
+          await signIn.create({ identifier });
+          const strategy = this.signInMethod === "email" ? "email_code" : "phone_code";
+          const factor = signIn.supportedFirstFactors?.find((f) => f.strategy === strategy);
+          if (!factor) {
+            this.setError("This sign-in method is not available for this account.");
+            this.loading = false;
+            return;
+          }
+          const prepareParams = { strategy };
+          if (strategy === "email_code" && factor.emailAddressId) prepareParams.emailAddressId = factor.emailAddressId;
+          if (strategy === "phone_code" && factor.phoneNumberId) prepareParams.phoneNumberId = factor.phoneNumberId;
+          await signIn.prepareFirstFactor(prepareParams);
+          this.signInCodeStep = true;
+          this.verificationCode = "";
+          this.loading = false;
+        } catch (e) {
+          const err = (e && typeof e === "object" && "errors" in e && Array.isArray((e).errors) ? (e).errors[0] : e);
+          this.setError(err?.longMessage ?? err?.message ?? "Could not send verification code.");
+        }
+      },
+
+      async handleSignInVerify() {
+        const clerk = this.clerk;
+        const signIn = clerk?.client?.signIn;
+        if (!signIn || !this.verificationCode) {
+          this.setError("Enter the verification code.");
+          return;
+        }
+        this.loading = true;
+        this.errorMessage = "";
+        try {
+          const strategy = this.signInMethod === "email" ? "email_code" : "phone_code";
+          const result = await signIn.attemptFirstFactor({ strategy, code: this.verificationCode });
+          if (result.status === "complete") {
+            const sessionId = result.createdSessionId ?? signIn.createdSessionId;
+            if (sessionId && clerk.setActive) await clerk.setActive({ session: sessionId });
+            window.location.href = this.redirectUrl;
+            return;
+          }
+          const err = result?.firstFactorVerification?.error ?? result?.error;
+          this.setError(err?.longMessage ?? err?.message ?? "Verification failed.");
+        } catch (e) {
+          const err = (e && typeof e === "object" && "errors" in e && Array.isArray((e).errors) ? (e).errors[0] : e);
+          this.setError(err?.longMessage ?? err?.message ?? "Verification failed.");
+        }
+      },
+
+      async handleSignUp() {
+        if (!this.termsAgreed) {
+          this.setError("You must agree to the Terms of Service and Privacy Policy to sign up.");
+          return;
+        }
+        const clerk = this.clerk;
+        const signUp = clerk?.client?.signUp;
+        if (!signUp) {
+          this.setError("Sign-up is not ready. Please refresh.");
+          return;
+        }
+        this.loading = true;
+        this.errorMessage = "";
+        try {
+          const payload = { emailAddress: this.email };
+          if (this.firstName) payload.firstName = this.firstName;
+          if (this.lastName) payload.lastName = this.lastName;
+          const phone = this.phoneNumber ? this.phoneCountryCode + this.phoneNumber.replace(/\D/g, "") : null;
+          if (phone) payload.phoneNumber = phone;
+          await signUp.create(payload);
+          if (signUp.status === "missing_requirements" && signUp.unverifiedFields?.includes("email_address")) {
+            await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
+            this.signUpCodeStep = true;
+            this.verificationCode = "";
+            this.errorMessage = "";
+            this.loading = false;
+            return;
+          }
+          if (signUp.status === "complete" && signUp.createdSessionId && clerk.setActive) {
+            await clerk.setActive({ session: signUp.createdSessionId });
+            window.location.href = this.redirectUrl;
+            return;
+          }
+          const err = signUp?.verifications?.emailAddress?.error;
+          this.setError(err?.longMessage ?? err?.message ?? "Sign-up did not complete.");
+        } catch (e) {
+          const err = (e && typeof e === "object" && "errors" in e && Array.isArray((e).errors) ? (e).errors[0] : e);
+          this.setError(err?.longMessage ?? err?.message ?? "Sign-up failed.");
+        }
+      },
+
+      async handleSignUpVerify() {
+        const clerk = this.clerk;
+        const signUp = clerk?.client?.signUp;
+        if (!signUp || !this.verificationCode?.trim()) {
+          this.setError("Enter the verification code from your email.");
+          return;
+        }
+        this.loading = true;
+        this.errorMessage = "";
+        try {
+          await signUp.attemptEmailAddressVerification({ code: this.verificationCode.trim() });
+          if (signUp.status === "complete" && signUp.createdSessionId && clerk?.setActive) {
+            await clerk.setActive({ session: signUp.createdSessionId });
+            window.location.href = this.redirectUrl;
+            return;
+          }
+          const err = signUp?.verifications?.emailAddress?.error;
+          this.setError(err?.longMessage ?? err?.message ?? "Verification failed. Check the code and try again.");
+        } catch (e) {
+          const err = (e && typeof e === "object" && "errors" in e && Array.isArray((e).errors) ? (e).errors[0] : e);
+          this.setError(err?.longMessage ?? err?.message ?? "Verification failed.");
+        } finally {
+          this.loading = false;
+        }
+      }
+    }));
+  });
+</script>

@@ -194,5 +194,10 @@ const {
   Alpine.plugin(focus);
 
   window.Alpine = Alpine;
-  Alpine.start();
+  // Defer start so page-level Alpine.data() registrations (e.g. dashboard) run first
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", () => Alpine.start());
+  } else {
+    setTimeout(() => Alpine.start(), 0);
+  }
 </script>

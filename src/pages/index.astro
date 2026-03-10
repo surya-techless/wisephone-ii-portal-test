@@ -1,5 +1,7 @@
 ---
 import { SignedIn, SignedOut, SignInButton, SignUpButton } from "@clerk/astro/components";
+import { FEATURE_FLAGS } from "@/config/feature-flags";
+import SignInSignUpModal from "@/components/auth/SignInSignUpModal.astro";
 import WisephoneLogo from "@/components/WisephoneLogo.astro";
 import Layout from "@/layouts/Layout.astro";
 import Footer from "@/components/Footer.astro";
@@ -9,6 +11,11 @@ const { userId } = Astro.locals.auth();
 if (userId) {
   return Astro.redirect("/dashboard");
 }
+
+// Fallback when PUBLIC_CLERK_PUBLISHABLE_KEY is not set (e.g. dev/tunnel). Replace with your key from Clerk Dashboard.
+const CLERK_PUBLISHABLE_KEY_FALLBACK = "pk_test_ReplaceWithYourKeyFromClerkDashboard";
+const publishableKey = import.meta.env.PUBLIC_CLERK_PUBLISHABLE_KEY ?? CLERK_PUBLISHABLE_KEY_FALLBACK;
+const useLegacyAuthUI = FEATURE_FLAGS.USE_LEGACY_AUTH_UI;
 ---
 
 <Layout
@@ -36,24 +43,54 @@ if (userId) {
         </p>
         <div class="flex items-center gap-3" x-data="{ showAgeModal: false, isOver18: $persist(false) }">
           <SignedOut>
-            <SignInButton mode="modal" forceRedirectUrl="/dashboard" asChild>
-              <button
-                x-cloak
-                x-show="isOver18"
-                @click="showAgeModal = false"
-                class="btn btn-primary"
-                :disabled="!isOver18">Sign in</button
-              >
-            </SignInButton>
-            <SignUpButton mode="modal" forceRedirectUrl="/dashboard" asChild>
-              <button
-                x-cloak
-                x-show="isOver18"
-                @click="showAgeModal = false"
-                class="btn btn-ghost"
-                :disabled="!isOver18">Sign up</button
-              >
-            </SignUpButton>
+            {useLegacyAuthUI ? (
+              <>
+                <SignInButton mode="modal" forceRedirectUrl="/dashboard" asChild>
+                  <button
+                    x-cloak
+                    x-show="isOver18"
+                    @click="showAgeModal = false"
+                    class="btn btn-primary"
+                    :disabled="!isOver18"
+                  >
+                    Sign in
+                  </button>
+                </SignInButton>
+                <SignUpButton mode="modal" forceRedirectUrl="/dashboard" asChild>
+                  <button
+                    x-cloak
+                    x-show="isOver18"
+                    @click="showAgeModal = false"
+                    class="btn btn-ghost"
+                    :disabled="!isOver18"
+                  >
+                    Sign up
+                  </button>
+                </SignUpButton>
+              </>
+            ) : (
+              <>
+                <button
+                  x-cloak
+                  x-show="isOver18"
+                  @click="showAgeModal = false; window.dispatchEvent(new CustomEvent('auth-modal-open', { detail: { tab: 'signin' } }))"
+                  class="btn btn-primary"
+                  :disabled="!isOver18"
+                >
+                  Sign in
+                </button>
+                <button
+                  x-cloak
+                  x-show="isOver18"
+                  @click="showAgeModal = false; window.dispatchEvent(new CustomEvent('auth-modal-open', { detail: { tab: 'signup' } }))"
+                  class="btn btn-ghost"
+                  :disabled="!isOver18"
+                >
+                  Sign up
+                </button>
+                <SignInSignUpModal redirectUrl="/dashboard" publishableKey={publishableKey} />
+              </>
+            )}
             <button x-cloak x-transition x-show="!isOver18" @click="showAgeModal = true" class="btn btn-primary"
               >Get Started</button
             >

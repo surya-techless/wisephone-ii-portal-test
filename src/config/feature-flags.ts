@@ -11,7 +11,12 @@ export const FEATURE_FLAGS = {
    * Enable/disable Typeform integration for device registration
    * When enabled, clicking "Add Device" will show a Typeform instead of the regular form
    */
-  ENABLE_TYPEFORM: true
+  ENABLE_TYPEFORM: true,
+  /**
+   * When true, use Clerk's built-in SignInButton/SignUpButton (modal) on the landing page.
+   * When false, use the custom SignInSignUpModal component.
+   */
+  USE_LEGACY_AUTH_UI: false
 } as const;
 
 export type FeatureFlag = keyof typeof FEATURE_FLAGS;
