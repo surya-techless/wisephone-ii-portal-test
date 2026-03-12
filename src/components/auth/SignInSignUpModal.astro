@@ -62,28 +62,28 @@ const { redirectUrl = "/dashboard", publishableKey, termsUrl = "#", privacyUrl =
     <form
       x-show="tab === 'signin' && !signInCodeStep"
       x-cloak
-      class="space-y-4"
+      class="space-y-2"
       @submit.prevent="handleSignInContinue()"
     >
-      <div class="flex gap-2 mb-3">
-        <button type="button" class="btn btn-sm" :class="signInMethod === 'email' ? 'btn-primary' : 'btn-ghost'" @click="signInMethod = 'email'">Email address</button>
-        <button type="button" class="btn btn-sm" :class="signInMethod === 'phone' ? 'btn-primary' : 'btn-ghost'" @click="signInMethod = 'phone'">Phone number</button>
+      <div class="flex gap-4 mb-1">
+        <button type="button" class="pb-1 text-sm font-medium transition-colors" :class="signInMethod === 'email' ? 'text-[var(--primary)] border-b-2 border-[var(--primary)]' : 'text-gray-500 hover:text-gray-700'" @click="signInMethod = 'email'">Email address</button>
+        <button type="button" class="pb-1 text-sm font-medium transition-colors" :class="signInMethod === 'phone' ? 'text-[var(--primary)] border-b-2 border-[var(--primary)]' : 'text-gray-500 hover:text-gray-700'" @click="signInMethod = 'phone'">Phone number</button>
       </div>
       <div class="form-control" x-show="signInMethod === 'email'">
-        <label class="label" for="auth-email-signin"><span class="label-text">Email address</span></label>
+        <label class="label py-1" for="auth-email-signin"><span class="label-text">Email address</span></label>
         <input
           id="auth-email-signin"
           type="email"
-          class="input input-bordered w-full"
+          class="input input-bordered input-sm w-full h-10"
           placeholder="Enter your email address"
           x-model="email"
           autocomplete="email"
         />
       </div>
       <div class="form-control" x-show="signInMethod === 'phone'" x-cloak>
-        <label class="label" for="auth-phone-signin"><span class="label-text">Phone number</span></label>
+        <label class="label py-1" for="auth-phone-signin"><span class="label-text">Phone number</span></label>
         <div class="flex gap-2">
-          <select class="select select-bordered w-24 shrink-0" x-model="phoneCountryCode" aria-label="Country code">
+          <select class="select select-bordered select-sm w-24 shrink-0 h-10" x-model="phoneCountryCode" aria-label="Country code">
             <option value="+1">US +1</option>
             <option value="+44">UK +44</option>
             <option value="+91">IN +91</option>
@@ -92,7 +92,7 @@ const { redirectUrl = "/dashboard", publishableKey, termsUrl = "#", privacyUrl =
           <input
             id="auth-phone-signin"
             type="tel"
-            class="input input-bordered flex-1"
+            class="input input-bordered input-sm flex-1 h-10"
             placeholder="Enter your phone number"
             x-model="phoneNumber"
             autocomplete="tel"
@@ -110,14 +110,14 @@ const { redirectUrl = "/dashboard", publishableKey, termsUrl = "#", privacyUrl =
     <form
       x-show="tab === 'signin' && signInCodeStep"
       x-cloak
-      class="space-y-4"
+      class="space-y-2"
       @submit.prevent="handleSignInVerify()"
     >
       <div class="form-control">
-        <label class="label"><span class="label-text">Verification code</span></label>
+        <label class="label py-1"><span class="label-text">Verification code</span></label>
         <input
           type="text"
-          class="input input-bordered w-full"
+          class="input input-bordered input-sm w-full h-10"
           placeholder="Enter the code we sent"
           x-model="verificationCode"
           autocomplete="one-time-code"
@@ -134,14 +134,14 @@ const { redirectUrl = "/dashboard", publishableKey, termsUrl = "#", privacyUrl =
     <form
       x-show="tab === 'signup' && signUpCodeStep"
       x-cloak
-      class="space-y-4"
+      class="space-y-2"
       @submit.prevent="handleSignUpVerify()"
     >
       <div class="form-control">
-        <label class="label"><span class="label-text">Verification code</span></label>
+        <label class="label py-1"><span class="label-text">Verification code</span></label>
         <input
           type="text"
-          class="input input-bordered w-full"
+          class="input input-bordered input-sm w-full h-10"
           placeholder="Enter the code from your email"
           x-model="verificationCode"
           autocomplete="one-time-code"
@@ -158,23 +158,25 @@ const { redirectUrl = "/dashboard", publishableKey, termsUrl = "#", privacyUrl =
     <form
       x-show="tab === 'signup' && !signUpCodeStep"
       x-cloak
-      class="space-y-4"
+      class="space-y-2"
       @submit.prevent="handleSignUp()"
     >
-      <div class="form-control">
-        <label class="label" for="auth-firstname"><span class="label-text">First name</span><span class="label-text-alt text-[var(--text-secondary)]">Optional</span></label>
-        <input id="auth-firstname" type="text" class="input input-bordered w-full" placeholder="First name" x-model="firstName" autocomplete="given-name" />
+      <div class="flex gap-3">
+        <div class="form-control flex-1">
+          <label class="label py-1" for="auth-firstname"><span class="label-text">First name</span><span class="label-text-alt text-[var(--text-secondary)]">Optional</span></label>
+          <input id="auth-firstname" type="text" class="input input-bordered input-sm w-full h-10" placeholder="First name" x-model="firstName" autocomplete="given-name" />
+        </div>
+        <div class="form-control flex-1">
+          <label class="label py-1" for="auth-lastname"><span class="label-text">Last name</span><span class="label-text-alt text-[var(--text-secondary)]">Optional</span></label>
+          <input id="auth-lastname" type="text" class="input input-bordered input-sm w-full h-10" placeholder="Last name" x-model="lastName" autocomplete="family-name" />
+        </div>
       </div>
       <div class="form-control">
-        <label class="label" for="auth-lastname"><span class="label-text">Last name</span><span class="label-text-alt text-[var(--text-secondary)]">Optional</span></label>
-        <input id="auth-lastname" type="text" class="input input-bordered w-full" placeholder="Last name" x-model="lastName" autocomplete="family-name" />
-      </div>
-      <div class="form-control">
-        <label class="label" for="auth-email-signup"><span class="label-text">Email address</span></label>
+        <label class="label py-1" for="auth-email-signup"><span class="label-text">Email address</span></label>
         <input
           id="auth-email-signup"
           type="email"
-          class="input input-bordered w-full"
+          class="input input-bordered input-sm w-full h-10"
           placeholder="Enter your email address"
           x-model="email"
           required
@@ -182,10 +184,9 @@ const { redirectUrl = "/dashboard", publishableKey, termsUrl = "#", privacyUrl =
         />
       </div>
       <div class="form-control">
-        <label class="label" for="auth-phone-signup"><span class="label-text">Phone number</span></label>
-        <p class="label-text-alt text-[var(--text-secondary)] mb-1">This will be the account owner's phone #</p>
+        <label class="label py-1" for="auth-phone-signup"><span class="label-text">Phone number</span></label>
         <div class="flex gap-2">
-          <select class="select select-bordered w-24 shrink-0" x-model="phoneCountryCode" aria-label="Country code">
+          <select class="select select-bordered select-sm w-24 shrink-0 h-10" x-model="phoneCountryCode" aria-label="Country code">
             <option value="+1">US +1</option>
             <option value="+44">UK +44</option>
             <option value="+91">IN +91</option>
@@ -194,7 +195,7 @@ const { redirectUrl = "/dashboard", publishableKey, termsUrl = "#", privacyUrl =
           <input
             id="auth-phone-signup"
             type="tel"
-            class="input input-bordered flex-1"
+            class="input input-bordered input-sm flex-1 h-10"
             placeholder="Enter your phone number"
             x-model="phoneNumber"
             required
@@ -202,23 +203,23 @@ const { redirectUrl = "/dashboard", publishableKey, termsUrl = "#", privacyUrl =
           />
         </div>
       </div>
-      <div class="form-control">
-        <label class="flex items-start gap-3 cursor-pointer label justify-start">
-          <input type="checkbox" class="checkbox checkbox-primary border-2 border-[var(--surface-tertiary)] mt-0.5" x-model="termsAgreed" />
-          <span class="label-text">I agree to the <a href={termsUrl} target="_blank" rel="noopener noreferrer" class="link link-primary underline">Terms of Service</a> and <a href={privacyUrl} target="_blank" rel="noopener noreferrer" class="link link-primary underline">Privacy Policy</a>.</span>
-        </label>
-      </div>
       <!-- Clerk bot protection: required for custom sign-up when Attack Protection is enabled (https://clerk.com/docs/custom-flows/bot-sign-up-protection) -->
-      <div id="clerk-captcha" data-cl-theme="light" data-cl-size="normal" class="min-h-[78px] my-2" aria-hidden="false"></div>
-      <button
-        type="submit"
-        class="btn btn-primary w-full"
-        :disabled="loading"
-        x-bind:disabled="loading || !termsAgreed"
-      >
-        <span x-show="!loading">Continue</span>
-        <span x-show="loading" x-cloak>Creating account…</span>
-      </button>
+      <div id="clerk-captcha" data-cl-theme="light" data-cl-size="normal" class="my-1" aria-hidden="false"></div>
+      <div class="flex items-center gap-3 mt-2">
+        <label class="flex items-center gap-2 cursor-pointer flex-1 min-w-0">
+          <input type="checkbox" class="checkbox checkbox-primary checkbox-sm border-2 border-[var(--surface-tertiary)] shrink-0" x-model="termsAgreed" />
+          <span class="text-xs leading-tight">I agree to the <a href={termsUrl} target="_blank" rel="noopener noreferrer" class="link link-primary underline">Terms</a> and <a href={privacyUrl} target="_blank" rel="noopener noreferrer" class="link link-primary underline">Privacy Policy</a>.</span>
+        </label>
+        <button
+          type="submit"
+          class="btn btn-primary btn-sm h-10 px-6 shrink-0"
+          :disabled="loading"
+          x-bind:disabled="loading || !termsAgreed"
+        >
+          <span x-show="!loading">Continue</span>
+          <span x-show="loading" x-cloak>Creating…</span>
+        </button>
+      </div>
       <p class="text-sm text-center text-[var(--text-secondary)]">Already have an account? <button type="button" class="link link-primary font-semibold" @click="tab = 'signin'; signInCodeStep = false; signUpCodeStep = false; errorMessage = ''">Sign in</button></p>
     </form>
   </div>
