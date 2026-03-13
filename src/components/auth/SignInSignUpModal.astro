@@ -45,7 +45,7 @@ const { redirectUrl = "/dashboard", publishableKey, termsUrl = "#", privacyUrl =
 
     <h3 class="text-lg font-bold mb-2 pr-8" x-text="tab === 'signin' ? (signInCodeStep ? 'Verify your identity' : 'Sign in to Wisephone Portal') : (signUpCodeStep ? 'Verify your email' : 'Create your account')"></h3>
     <p class="text-sm text-[var(--text-secondary)] mb-4" x-show="tab === 'signin' && !signInCodeStep" x-cloak>Welcome back! Please sign in to continue.</p>
-    <p class="text-sm text-[var(--text-secondary)] mb-4" x-show="tab === 'signup' && !signUpCodeStep" x-cloak>Welcome! Please fill in the details to get started.</p>
+    <p class="text-sm text-[var(--text-secondary)] mb-2" x-show="tab === 'signup' && !signUpCodeStep" x-cloak>Welcome! Please fill in the details to get started.</p>
     <p class="text-sm text-[var(--text-secondary)] mb-4" x-show="tab === 'signup' && signUpCodeStep" x-cloak>We sent a verification code to your email. Enter it below.</p>
 
     <!-- Error message -->
@@ -212,7 +212,7 @@ const { redirectUrl = "/dashboard", publishableKey, termsUrl = "#", privacyUrl =
         </label>
         <button
           type="submit"
-          class="btn btn-primary btn-sm h-10 px-6 shrink-0"
+          class="btn btn-primary btn-sm h-10 px-6 shrink-0 ml-2.5"
           :disabled="loading"
           x-bind:disabled="loading || !termsAgreed"
         >
