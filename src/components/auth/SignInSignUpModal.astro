@@ -27,14 +27,14 @@ const { redirectUrl = "/dashboard", publishableKey, termsUrl = "#", privacyUrl =
 
 <dialog
   id="auth-modal"
-  class="modal"
+  class="modal items-start md:items-center"
   x-data={`authModal({
     redirectUrl: ${JSON.stringify(redirectUrl)},
     publishableKey: ${JSON.stringify(publishableKey)}
   })`}
   x-init="init()"
 >
-  <div class="modal-box max-w-md w-full mx-4">
+  <div class="modal-box max-w-md w-full mx-4 mt-10 md:mt-0">
     <form method="dialog" class="absolute right-4 top-4">
       <button type="submit" class="btn btn-ghost btn-sm btn-circle" aria-label="Close">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
