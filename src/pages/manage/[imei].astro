@@ -1044,40 +1044,39 @@ try {
                 </div>
 
                 <!-- Allow Tool Drawer Toggle -->
-                <template x-if="availableFeatures.find(f => f.featureKey === 'TOOL_DRAWER_IN_PHONE')">
-                  <div class="mt-4 md:max-w-[500px]">
-                    <div
-                      class="flex items-center justify-between p-4 border border-gray-300 rounded-lg transition-colors"
-                      :class="{
-                        'hover:bg-gray-50 cursor-pointer': isSubscribed,
-                        'opacity-50 cursor-not-allowed': !isSubscribed
-                      }"
-                    >
-                      <div class="flex-1 pr-4">
-                        <h4
-                          class="text-sm font-semibold text-gray-900"
-                          x-text="availableFeatures.find(f => f.featureKey === 'TOOL_DRAWER_IN_PHONE').name"
-                        ></h4>
-                        <p
-                          class="text-sm text-gray-600 leading-snug mt-0.5"
-                          x-text="availableFeatures.find(f => f.featureKey === 'TOOL_DRAWER_IN_PHONE').description"
-                        ></p>
-                      </div>
-                      <label class="relative inline-flex items-center cursor-pointer flex-shrink-0">
-                        <input
-                          type="checkbox"
-                          class="sr-only peer"
-                          :checked="isFeatureEnabledForFeature(availableFeatures.find(f => f.featureKey === 'TOOL_DRAWER_IN_PHONE'))"
-                          @click.prevent="toggleFeature(availableFeatures.find(f => f.featureKey === 'TOOL_DRAWER_IN_PHONE'))"
-                          :disabled="!isSubscribed"
-                        />
-                        <div
-                          class="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-5 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-teal-600"
-                        ></div>
-                      </label>
+                <div
+                  x-show="toolDrawerInPhoneFeature"
+                  x-cloak
+                  class="mt-4 md:max-w-[500px]"
+                >
+                  <div
+                    class="flex items-center justify-between p-4 border border-gray-300 rounded-lg transition-colors"
+                    :class="isSubscribed ? 'hover:bg-gray-50 cursor-pointer' : 'opacity-50 cursor-not-allowed'"
+                  >
+                    <div class="flex-1 pr-4">
+                      <h4
+                        class="text-sm font-semibold text-gray-900"
+                        x-text="toolDrawerInPhoneFeature && toolDrawerInPhoneFeature.name"
+                      ></h4>
+                      <p
+                        class="text-sm text-gray-600 leading-snug mt-0.5"
+                        x-text="toolDrawerInPhoneFeature && toolDrawerInPhoneFeature.description"
+                      ></p>
                     </div>
+                    <label class="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                      <input
+                        type="checkbox"
+                        class="sr-only peer"
+                        :checked="toolDrawerInPhoneFeature && isFeatureEnabledForFeature(toolDrawerInPhoneFeature)"
+                        @click.prevent="toolDrawerInPhoneFeature && toggleFeature(toolDrawerInPhoneFeature)"
+                        :disabled="!isSubscribed"
+                      />
+                      <div
+                        class="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-5 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-teal-600"
+                      ></div>
+                    </label>
                   </div>
-                </template>
+                </div>
               </div>
             </div>
 
@@ -1354,6 +1353,9 @@ try {
                 appSearchQuery: "",
                 features: [] as string[],
                 availableFeatures: [] as Feature[],
+                get toolDrawerInPhoneFeature(): Feature | undefined {
+                  return (this.availableFeatures as Feature[]).find((f: Feature) => f.featureKey === "TOOL_DRAWER_IN_PHONE");
+                },
                 isSubscribed: false,
                 imei: "",
                 deviceName: "",
