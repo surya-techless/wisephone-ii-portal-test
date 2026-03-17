@@ -784,7 +784,7 @@ try {
                 </div>
 
                 <div class="space-y-3" :class="{ 'opacity-50 pointer-events-none': !isSubscribed }">
-                  <template x-for="feature in availableFeatures" :key="feature.knoxManageId">
+                  <template x-for="feature in availableFeatures.filter(f => f.featureKey !== 'TOOL_DRAWER_IN_PHONE' && !f.isPortalOnly)" :key="feature.knoxManageId">
                     <div
                       class="flex items-center justify-between p-4 border border-gray-300 rounded-lg transition-colors"
                       :class="{ 'hover:bg-gray-50 cursor-pointer': isSubscribed, 'cursor-not-allowed': !isSubscribed }"
@@ -871,7 +871,7 @@ try {
               <div
                 x-show="currentTab === 'app-management'"
                 x-cloak
-                class="flex flex-col h-[calc(100vh-280px)] max-h-[calc(100vh-280px)] max-w-full md:max-w-[500px]"
+                class="flex flex-col max-w-full md:max-w-[500px]"
               >
                 <!-- Header Text -->
                 <div class="mb-4 flex-shrink-0 md:max-w-[500px]">
@@ -901,13 +901,12 @@ try {
                 </div>
 
                 <!-- Content Container: Search Results + Installed Apps -->
-                <div class="flex flex-col flex-1 min-h-0">
+                <div class="flex flex-col">
                   <!-- Search Results Area (Scrollable when long, only shown when searching) -->
                   <div
                     x-show="appSearchQuery && appSearchQuery.trim().length > 0"
                     x-cloak
-                    class="mb-4 overflow-y-auto md:max-w-[500px]"
-                    style="flex: 0 1 auto; max-height: calc(100% - 100px);"
+                    class="mb-4 overflow-y-auto md:max-w-[500px] max-h-80"
                   >
                     <div class="space-y-2 pr-2">
                       <template x-for="app in availableApps" :key="app.packageName">
@@ -1043,6 +1042,42 @@ try {
                     </div>
                   </div>
                 </div>
+
+                <!-- Allow Tool Drawer Toggle -->
+                <template x-if="availableFeatures.find(f => f.featureKey === 'TOOL_DRAWER_IN_PHONE')">
+                  <div class="mt-4 md:max-w-[500px]">
+                    <div
+                      class="flex items-center justify-between p-4 border border-gray-300 rounded-lg transition-colors"
+                      :class="{
+                        'hover:bg-gray-50 cursor-pointer': isSubscribed,
+                        'opacity-50 cursor-not-allowed': !isSubscribed
+                      }"
+                    >
+                      <div class="flex-1 pr-4">
+                        <h4
+                          class="text-sm font-semibold text-gray-900"
+                          x-text="availableFeatures.find(f => f.featureKey === 'TOOL_DRAWER_IN_PHONE').name"
+                        ></h4>
+                        <p
+                          class="text-sm text-gray-600 leading-snug mt-0.5"
+                          x-text="availableFeatures.find(f => f.featureKey === 'TOOL_DRAWER_IN_PHONE').description"
+                        ></p>
+                      </div>
+                      <label class="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                        <input
+                          type="checkbox"
+                          class="sr-only peer"
+                          :checked="isFeatureEnabledForFeature(availableFeatures.find(f => f.featureKey === 'TOOL_DRAWER_IN_PHONE'))"
+                          @click.prevent="toggleFeature(availableFeatures.find(f => f.featureKey === 'TOOL_DRAWER_IN_PHONE'))"
+                          :disabled="!isSubscribed"
+                        />
+                        <div
+                          class="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-5 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-teal-600"
+                        ></div>
+                      </label>
+                    </div>
+                  </div>
+                </template>
               </div>
             </div>
 
@@ -2748,6 +2783,16 @@ try {
                       }
                     }
 
+                    // Cascade: if TOOL_DRAWER is turned off, also force-disable TOOL_DRAWER_IN_PHONE
+                    if (feature.featureKey === "TOOL_DRAWER" && !updatedValue) {
+                      const tdip = (this.availableFeatures as Feature[]).find(
+                        (f: Feature) => f.featureKey === "TOOL_DRAWER_IN_PHONE"
+                      );
+                      if (tdip && this.isFeatureEnabledForFeature(tdip)) {
+                        await this.forceDisableFeature(tdip);
+                      }
+                    }
+
                     // Reset pending feature
                     this.pendingFeature = null;
                     this.pendingFeatureEnabled = false;
@@ -2757,6 +2802,54 @@ try {
                     // Reset pending feature
                     this.pendingFeature = null;
                     this.pendingFeatureEnabled = false;
+                  }
+                },
+
+                /**
+                 * Force-disables a feature without a confirmation modal.
+                 * Used for cascading toggles (e.g. TOOL_DRAWER off → TOOL_DRAWER_IN_PHONE off).
+                 */
+                async forceDisableFeature(feature: Feature) {
+                  try {
+                    const isInverse = feature.isInverse || false;
+                    const isA16 = this.isA16Device();
+                    const apiEnabled = isInverse ? true : false;
+
+                    await featureManagement.toggleFeature({
+                      imei: this.imei,
+                      feature,
+                      enabled: apiEnabled,
+                      isA16Device: isA16
+                    });
+
+                    const correctGroupId =
+                      isA16 && feature.a16KnoxManageId ? feature.a16KnoxManageId : feature.knoxManageId;
+
+                    if (isInverse) {
+                      if (correctGroupId && !this.features.includes(correctGroupId)) {
+                        this.features.push(correctGroupId);
+                      }
+                    } else {
+                      this.features = this.features.filter(
+                        (id) => id !== feature.knoxManageId && id !== feature.a16KnoxManageId
+                      );
+                    }
+
+                    if (this.imei && feature.featureKey) {
+                      try {
+                        await actions.features.updateFeatureFlag({
+                          imei: this.imei,
+                          featureKey: feature.featureKey,
+                          value: 0
+                        });
+                      } catch (dbErr) {
+                        devLog.error("[FeatureFlags] Failed to update DB for cascade disable:", dbErr);
+                      }
+                    }
+
+                    devLog.log("[FeatureFlags] Cascade disabled:", feature.featureKey);
+                  } catch (error) {
+                    devLog.error("[FeatureFlags] Cascade disable failed for", feature.featureKey, error);
                   }
                 },
 
