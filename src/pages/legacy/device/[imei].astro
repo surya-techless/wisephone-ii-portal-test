@@ -914,7 +914,7 @@ const userLink = user?.id
           if (this.isA16Device && feature.a16KnoxManageId) {
             return feature.a16KnoxManageId;
           }
-          return feature.knoxManageId;
+          return feature.knoxManageId || "";
         },
 
         /**

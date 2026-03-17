@@ -16,7 +16,7 @@ export class FeatureManagementService {
 
     // Use A16 group ID if device is A16 and feature has A16 ID, otherwise use regular ID
     const knoxManageId = isA16Device && feature.a16KnoxManageId ? feature.a16KnoxManageId : feature.knoxManageId;
-    url.searchParams.set("knoxManageId", knoxManageId);
+    url.searchParams.set("knoxManageId", knoxManageId || "");
 
     const response = await fetch(url, { method: "POST" });
     if (!response.ok) {
