@@ -313,6 +313,14 @@ const serializedData = screenTimeData.map((week) => {
               </template>
             </div>
 
+            <!-- No data message inside graph -->
+            <div
+              class="absolute inset-0 flex items-center justify-center z-10"
+              x-show="!dailyTimes || dailyTimes.length === 0 || maxTime === 0"
+            >
+              <p class="text-sm text-gray-500">No app usage data available</p>
+            </div>
+
             <!-- Bars -->
             <div
               class="absolute inset-0 flex items-end justify-around gap-1 pl-8 pr-2 pb-2 z-10"
@@ -368,11 +376,6 @@ const serializedData = screenTimeData.map((week) => {
                   <span class="text-sm text-gray-600 whitespace-nowrap" x-text="formatDuration(app.totalTimeMs)"></span>
                 </div>
               </template>
-            </template>
-            <template
-              x-if="!currentWeek || !currentWeek.apps || currentWeek.apps.filter(app => (app.totalTimeMs || 0) > 0).length === 0"
-            >
-              <p class="text-sm text-gray-500">No app usage data available</p>
             </template>
           </div>
         </div>

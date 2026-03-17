@@ -1,10 +1,18 @@
 export type Feature = {
-  knoxManageId: string;
+  /**
+   * Knox group ID used for API calls. Not required for portal-only features.
+   */
+  knoxManageId?: string;
   /**
    * Optional A16-specific group ID. If provided, this will be used for A16 devices instead of knoxManageId.
    * If not provided, knoxManageId will be used for all devices.
    */
   a16KnoxManageId?: string;
+  /**
+   * If true, this feature is managed by the portal only (no Knox API call).
+   * knoxManageId is not required for portal-only features.
+   */
+  isPortalOnly?: boolean;
   lucideIcon: string;
   isEnabled: boolean;
   name: string;
@@ -21,6 +29,14 @@ export type Feature = {
   isBeta?: boolean;
   disclosure?: string;
   isAdminOnly?: boolean;
+  /**
+   * If true, this feature is a sub-feature that appears nested under a parent feature.
+   * parentFeatureKnoxId should match the knoxManageId of the parent feature.
+   */
+  isSubFeature?: boolean;
+  parentFeatureKnoxId?: string;
+  /** Stable identifier derived from the FEATURES record key (e.g. "TOOL_DRAWER"). Never changes even if name does. */
+  featureKey?: string;
 };
 
 export const KNOX_USER_GROUPS = {
@@ -30,6 +46,7 @@ export const KNOX_USER_GROUPS = {
   ADD_ON_DISABLE_HOTSPOT: "f463ade53b1f43f5bf2f540a99395c2d",
   ADD_ON_DISABLE_FACTORY_RESET: "2af281b5d6764f06801c5925d5aa06e4",
   ADD_ON_GOOGLE_APPS: "2023496b363e4a639a379fe5efedd171",
+  ADD_ON_BLOCK_TOOL_DRAWER:"9d218eb108ff4b73a6eab0063082fac7",
   /**
    * @deprecated This is no longer used.
    */
@@ -57,7 +74,10 @@ export const KNOX_USER_GROUPS = {
   A16_ADD_ON_WISEOS_PROTECT: "8bc9034354c64e9cbd8567905eb0d994",
   A16_SUBSCRIBED: "7c932e5455a444bcb40d56bcc0460ae0",
   A16_UNPAID: "bc9ef35416a74023a26b28b46827bbf7",
-  A16_ADD_ON_GOOGLE_APPS: "3a4c1a51878f4610a2de2d54a50bc31b"
+  A16_ADD_ON_GOOGLE_APPS: "3a4c1a51878f4610a2de2d54a50bc31b",
+  A16_ADD_ON_BLOCK_TOOL_DRAWER: "07adbb1d5145473eaf5fd911e017e75e",
+  // "Add-on- WPII - Block-Tool Drawer" Knox group — applying this group blocks the Tool Drawer on the phone
+
 };
 
 export const FEATURES: Record<string, Feature> = {
@@ -75,6 +95,17 @@ export const FEATURES: Record<string, Feature> = {
       "I acknowledge turning off this feature will remove access to third-party apps on this device. Any installed third-party apps will be uninstalled.",
     disclosure:
       "Please note that third-party apps may display in-app ads, which are not endorsed by Techless and could contain unexpected content. Use of the Tool Drawer apps is at your discretion. If you are battling addiction, we recommend not enabling the Tool Drawer. And, at this time, in-app purchases are not supported."
+  },
+  TOOL_DRAWER_IN_PHONE: {
+    knoxManageId: KNOX_USER_GROUPS.ADD_ON_BLOCK_TOOL_DRAWER,
+    a16KnoxManageId: KNOX_USER_GROUPS.A16_ADD_ON_BLOCK_TOOL_DRAWER,
+    lucideIcon: "smartphone",
+    isEnabled: true,
+    name: "Allow Tool Drawer",
+    description: "Allow the Tool Drawer to be accessible on the phone.",
+    enableMessage: "I acknowledge turning on this feature will allow the Tool Drawer to be accessible on the phone.",
+    disableMessage: "I acknowledge turning off this feature will block the Tool Drawer from being accessible on the phone.",
+    isInverse: true
   },
   // FAITH_TOOLS: {
   //   isEnabled: true,
@@ -145,6 +176,15 @@ export const FEATURES: Record<string, Feature> = {
     disableMessage: "I acknowledge this will uninstall the Cloudflare 1.1.1.1 app and the associated protections.",
     isBeta: true,
     isEnabled: true
+  },
+  SHOW_SCREEN_TIME: {
+    lucideIcon: "clock",
+    isEnabled: true,
+    isPortalOnly: true,
+    name: "Screen Time",
+    description: "Show screen time and data usage on the Device Info tab for this device.",
+    enableMessage: "I acknowledge turning on this feature will show screen time on the Device Info tab.",
+    disableMessage: "I acknowledge turning off this feature will hide screen time on the Device Info tab."
   }
 };
 

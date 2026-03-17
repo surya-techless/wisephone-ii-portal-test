@@ -55,6 +55,22 @@ const DeviceScreenTimeMetrics = defineTable({
   }
 });
 
+// One row per IMEI: feature flag state synced from Knox on manage page load.
+// Defaults reflect the untouched-subscribed state (what a brand new device would have).
+const DeviceFeatureFlags = defineTable({
+  columns: {
+    imei: column.text({ primaryKey: true }),
+    TOOL_DRAWER: column.number({ default: 0 }),
+    TOOL_DRAWER_IN_PHONE: column.number({ default: 0 }),
+    GOOGLE_APPS: column.number({ default: 0 }),
+    NO_HOTSPOT: column.number({ default: 1 }),
+    ALLOW_FACTORY_RESET: column.number({ default: 1 }),
+    WISEOS_PROTECT: column.number({ default: 0 }),
+    SHOW_SCREEN_TIME: column.number({ default: 0 }),
+    updatedAt: column.date({ default: new Date() })
+  }
+});
+
 // One row per IMEI: data usage (future use).
 const DeviceDataUsage = defineTable({
   columns: {
@@ -73,6 +89,7 @@ export default defineDb({
     UserPermission,
     OttogridCache,
     DeviceScreenTimeMetrics,
-    DeviceDataUsage
+    DeviceDataUsage,
+    DeviceFeatureFlags
   }
 });

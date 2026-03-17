@@ -32,7 +32,7 @@ import { isFeatureEnabled } from "@/config/feature-flags";
 // Initialize variables
 let imei: string | undefined = Astro.params.imei;
 let wisephone: any = null;
-let features = Object.values(FEATURES);
+let features = Object.entries(FEATURES).map(([key, feature]) => ({ ...feature, featureKey: key }));
 let isSubscribed = false;
 let error = "";
 let installedApps: any[] = [];
@@ -91,7 +91,7 @@ try {
       wisephone = wisephones[0];
     }
   } else {
-    features = features.filter((feature) => !feature.isAdminOnly);
+    features = features.filter((feature) => !feature.isAdminOnly && !feature.isPortalOnly);
 
     const wisephones = await db
       .select()
@@ -613,8 +613,8 @@ try {
                         </div>
                       </div>
 
-                      <!-- Device Removal (Desktop: always visible) -->
-                      <div class="hidden lg:block md:w-[500px]">
+                      <!-- Device Removal (Desktop: always visible, only at 2xl+ where layout is side-by-side) -->
+                      <div class="hidden 2xl:block md:w-[500px]">
                         <div class="border-t border-gray-200 w-full md:w-[500px] mb-4"></div>
                         <h4 class="text-sm font-semibold text-gray-900 mb-2">Device Removal</h4>
                         <p class="text-sm text-gray-600 mb-2">
@@ -632,8 +632,8 @@ try {
                           Remove Device
                         </button>
                       </div>
-                      <!-- Device Removal (Visible on mobile only when screen time is disabled) -->
-                      <div class="pt-4 border-t border-gray-200 lg:hidden" x-show="!enableScreenTime" x-cloak>
+                      <!-- Device Removal (Visible below 2xl when screen time is disabled) -->
+                      <div class="pt-4 border-t border-gray-200 2xl:hidden" x-show="!enableScreenTime" x-cloak>
                         <h4 class="text-sm font-semibold text-gray-900 mb-2">Device Removal</h4>
                         <p class="text-sm text-gray-600 mb-2">
                           Remove this device from this list of managed devices. Perform this action if you want to
@@ -726,8 +726,8 @@ try {
                         Both subscription options are managed through third party portals.
                       </p>
 
-                      <!-- Device Removal (Non-Paying - Desktop: always visible, Mobile: only when screen time is disabled) -->
-                      <div class="hidden lg:block md:w-[500px]">
+                      <!-- Device Removal (Non-Paying - only at 2xl+ where layout is side-by-side) -->
+                      <div class="hidden 2xl:block md:w-[500px]">
                         <div class="border-t border-gray-200 w-full md:w-[500px] mb-4"></div>
                         <h4 class="text-sm font-semibold text-gray-900 mb-2">Device Removal</h4>
                         <p class="text-sm text-gray-600 mb-2">
@@ -745,8 +745,8 @@ try {
                           Remove Device
                         </button>
                       </div>
-                      <!-- Device Removal (Non-Paying - Mobile only - when screen time is disabled) -->
-                      <div class="pt-6 border-t border-gray-200 lg:hidden" x-show="!enableScreenTime" x-cloak>
+                      <!-- Device Removal (Non-Paying - below 2xl when screen time is disabled) -->
+                      <div class="pt-6 border-t border-gray-200 2xl:hidden" x-show="!enableScreenTime" x-cloak>
                         <h4 class="text-sm font-semibold text-gray-900 mb-2">Device Removal</h4>
                         <p class="text-sm text-gray-600 mb-2">
                           Remove this device from this list of managed devices. Perform this action if you want to
@@ -794,7 +794,7 @@ try {
                           <h4 class="text-sm font-semibold text-gray-900" x-text="feature.name"></h4>
                           <button
                             x-show="feature.disclosure"
-                            @click.stop="showDisclosureFor = (showDisclosureFor === feature.knoxManageId ? null : feature.knoxManageId)"
+                            @click.stop="showDisclosureFor = (showDisclosureFor === feature.featureKey ? null : feature.featureKey)"
                             class="text-gray-500 hover:text-gray-700 transition-colors"
                           >
                             <Icon name="lucide:info" class="w-4 h-4" />
@@ -803,7 +803,7 @@ try {
 
                           <!-- Disclosure Popup -->
                           <div
-                            x-show="showDisclosureFor === feature.knoxManageId"
+                            x-show="showDisclosureFor === feature.featureKey"
                             x-cloak
                             @click.outside="showDisclosureFor = null"
                             class="absolute left-0 top-full mt-2 z-10 bg-white border border-gray-300 rounded-lg shadow-lg p-4 w-80 max-w-md"
@@ -1048,7 +1048,7 @@ try {
 
 
               <!-- Right Column: Screen Time (same max width as tabs on mobile/tablet: 500px; min 700px at xl; constant 80px right margin so it never merges with viewport edge) -->
-              <div class="mb-6 w-full min-w-0 max-w-[600px] 2xl:ml-5 h-full order-2 2xl:order-none" x-show="currentTab === 'device-info' && enableScreenTime && showScreenTimeComponent" x-cloak>
+              <div class="mb-6 w-full min-w-0 max-w-full md:max-w-[500px] 2xl:max-w-[600px] 2xl:ml-5 h-full order-2 2xl:order-none" x-show="currentTab === 'device-info' && enableScreenTime && showScreenTimeComponent" x-cloak>
                 <ScreenTimeStats imei={imei || ""} screenTimeData={enableScreenTime ? screenTimeData : []} />
               </div>
 
@@ -1615,7 +1615,7 @@ try {
                   if (this.isA16Device() && feature.a16KnoxManageId) {
                     return feature.a16KnoxManageId;
                   }
-                  return feature.knoxManageId;
+                  return feature.knoxManageId || "";
                 },
 
                 /**
@@ -1628,9 +1628,13 @@ try {
                     const deviceModel = await this.getDeviceModelFromKnox();
                     if (!deviceModel) {
                       devLog.warn("Could not determine device model, using default SUBSCRIBED group");
-                      // Default to SUBSCRIBED if we can't determine model
                       await this.addFeatureToDevice(KNOX_USER_GROUPS.SUBSCRIBED);
                       this.features.push(KNOX_USER_GROUPS.SUBSCRIBED);
+                      // Add block tool drawer group by default (A15 fallback)
+                      if (!this.features.includes(KNOX_USER_GROUPS.ADD_ON_BLOCK_TOOL_DRAWER)) {
+                        await this.addFeatureToDevice(KNOX_USER_GROUPS.ADD_ON_BLOCK_TOOL_DRAWER);
+                        this.features.push(KNOX_USER_GROUPS.ADD_ON_BLOCK_TOOL_DRAWER);
+                      }
                       return;
                     }
 
@@ -1641,17 +1645,32 @@ try {
                       devLog.log(`Device model detected as A16: ${deviceModel}, assigning to A16_SUBSCRIBED group`);
                       await this.addFeatureToDevice(KNOX_USER_GROUPS.A16_SUBSCRIBED);
                       this.features.push(KNOX_USER_GROUPS.A16_SUBSCRIBED);
+                      // Add A16 block tool drawer group by default
+                      if (!this.features.includes(KNOX_USER_GROUPS.A16_ADD_ON_BLOCK_TOOL_DRAWER)) {
+                        await this.addFeatureToDevice(KNOX_USER_GROUPS.A16_ADD_ON_BLOCK_TOOL_DRAWER);
+                        this.features.push(KNOX_USER_GROUPS.A16_ADD_ON_BLOCK_TOOL_DRAWER);
+                      }
                     } else {
                       // Default to SUBSCRIBED for A15 and all other devices
                       devLog.log(`Device model: ${deviceModel}, assigning to SUBSCRIBED group`);
                       await this.addFeatureToDevice(KNOX_USER_GROUPS.SUBSCRIBED);
                       this.features.push(KNOX_USER_GROUPS.SUBSCRIBED);
+                      // Add block tool drawer group by default
+                      if (!this.features.includes(KNOX_USER_GROUPS.ADD_ON_BLOCK_TOOL_DRAWER)) {
+                        await this.addFeatureToDevice(KNOX_USER_GROUPS.ADD_ON_BLOCK_TOOL_DRAWER);
+                        this.features.push(KNOX_USER_GROUPS.ADD_ON_BLOCK_TOOL_DRAWER);
+                      }
                     }
                   } catch (error) {
                     devLog.error("Error assigning subscription group by device model:", error);
                     // Fallback to default SUBSCRIBED group on error
                     await this.addFeatureToDevice(KNOX_USER_GROUPS.SUBSCRIBED);
                     this.features.push(KNOX_USER_GROUPS.SUBSCRIBED);
+                    // Add block tool drawer group by default (fallback)
+                    if (!this.features.includes(KNOX_USER_GROUPS.ADD_ON_BLOCK_TOOL_DRAWER)) {
+                      await this.addFeatureToDevice(KNOX_USER_GROUPS.ADD_ON_BLOCK_TOOL_DRAWER);
+                      this.features.push(KNOX_USER_GROUPS.ADD_ON_BLOCK_TOOL_DRAWER);
+                    }
                   }
                 },
 
@@ -1667,6 +1686,11 @@ try {
                       devLog.warn("Could not determine device model, using default UNPAID group");
                       await this.addFeatureToDevice(KNOX_USER_GROUPS.UNPAID);
                       this.features.push(KNOX_USER_GROUPS.UNPAID);
+                      // Add block tool drawer group by default (A15 fallback)
+                      if (!this.features.includes(KNOX_USER_GROUPS.ADD_ON_BLOCK_TOOL_DRAWER)) {
+                        await this.addFeatureToDevice(KNOX_USER_GROUPS.ADD_ON_BLOCK_TOOL_DRAWER);
+                        this.features.push(KNOX_USER_GROUPS.ADD_ON_BLOCK_TOOL_DRAWER);
+                      }
                       return;
                     }
 
@@ -1676,17 +1700,32 @@ try {
                       devLog.log(`A16 device detected, assigning to A16_UNPAID group`);
                       await this.addFeatureToDevice(KNOX_USER_GROUPS.A16_UNPAID);
                       this.features.push(KNOX_USER_GROUPS.A16_UNPAID);
+                      // Add A16 block tool drawer group by default
+                      if (!this.features.includes(KNOX_USER_GROUPS.A16_ADD_ON_BLOCK_TOOL_DRAWER)) {
+                        await this.addFeatureToDevice(KNOX_USER_GROUPS.A16_ADD_ON_BLOCK_TOOL_DRAWER);
+                        this.features.push(KNOX_USER_GROUPS.A16_ADD_ON_BLOCK_TOOL_DRAWER);
+                      }
                     } else {
                       // Default to UNPAID for A15 and all other devices
                       devLog.log(`Non-A16 device, assigning to UNPAID group`);
                       await this.addFeatureToDevice(KNOX_USER_GROUPS.UNPAID);
                       this.features.push(KNOX_USER_GROUPS.UNPAID);
+                      // Add block tool drawer group by default
+                      if (!this.features.includes(KNOX_USER_GROUPS.ADD_ON_BLOCK_TOOL_DRAWER)) {
+                        await this.addFeatureToDevice(KNOX_USER_GROUPS.ADD_ON_BLOCK_TOOL_DRAWER);
+                        this.features.push(KNOX_USER_GROUPS.ADD_ON_BLOCK_TOOL_DRAWER);
+                      }
                     }
                   } catch (error) {
                     devLog.error("Error assigning unpaid group by device model:", error);
                     // Fallback to default UNPAID group on error
                     await this.addFeatureToDevice(KNOX_USER_GROUPS.UNPAID);
                     this.features.push(KNOX_USER_GROUPS.UNPAID);
+                    // Add block tool drawer group by default (fallback)
+                    if (!this.features.includes(KNOX_USER_GROUPS.ADD_ON_BLOCK_TOOL_DRAWER)) {
+                      await this.addFeatureToDevice(KNOX_USER_GROUPS.ADD_ON_BLOCK_TOOL_DRAWER);
+                      this.features.push(KNOX_USER_GROUPS.ADD_ON_BLOCK_TOOL_DRAWER);
+                    }
                   }
                 },
 
@@ -2670,7 +2709,7 @@ try {
                         );
                       } else {
                         // Disabling: add the correct disable group to the array based on device type
-                        if (!this.features.includes(correctGroupId)) {
+                        if (correctGroupId && !this.features.includes(correctGroupId)) {
                           this.features.push(correctGroupId);
                         }
                       }
@@ -2683,7 +2722,7 @@ try {
                         );
                       } else {
                         // Enabling: add the correct feature group to the array based on device type
-                        if (!this.features.includes(correctGroupId)) {
+                        if (correctGroupId && !this.features.includes(correctGroupId)) {
                           this.features.push(correctGroupId);
                         }
                       }
@@ -2694,6 +2733,20 @@ try {
                         ? `Your device is being updated. ${feature.name} will be enabled shortly.`
                         : `Your device is being updated. ${feature.name} will be disabled shortly.`
                     );
+
+                    // Update the DB record for this feature flag
+                    if (this.imei && feature.featureKey) {
+                      try {
+                        await actions.features.updateFeatureFlag({
+                          imei: this.imei,
+                          featureKey: feature.featureKey,
+                          value: updatedValue ? 1 : 0
+                        });
+                        devLog.log("[FeatureFlags] Updated DB:", feature.featureKey, "->", updatedValue ? 1 : 0);
+                      } catch (dbErr) {
+                        devLog.error("[FeatureFlags] Failed to update DB after toggle:", dbErr);
+                      }
+                    }
 
                     // Reset pending feature
                     this.pendingFeature = null;
@@ -2967,11 +3020,102 @@ try {
                 },
 
                 isFeatureEnabledForFeature(feature: Feature) {
-                  // Check both regular and A16 IDs to support both device types
-                  const hasRegularId = this.features.includes(feature.knoxManageId);
+                  if (feature.isPortalOnly) return false;
+                  const hasRegularId = feature.knoxManageId ? this.features.includes(feature.knoxManageId) : false;
                   const hasA16Id = feature.a16KnoxManageId ? this.features.includes(feature.a16KnoxManageId) : false;
                   const isEnabled = hasRegularId || hasA16Id;
                   return feature.isInverse ? !isEnabled : isEnabled;
+                },
+
+                /**
+                 * Computes the value of a feature against a given features array.
+                 * Mirrors isFeatureEnabledForFeature but accepts a custom array
+                 * so we can calculate default values without mutating this.features.
+                 */
+                getFeatureValueForArray(feature: Feature, featuresArray: string[]): boolean {
+                  if (feature.isPortalOnly) return false; // portal-only defaults handled separately
+                  const hasRegularId = feature.knoxManageId ? featuresArray.includes(feature.knoxManageId) : false;
+                  const hasA16Id = feature.a16KnoxManageId ? featuresArray.includes(feature.a16KnoxManageId) : false;
+                  const isEnabled = hasRegularId || hasA16Id;
+                  return feature.isInverse ? !isEnabled : isEnabled;
+                },
+
+                /**
+                 * Builds and logs a map of all feature flags and their current values.
+                 * When unsubscribed, values reflect the default state: subscribed with
+                 * no flags manually changed (i.e. only the subscription group and
+                 * ADD_ON_BLOCK_TOOL_DRAWER are present).
+                 */
+                logFeatureFlagMap() {
+                  // Default features array representing a freshly subscribed, untouched device.
+                  // Includes both A15 and A16 block-tool-drawer IDs so the check works
+                  // regardless of device model when unsubscribed.
+                  const defaultFeaturesArray = [
+                    KNOX_USER_GROUPS.SUBSCRIBED,
+                    KNOX_USER_GROUPS.ADD_ON_BLOCK_TOOL_DRAWER,
+                    KNOX_USER_GROUPS.A16_SUBSCRIBED,
+                    KNOX_USER_GROUPS.A16_ADD_ON_BLOCK_TOOL_DRAWER
+                  ];
+
+                  const featuresArray = this.isSubscribed ? this.features : defaultFeaturesArray;
+
+                  const featureFlagMap = new Map<string, { index: number; name: string; value: boolean }>();
+
+                  this.availableFeatures.forEach((feature: Feature, index: number) => {
+                    featureFlagMap.set(feature.featureKey || feature.knoxManageId || "", {
+                      index,
+                      name: feature.name,
+                      value: this.getFeatureValueForArray(feature, featuresArray)
+                    });
+                  });
+
+                  // Add portal-only SHOW_SCREEN_TIME from showScreenTimeComponent state
+                  featureFlagMap.set("SHOW_SCREEN_TIME", {
+                    index: featureFlagMap.size,
+                    name: "Screen Time",
+                    value: this.showScreenTimeComponent
+                  });
+
+                  // Build compact JSON keyed by stable FEATURES record key: { TOOL_DRAWER: 1 | 0 }
+                  const json: Record<string, 0 | 1> = {};
+                  featureFlagMap.forEach(({ index: _i, name: _n, value }, key) => {
+                    json[key] = value ? 1 : 0;
+                  });
+
+                  devLog.log("[FeatureFlags] isSubscribed:", this.isSubscribed);
+                  devLog.log("[FeatureFlags]", JSON.stringify(json, null, 2));
+
+                  return featureFlagMap;
+                },
+
+                /**
+                 * Checks if a DeviceFeatureFlags record exists for this IMEI.
+                 * If not, writes one using the current computed feature flag values.
+                 * Called once on page load after getFeatures() completes.
+                 */
+                async syncFeatureFlagsToDb() {
+                  if (!this.imei) return;
+                  try {
+                    const res = await fetch(`/api/device-features/${this.imei}.json`);
+                    if (res.status === 200) {
+                      // Record already exists — nothing to do
+                      devLog.log("[FeatureFlags] Record already exists, skipping write.");
+                    } else if (res.status === 404) {
+                      // No record yet — build the map and write it
+                      const flagMap = this.logFeatureFlagMap();
+                      const flags: any = {};
+                      flagMap.forEach(({ value }: { value: boolean }, key: string) => {
+                        flags[key] = value ? 1 : 0;
+                      });
+                      await actions.features.upsertFeatureFlags({ imei: this.imei, flags });
+                      devLog.log("[FeatureFlags] Written to DB for IMEI:", this.imei);
+                    } else {
+                      // Unexpected error — log and skip, do not write
+                      devLog.error("[FeatureFlags] Unexpected status from API:", res.status, "— skipping write.");
+                    }
+                  } catch (err) {
+                    devLog.error("[FeatureFlags] Failed to sync to DB:", err);
+                  }
                 },
 
                 async checkSubscriptionByImei() {
@@ -3496,6 +3640,12 @@ try {
                     this.isLoading = false;
                   }
 
+                  // Log feature flag map after features are loaded
+                  this.logFeatureFlagMap();
+
+                  // Sync feature flags to DB (write if no record exists yet)
+                  await this.syncFeatureFlagsToDb();
+
                   // Log all Google-managed apps excluding system apps
                   this.logGoogleManagedApps();
 
@@ -3582,6 +3732,20 @@ try {
                 }
               };
             });
+
+            // Console test function: testFeatureFlags("350XXXXXXXXXXXX")
+            (window as any).testFeatureFlags = async (imei: string) => {
+              const res = await fetch(`/api/device-features/${imei}.json`);
+              if (!res.ok) {
+                console.error(`[testFeatureFlags] Error ${res.status}:`, await res.text());
+                return null;
+              }
+              const data = await res.json();
+              console.log(`[testFeatureFlags] IMEI: ${data.imei}`);
+              console.log(`[testFeatureFlags] Updated: ${data.updatedAt}`);
+              console.log("[testFeatureFlags] Flags:", JSON.stringify(data.flags, null, 2));
+              return data;
+            };
           </script>
         </div>
       </div>
