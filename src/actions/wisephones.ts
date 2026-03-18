@@ -1,9 +1,9 @@
 import { defineAction, ActionError } from "astro:actions";
 import { z } from "astro:schema";
-import { db, Wisephone, BypassTechlessSubscription, eq, sql } from "astro:db";
+import { db, Wisephone, BypassTechlessSubscription, DeviceFeatureFlags, eq, sql } from "astro:db";
 import { SamsungKnoxService } from "@/libs/samsung-knox-service";
 import { validateIsSubscribed } from "@/libs/stripe";
-import { isValidIMEI, devLog } from "@/libs/utils";
+import { isValidIMEI, devLog, FEATURES } from "@/libs/utils";
 
 export const wisephones = {
   // Create a new Wisephone
@@ -37,6 +37,30 @@ export const wisephones = {
         }
 
         const newWisephone = await db.insert(Wisephone).values(input).returning();
+
+        // Seed DeviceFeatureFlags from live Knox groups
+        try {
+          const groups = await SamsungKnoxService.getGroupsForDevice(input.imei.toString());
+          const flags: Record<string, number> = { SHOW_SCREEN_TIME: 0 };
+          for (const [key, feature] of Object.entries(FEATURES)) {
+            if (feature.isPortalOnly) continue;
+            const hasGroup =
+              (feature.knoxManageId ? groups.includes(feature.knoxManageId) : false) ||
+              (feature.a16KnoxManageId ? groups.includes(feature.a16KnoxManageId) : false);
+            flags[key] = (feature.isInverse ? !hasGroup : hasGroup) ? 1 : 0;
+          }
+          await db
+            .insert(DeviceFeatureFlags)
+            .values({ imei: input.imei.toString(), ...(flags as any), updatedAt: new Date() })
+            .onConflictDoUpdate({
+              target: DeviceFeatureFlags.imei,
+              set: { ...(flags as any), updatedAt: new Date() }
+            });
+          devLog.log("[FeatureFlags] Seeded from Knox on device add for IMEI:", input.imei);
+        } catch (flagsError) {
+          // Non-fatal — flags will be seeded on first manage page visit
+          devLog.error("[FeatureFlags] Failed to seed on device add:", flagsError);
+        }
 
         // Check if device is already subscribed
         // First check for bypass subscription

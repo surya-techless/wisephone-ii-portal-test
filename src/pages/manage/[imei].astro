@@ -5,6 +5,7 @@ import {
   Wisephone,
   DeviceScreenTimeMetrics,
   DeviceDataUsage,
+  DeviceFeatureFlags,
   sql,
   and,
   eq,
@@ -42,6 +43,7 @@ let user: UserResource | User | null = null;
 let enableScreenTime = false;
 let screenTimeData: any[] = [];
 let dataUsageData: { cycleStartDate?: Date; usageDetail?: any; lastSyncedAt?: Date } | null = null;
+let dbShowScreenTime: boolean = false;
 
 // Load apps.json file
 let appsJsonData: any = { rows: [] };
@@ -349,6 +351,18 @@ try {
     screenTimeData = [];
   }
 
+  // Read SHOW_SCREEN_TIME from DB — DB is source of truth for this portal-only flag
+  try {
+    const flagsRow = await db
+      .select()
+      .from(DeviceFeatureFlags)
+      .where(eq(DeviceFeatureFlags.imei, imei))
+      .get();
+    if (flagsRow) {
+      dbShowScreenTime = flagsRow.SHOW_SCREEN_TIME === 1;
+    }
+  } catch (_) {}
+
   // Installed apps will be fetched client-side asynchronously
   // Initialize as empty - will be populated after page loads
   installedApps = [];
@@ -381,6 +395,7 @@ try {
       originalDeviceName = \`${(wisephone?.nickname || "").replace(/`/g, "'")}\`;
       originalDevicePhone = \`${wisephone?.phoneNumber || "(111) 111-1111"}\`;
       enableScreenTime = ${enableScreenTime};
+      showScreenTimeComponent = ${dbShowScreenTime};
       dataUsageFormatted = \`${String((dataUsageData?.usageDetail as any)?.totalFormatted ?? "").replace(/`/g, "'")}\`;
       userName = \`${user?.firstName || ""} ${user?.lastName || ""}\`;
       userPhone = \`${wisephone?.phoneNumber || "(111) 111-1111"}\`;
@@ -2663,13 +2678,14 @@ try {
                   }
                 },
 
-                persistShowScreenTime() {
+                async persistShowScreenTime() {
                   try {
                     if (this.imei) {
-                      localStorage.setItem(
-                        `portal_showScreenTime_${this.imei}`,
-                        this.showScreenTimeComponent ? "true" : "false"
-                      );
+                      await actions.features.updateFeatureFlag({
+                        imei: this.imei,
+                        featureKey: "SHOW_SCREEN_TIME",
+                        value: this.showScreenTimeComponent ? 1 : 0
+                      });
                     }
                   } catch (_) {}
                 },
@@ -3184,30 +3200,22 @@ try {
                 },
 
                 /**
-                 * Checks if a DeviceFeatureFlags record exists for this IMEI.
-                 * If not, writes one using the current computed feature flag values.
+                 * Always upserts DeviceFeatureFlags from live Knox groups (this.features).
+                 * Knox is the source of truth for all Knox-backed flags.
+                 * SHOW_SCREEN_TIME is sourced from showScreenTimeComponent (loaded from localStorage
+                 * before this runs), so no API fetch is needed.
                  * Called once on page load after getFeatures() completes.
                  */
                 async syncFeatureFlagsToDb() {
                   if (!this.imei) return;
                   try {
-                    const res = await fetch(`/api/device-features/${this.imei}.json`);
-                    if (res.status === 200) {
-                      // Record already exists — nothing to do
-                      devLog.log("[FeatureFlags] Record already exists, skipping write.");
-                    } else if (res.status === 404) {
-                      // No record yet — build the map and write it
-                      const flagMap = this.logFeatureFlagMap();
-                      const flags: any = {};
-                      flagMap.forEach(({ value }: { value: boolean }, key: string) => {
-                        flags[key] = value ? 1 : 0;
-                      });
-                      await actions.features.upsertFeatureFlags({ imei: this.imei, flags });
-                      devLog.log("[FeatureFlags] Written to DB for IMEI:", this.imei);
-                    } else {
-                      // Unexpected error — log and skip, do not write
-                      devLog.error("[FeatureFlags] Unexpected status from API:", res.status, "— skipping write.");
-                    }
+                    const flagMap = this.logFeatureFlagMap();
+                    const flags: any = {};
+                    flagMap.forEach(({ value }: { value: boolean }, key: string) => {
+                      flags[key] = value ? 1 : 0;
+                    });
+                    await actions.features.upsertFeatureFlags({ imei: this.imei, flags });
+                    devLog.log("[FeatureFlags] Synced to DB from Knox for IMEI:", this.imei);
                   } catch (err) {
                     devLog.error("[FeatureFlags] Failed to sync to DB:", err);
                   }
@@ -3523,13 +3531,6 @@ try {
                   devLog.log("PAY DEBUG: [M0.7] Final IMEI after extraction:", this.imei);
                   devLog.log("PAY DEBUG: [M0.8] Final Device Phone after extraction:", this.devicePhone);
 
-                  // Load portal-only Screen Time visibility (per device, from localStorage)
-                  try {
-                    if (this.imei) {
-                      const stored = localStorage.getItem(`portal_showScreenTime_${this.imei}`);
-                      if (stored === "false") this.showScreenTimeComponent = false;
-                    }
-                  } catch (_) {}
 
                   // Check URL params to determine flow
                   const urlParams = new URLSearchParams(window.location.search);
