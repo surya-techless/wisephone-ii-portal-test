@@ -205,14 +205,14 @@ const { redirectUrl = "/dashboard", publishableKey, termsUrl = "#", privacyUrl =
       </div>
       <!-- Clerk bot protection: required for custom sign-up when Attack Protection is enabled (https://clerk.com/docs/custom-flows/bot-sign-up-protection) -->
       <div id="clerk-captcha" data-cl-theme="light" data-cl-size="normal" class="my-1" aria-hidden="false"></div>
-      <div class="flex items-start gap-3 mt-2">
-        <label class="flex items-start gap-2 cursor-pointer flex-1 min-w-0 pt-1">
-          <input type="checkbox" class="checkbox checkbox-primary checkbox-sm border-2 border-[var(--surface-tertiary)] shrink-0 mt-0.5" x-model="termsAgreed" />
+      <div class="flex items-center justify-between gap-4 mt-2">
+        <label class="flex items-center gap-2 cursor-pointer min-w-0">
+          <input type="checkbox" class="checkbox checkbox-primary checkbox-sm border-2 border-[var(--surface-tertiary)] shrink-0" x-model="termsAgreed" />
           <span class="text-xs leading-tight">I agree to the <a href={termsUrl} target="_blank" rel="noopener noreferrer" class="link link-primary underline">Terms</a> and <a href={privacyUrl} target="_blank" rel="noopener noreferrer" class="link link-primary underline">Privacy Policy</a>.</span>
         </label>
         <button
           type="submit"
-          class="btn btn-primary btn-sm h-10 px-6 shrink-0"
+          class="btn btn-primary btn-sm h-10 px-5 shrink-0"
           :disabled="loading"
           x-bind:disabled="loading || !termsAgreed"
         >
