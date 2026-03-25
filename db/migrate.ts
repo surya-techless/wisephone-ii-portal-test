@@ -1,5 +1,6 @@
 // db/migrate.ts
-// One-time migration: drop old screen time tables (clear data), create new one-row-per-IMEI tables.
+// One-time migration: drop old screen time tables (clear data), create new one-row-per-IMEI tables,
+// and ensure DeviceFeatureFlags has SHOW_SCREEN_TIME on legacy databases.
 // Run with: astro db execute db/migrate.ts --remote
 // Ensure config has DeviceScreenTimeMetrics and DeviceDataUsage; then run: astro db push
 
@@ -42,6 +43,31 @@ export default async function migrate() {
       )
     `);
     console.log("✅ DeviceDataUsage table ready");
+
+    // 3. Older DeviceFeatureFlags rows may exist without SHOW_SCREEN_TIME (schema added later).
+    // CREATE TABLE IF NOT EXISTS does not alter existing tables — add column when missing.
+    console.log("📊 Ensuring DeviceFeatureFlags.SHOW_SCREEN_TIME column exists...");
+    try {
+      await db.run(sql`
+        ALTER TABLE DeviceFeatureFlags ADD COLUMN SHOW_SCREEN_TIME INTEGER NOT NULL DEFAULT 0
+      `);
+      console.log("✅ DeviceFeatureFlags.SHOW_SCREEN_TIME column added");
+    } catch (alterError: unknown) {
+      const msg = alterError instanceof Error ? alterError.message : String(alterError);
+      if (
+        msg.includes("duplicate column name") ||
+        msg.includes("already exists") ||
+        /duplicate column/i.test(msg)
+      ) {
+        console.log("ℹ️  DeviceFeatureFlags.SHOW_SCREEN_TIME already present — skipping");
+      } else if (msg.includes("no such table")) {
+        console.log(
+          "ℹ️  DeviceFeatureFlags table not found — create it with: astro db execute db/migrate-feature-flags.ts --remote"
+        );
+      } else {
+        throw alterError;
+      }
+    }
 
     console.log("========================================");
     console.log("🎉 Migration completed successfully!");
