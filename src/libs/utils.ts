@@ -103,8 +103,8 @@ export const FEATURES: Record<string, Feature> = {
     isEnabled: true,
     name: "Allow Tool Drawer",
     description: "Allow the Tool Drawer to be accessible on the phone.",
-    enableMessage: "I acknowledge turning on this feature will allow the Tool Drawer to be accessible on the phone.",
-    disableMessage: "I acknowledge turning off this feature will block the Tool Drawer from being accessible on the phone.",
+    enableMessage: "I acknowledge turning on this feature will allow the Tool Drawer to be accessible directly from the device. This change may take up to an hour to take effect.",
+    disableMessage: "I acknowledge turning off this feature will remove the Tool Drawer from the device. Apps may still be downloaded from the Wisephone Portal. This change may take up to an hour to take effect.",
     isInverse: true
   },
   // FAITH_TOOLS: {

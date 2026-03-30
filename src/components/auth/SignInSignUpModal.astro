@@ -212,11 +212,11 @@ const { redirectUrl = "/dashboard", publishableKey, termsUrl = "#", privacyUrl =
         </label>
         <button
           type="submit"
-          class="btn btn-primary btn-sm h-10 px-5 shrink-0"
+          class="btn btn-primary btn-sm px-4 shrink-0"
           :disabled="loading"
           x-bind:disabled="loading || !termsAgreed"
         >
-          <span x-show="!loading">Continue</span>
+          <span x-show="!loading">Sign up</span>
           <span x-show="loading" x-cloak>Creating…</span>
         </button>
       </div>

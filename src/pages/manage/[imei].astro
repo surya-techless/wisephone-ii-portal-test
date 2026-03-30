@@ -950,7 +950,7 @@ try {
                       <div class="flex-1 min-w-0">
                         <h4 class="text-sm font-semibold text-gray-900">Screen Time</h4>
                         <p class="text-sm text-gray-600 mt-0.5">
-                          Show screen time and data usage on the Device Info tab for this device.
+                          Show screen time on the Device Info tab for this device.
                         </p>
                       </div>
                       <label class="relative inline-flex items-center cursor-pointer flex-shrink-0">
@@ -1222,7 +1222,7 @@ try {
               x-show="showConfirmModal"
               x-cloak
               @click.self="cancelFeatureToggle()"
-              class="absolute inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4"
+              class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4"
             >
               <div @click.stop class="bg-white rounded-lg shadow-xl max-w-md w-full p-6 space-y-4">
                 <h3 class="text-lg font-semibold text-gray-900">Are you sure?</h3>
@@ -1252,7 +1252,7 @@ try {
               x-show="showAppInstallModal"
               x-cloak
               @click.self="cancelAppInstall()"
-              class="absolute inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4"
+              class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4"
             >
               <div @click.stop class="bg-white rounded-lg shadow-xl max-w-md w-full p-6 space-y-4">
                 <h3 class="text-lg font-semibold text-gray-900">
@@ -1281,7 +1281,7 @@ try {
               x-show="showAppUninstallModal"
               x-cloak
               @click.self="cancelAppUninstall()"
-              class="absolute inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4"
+              class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4"
             >
               <div @click.stop class="bg-white rounded-lg shadow-xl max-w-md w-full p-6 space-y-4">
                 <h3 class="text-lg font-semibold text-gray-900">
@@ -1304,6 +1304,35 @@ try {
                     class="px-4 py-2 text-sm font-medium text-gray-900 bg-white border border-gray-300 rounded hover:bg-gray-50 transition-colors"
                   >
                     Uninstall
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Screen Time Confirmation Modal -->
+            <div
+              x-show="showScreenTimeConfirmModal"
+              x-cloak
+              @click.self="cancelScreenTimeToggle()"
+              class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4"
+            >
+              <div @click.stop class="bg-white rounded-lg shadow-xl max-w-md w-full p-6 space-y-4">
+                <h3 class="text-lg font-semibold text-gray-900">Are you sure?</h3>
+
+                <p class="text-sm text-gray-700 leading-relaxed" x-text="pendingScreenTimeValue ? 'I acknowledge turning on this feature will enable screen time metrics to be shown in the Wisephone Portal.' : 'I acknowledge turning off this feature will disable screen time metrics to be shown in the Wisephone Portal.'"></p>
+
+                <div class="flex justify-end gap-3 pt-2">
+                  <button
+                    @click="cancelScreenTimeToggle()"
+                    class="px-4 py-2 text-sm font-medium text-white bg-gray-800 rounded hover:bg-gray-700 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    @click="confirmScreenTimeToggle()"
+                    class="px-4 py-2 text-sm font-medium text-gray-900 bg-white border border-gray-300 rounded hover:bg-gray-50 transition-colors"
+                    x-text="pendingScreenTimeValue ? 'Turn On' : 'Turn Off'"
+                  >
                   </button>
                 </div>
               </div>
@@ -1392,7 +1421,7 @@ try {
               x-show="showRemoveModal"
               x-cloak
               @click.self="showRemoveModal = false"
-              class="absolute inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4"
+              class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4"
             >
               <div @click.stop class="bg-white rounded-lg shadow-xl max-w-md w-full p-6 space-y-4">
                 <h3 class="text-lg font-semibold text-gray-900">Remove Device?</h3>
@@ -1491,6 +1520,8 @@ try {
                 pendingFeature: null as Feature | null,
                 pendingFeatureEnabled: false,
                 confirmationMessage: "",
+                showScreenTimeConfirmModal: false,
+                pendingScreenTimeValue: false,
                 showDisclosureFor: null as string | null,
                 showAppInstallModal: false,
                 pendingAppToInstall: null as string | null,
@@ -2770,7 +2801,18 @@ try {
                   }
                 },
 
-                async persistShowScreenTime() {
+                persistShowScreenTime() {
+                  // Capture the intended value before reverting
+                  this.pendingScreenTimeValue = this.showScreenTimeComponent;
+                  // Revert the checkbox until the user confirms
+                  this.showScreenTimeComponent = !this.showScreenTimeComponent;
+                  // Show confirmation modal
+                  this.showScreenTimeConfirmModal = true;
+                },
+
+                async confirmScreenTimeToggle() {
+                  this.showScreenTimeComponent = this.pendingScreenTimeValue;
+                  this.showScreenTimeConfirmModal = false;
                   try {
                     if (this.imei) {
                       await actions.features.updateFeatureFlag({
@@ -2780,6 +2822,11 @@ try {
                       });
                     }
                   } catch (_) {}
+                },
+
+                cancelScreenTimeToggle() {
+                  this.showScreenTimeConfirmModal = false;
+                  this.pendingScreenTimeValue = false;
                 },
 
                 async toggleFeature(feature: Feature) {
