@@ -1716,6 +1716,9 @@ try {
                       this.features = data.groups || [];
                       this.deviceInfo = data.deviceInfo || null;
                     }
+                    const BLOCK_TD = "ADD_ON_BLOCK_TOOL_DRAWER";
+                    devLog.log("[TDIP] getFeatures() refreshed — ADD_ON_BLOCK_TOOL_DRAWER present:", this.features.some(f => f.includes("BLOCK_TOOL_DRAWER")));
+                    devLog.log("[TDIP] getFeatures() full list:", JSON.stringify(this.features));
                   } catch (error) {
                     devLog.error("Error fetching features:", error);
                     this.showErrorToast("Failed to load device features. Please try again.");
@@ -1809,6 +1812,7 @@ try {
                         this.features.push(KNOX_USER_GROUPS.SUBSCRIBED);
                       }
                       // Add block tool drawer group by default (A15 fallback)
+                      devLog.log("[TDIP] assignSubscriptionGroup — no model, adding ADD_ON_BLOCK_TOOL_DRAWER");
                       if (!this.features.includes(KNOX_USER_GROUPS.ADD_ON_BLOCK_TOOL_DRAWER)) {
                         await this.addFeatureToDevice(KNOX_USER_GROUPS.ADD_ON_BLOCK_TOOL_DRAWER);
                         this.features.push(KNOX_USER_GROUPS.ADD_ON_BLOCK_TOOL_DRAWER);
@@ -1826,6 +1830,7 @@ try {
                         this.features.push(KNOX_USER_GROUPS.A16_SUBSCRIBED);
                       }
                       // Add A16 block tool drawer group by default
+                      devLog.log("[TDIP] assignSubscriptionGroup — A16, adding A16_ADD_ON_BLOCK_TOOL_DRAWER");
                       if (!this.features.includes(KNOX_USER_GROUPS.A16_ADD_ON_BLOCK_TOOL_DRAWER)) {
                         await this.addFeatureToDevice(KNOX_USER_GROUPS.A16_ADD_ON_BLOCK_TOOL_DRAWER);
                         this.features.push(KNOX_USER_GROUPS.A16_ADD_ON_BLOCK_TOOL_DRAWER);
@@ -1838,6 +1843,7 @@ try {
                         this.features.push(KNOX_USER_GROUPS.SUBSCRIBED);
                       }
                       // Add block tool drawer group by default
+                      devLog.log("[TDIP] assignSubscriptionGroup — A15, adding ADD_ON_BLOCK_TOOL_DRAWER");
                       if (!this.features.includes(KNOX_USER_GROUPS.ADD_ON_BLOCK_TOOL_DRAWER)) {
                         await this.addFeatureToDevice(KNOX_USER_GROUPS.ADD_ON_BLOCK_TOOL_DRAWER);
                         this.features.push(KNOX_USER_GROUPS.ADD_ON_BLOCK_TOOL_DRAWER);
@@ -1851,6 +1857,7 @@ try {
                       this.features.push(KNOX_USER_GROUPS.SUBSCRIBED);
                     }
                     // Add block tool drawer group by default (fallback)
+                    devLog.log("[TDIP] assignSubscriptionGroup — error fallback, adding ADD_ON_BLOCK_TOOL_DRAWER");
                     if (!this.features.includes(KNOX_USER_GROUPS.ADD_ON_BLOCK_TOOL_DRAWER)) {
                       await this.addFeatureToDevice(KNOX_USER_GROUPS.ADD_ON_BLOCK_TOOL_DRAWER);
                       this.features.push(KNOX_USER_GROUPS.ADD_ON_BLOCK_TOOL_DRAWER);
@@ -1957,6 +1964,7 @@ try {
                  * Ensures the device has at least one base group
                  */
                 async ensureBaseGroup(userGroups: string[]) {
+                  if (this.SKIP_BASE_GROUP_ASSIGNMENT) return;
                   const hasBaseGroup = userGroups.some(
                     (group) =>
                       group === KNOX_USER_GROUPS.UNPAID ||
@@ -2856,6 +2864,11 @@ try {
                     const currentEnabled = this.isFeatureEnabledForFeature(feature);
                     const updatedValue = !currentEnabled;
 
+                    if (feature.featureKey === "TOOL_DRAWER_IN_PHONE") {
+                      devLog.log("[TDIP] toggleFeature called — currentEnabled:", currentEnabled, "→ updatedValue:", updatedValue);
+                      devLog.log("[TDIP] features at toggle time:", JSON.stringify(this.features));
+                    }
+
                     // Store the pending feature change
                     this.pendingFeature = feature;
                     this.pendingFeatureEnabled = updatedValue;
@@ -2896,6 +2909,10 @@ try {
                     // Determine device type and use appropriate group ID
                     const isA16 = this.isA16Device();
 
+                    if (feature.featureKey === "TOOL_DRAWER_IN_PHONE") {
+                      devLog.log("[TDIP] confirmFeatureToggle — isInverse:", isInverse, "apiEnabled sent to Knox:", apiEnabled, "isA16:", isA16);
+                    }
+
                     await featureManagement.toggleFeature({
                       imei: this.imei,
                       feature,
@@ -2910,16 +2927,27 @@ try {
                     const correctGroupId =
                       isA16 && feature.a16KnoxManageId ? feature.a16KnoxManageId : feature.knoxManageId;
 
+                    if (feature.featureKey === "TOOL_DRAWER_IN_PHONE") {
+                      devLog.log("[TDIP] features BEFORE local update:", JSON.stringify(this.features));
+                      devLog.log("[TDIP] correctGroupId:", correctGroupId, "updatedValue:", updatedValue);
+                    }
+
                     if (isInverse) {
                       if (updatedValue) {
                         // Enabling: remove both regular and A16 disable groups from the array
                         this.features = this.features.filter(
                           (id) => id !== feature.knoxManageId && id !== feature.a16KnoxManageId
                         );
+                        if (feature.featureKey === "TOOL_DRAWER_IN_PHONE") {
+                          devLog.log("[TDIP] features AFTER local update (enabled — group removed):", JSON.stringify(this.features));
+                        }
                       } else {
                         // Disabling: add the correct disable group to the array based on device type
                         if (correctGroupId && !this.features.includes(correctGroupId)) {
                           this.features.push(correctGroupId);
+                        }
+                        if (feature.featureKey === "TOOL_DRAWER_IN_PHONE") {
+                          devLog.log("[TDIP] features AFTER local update (disabled — group added):", JSON.stringify(this.features));
                         }
                       }
                     } else {
@@ -2962,7 +2990,9 @@ try {
                       const tdip = (this.availableFeatures as Feature[]).find(
                         (f: Feature) => f.featureKey === "TOOL_DRAWER_IN_PHONE"
                       );
+                      devLog.log("[TDIP] TOOL_DRAWER turned off — checking cascade. tdip found:", !!tdip, "isEnabled:", tdip ? this.isFeatureEnabledForFeature(tdip) : "n/a");
                       if (tdip && this.isFeatureEnabledForFeature(tdip)) {
+                        devLog.log("[TDIP] Cascade triggered — force-disabling TOOL_DRAWER_IN_PHONE");
                         await this.forceDisableFeature(tdip);
                       }
                     }
@@ -2984,6 +3014,9 @@ try {
                  * Used for cascading toggles (e.g. TOOL_DRAWER off → TOOL_DRAWER_IN_PHONE off).
                  */
                 async forceDisableFeature(feature: Feature) {
+                  if (feature.featureKey === "TOOL_DRAWER_IN_PHONE") {
+                    devLog.log("[TDIP] forceDisableFeature called — features before:", JSON.stringify(this.features));
+                  }
                   try {
                     const isInverse = feature.isInverse || false;
                     const isA16 = this.isA16Device();
@@ -3853,7 +3886,7 @@ try {
                   // Watch for features changes to manage Knox groups and load Tool Drawer
                   this.$watch("features", async (userGroups: string[]) => {
                     // Check if device is subscribed but doesn't have any subscription group
-                    if (this.isSubscribed) {
+                    if (!this.SKIP_BASE_GROUP_ASSIGNMENT && this.isSubscribed) {
                       const hasSubscribedGroup =
                         userGroups.includes(KNOX_USER_GROUPS.SUBSCRIBED) ||
                         userGroups.includes(KNOX_USER_GROUPS.A16_SUBSCRIBED);
