@@ -1522,7 +1522,6 @@ try {
                 confirmationMessage: "",
                 showScreenTimeConfirmModal: false,
                 pendingScreenTimeValue: false,
-                SKIP_BASE_GROUP_ASSIGNMENT: true, // TESTING ONLY — set to false to re-enable
                 showDisclosureFor: null as string | null,
                 showAppInstallModal: false,
                 pendingAppToInstall: null as string | null,
@@ -1807,10 +1806,8 @@ try {
                     const deviceModel = await this.getDeviceModelFromKnox();
                     if (!deviceModel) {
                       devLog.warn("Could not determine device model, using default SUBSCRIBED group");
-                      if (!this.SKIP_BASE_GROUP_ASSIGNMENT) {
-                        await this.addFeatureToDevice(KNOX_USER_GROUPS.SUBSCRIBED);
-                        this.features.push(KNOX_USER_GROUPS.SUBSCRIBED);
-                      }
+                      await this.addFeatureToDevice(KNOX_USER_GROUPS.SUBSCRIBED);
+                      this.features.push(KNOX_USER_GROUPS.SUBSCRIBED);
                       // Add block tool drawer group by default (A15 fallback)
                       devLog.log("[TDIP] assignSubscriptionGroup — no model, adding ADD_ON_BLOCK_TOOL_DRAWER");
                       if (!this.features.includes(KNOX_USER_GROUPS.ADD_ON_BLOCK_TOOL_DRAWER)) {
@@ -1825,10 +1822,8 @@ try {
                     // Check if device is A16
                     if (modelUpper.includes("A16") || modelUpper.includes("SM-A16")) {
                       devLog.log(`Device model detected as A16: ${deviceModel}, assigning to A16_SUBSCRIBED group`);
-                      if (!this.SKIP_BASE_GROUP_ASSIGNMENT) {
-                        await this.addFeatureToDevice(KNOX_USER_GROUPS.A16_SUBSCRIBED);
-                        this.features.push(KNOX_USER_GROUPS.A16_SUBSCRIBED);
-                      }
+                      await this.addFeatureToDevice(KNOX_USER_GROUPS.A16_SUBSCRIBED);
+                      this.features.push(KNOX_USER_GROUPS.A16_SUBSCRIBED);
                       // Add A16 block tool drawer group by default
                       devLog.log("[TDIP] assignSubscriptionGroup — A16, adding A16_ADD_ON_BLOCK_TOOL_DRAWER");
                       if (!this.features.includes(KNOX_USER_GROUPS.A16_ADD_ON_BLOCK_TOOL_DRAWER)) {
@@ -1838,10 +1833,8 @@ try {
                     } else {
                       // Default to SUBSCRIBED for A15 and all other devices
                       devLog.log(`Device model: ${deviceModel}, assigning to SUBSCRIBED group`);
-                      if (!this.SKIP_BASE_GROUP_ASSIGNMENT) {
-                        await this.addFeatureToDevice(KNOX_USER_GROUPS.SUBSCRIBED);
-                        this.features.push(KNOX_USER_GROUPS.SUBSCRIBED);
-                      }
+                      await this.addFeatureToDevice(KNOX_USER_GROUPS.SUBSCRIBED);
+                      this.features.push(KNOX_USER_GROUPS.SUBSCRIBED);
                       // Add block tool drawer group by default
                       devLog.log("[TDIP] assignSubscriptionGroup — A15, adding ADD_ON_BLOCK_TOOL_DRAWER");
                       if (!this.features.includes(KNOX_USER_GROUPS.ADD_ON_BLOCK_TOOL_DRAWER)) {
@@ -1852,10 +1845,8 @@ try {
                   } catch (error) {
                     devLog.error("Error assigning subscription group by device model:", error);
                     // Fallback to default SUBSCRIBED group on error
-                    if (!this.SKIP_BASE_GROUP_ASSIGNMENT) {
-                      await this.addFeatureToDevice(KNOX_USER_GROUPS.SUBSCRIBED);
-                      this.features.push(KNOX_USER_GROUPS.SUBSCRIBED);
-                    }
+                    await this.addFeatureToDevice(KNOX_USER_GROUPS.SUBSCRIBED);
+                    this.features.push(KNOX_USER_GROUPS.SUBSCRIBED);
                     // Add block tool drawer group by default (fallback)
                     devLog.log("[TDIP] assignSubscriptionGroup — error fallback, adding ADD_ON_BLOCK_TOOL_DRAWER");
                     if (!this.features.includes(KNOX_USER_GROUPS.ADD_ON_BLOCK_TOOL_DRAWER)) {
@@ -1875,10 +1866,8 @@ try {
                     const deviceModel = await this.getDeviceModelFromKnox();
                     if (!deviceModel) {
                       devLog.warn("Could not determine device model, using default UNPAID group");
-                      if (!this.SKIP_BASE_GROUP_ASSIGNMENT) {
-                        await this.addFeatureToDevice(KNOX_USER_GROUPS.UNPAID);
-                        this.features.push(KNOX_USER_GROUPS.UNPAID);
-                      }
+                      await this.addFeatureToDevice(KNOX_USER_GROUPS.UNPAID);
+                      this.features.push(KNOX_USER_GROUPS.UNPAID);
                       // Add block tool drawer group by default (A15 fallback)
                       if (!this.features.includes(KNOX_USER_GROUPS.ADD_ON_BLOCK_TOOL_DRAWER)) {
                         await this.addFeatureToDevice(KNOX_USER_GROUPS.ADD_ON_BLOCK_TOOL_DRAWER);
@@ -1891,10 +1880,8 @@ try {
 
                     if (modelUpper.includes("A16") || modelUpper.includes("SM-A16")) {
                       devLog.log(`A16 device detected, assigning to A16_UNPAID group`);
-                      if (!this.SKIP_BASE_GROUP_ASSIGNMENT) {
-                        await this.addFeatureToDevice(KNOX_USER_GROUPS.A16_UNPAID);
-                        this.features.push(KNOX_USER_GROUPS.A16_UNPAID);
-                      }
+                      await this.addFeatureToDevice(KNOX_USER_GROUPS.A16_UNPAID);
+                      this.features.push(KNOX_USER_GROUPS.A16_UNPAID);
                       // Add A16 block tool drawer group by default
                       if (!this.features.includes(KNOX_USER_GROUPS.A16_ADD_ON_BLOCK_TOOL_DRAWER)) {
                         await this.addFeatureToDevice(KNOX_USER_GROUPS.A16_ADD_ON_BLOCK_TOOL_DRAWER);
@@ -1903,10 +1890,8 @@ try {
                     } else {
                       // Default to UNPAID for A15 and all other devices
                       devLog.log(`Non-A16 device, assigning to UNPAID group`);
-                      if (!this.SKIP_BASE_GROUP_ASSIGNMENT) {
-                        await this.addFeatureToDevice(KNOX_USER_GROUPS.UNPAID);
-                        this.features.push(KNOX_USER_GROUPS.UNPAID);
-                      }
+                      await this.addFeatureToDevice(KNOX_USER_GROUPS.UNPAID);
+                      this.features.push(KNOX_USER_GROUPS.UNPAID);
                       // Add block tool drawer group by default
                       if (!this.features.includes(KNOX_USER_GROUPS.ADD_ON_BLOCK_TOOL_DRAWER)) {
                         await this.addFeatureToDevice(KNOX_USER_GROUPS.ADD_ON_BLOCK_TOOL_DRAWER);
@@ -1916,10 +1901,8 @@ try {
                   } catch (error) {
                     devLog.error("Error assigning unpaid group by device model:", error);
                     // Fallback to default UNPAID group on error
-                    if (!this.SKIP_BASE_GROUP_ASSIGNMENT) {
-                      await this.addFeatureToDevice(KNOX_USER_GROUPS.UNPAID);
-                      this.features.push(KNOX_USER_GROUPS.UNPAID);
-                    }
+                    await this.addFeatureToDevice(KNOX_USER_GROUPS.UNPAID);
+                    this.features.push(KNOX_USER_GROUPS.UNPAID);
                     // Add block tool drawer group by default (fallback)
                     if (!this.features.includes(KNOX_USER_GROUPS.ADD_ON_BLOCK_TOOL_DRAWER)) {
                       await this.addFeatureToDevice(KNOX_USER_GROUPS.ADD_ON_BLOCK_TOOL_DRAWER);
@@ -1964,7 +1947,6 @@ try {
                  * Ensures the device has at least one base group
                  */
                 async ensureBaseGroup(userGroups: string[]) {
-                  if (this.SKIP_BASE_GROUP_ASSIGNMENT) return;
                   const hasBaseGroup = userGroups.some(
                     (group) =>
                       group === KNOX_USER_GROUPS.UNPAID ||
@@ -3886,7 +3868,7 @@ try {
                   // Watch for features changes to manage Knox groups and load Tool Drawer
                   this.$watch("features", async (userGroups: string[]) => {
                     // Check if device is subscribed but doesn't have any subscription group
-                    if (!this.SKIP_BASE_GROUP_ASSIGNMENT && this.isSubscribed) {
+                    if (this.isSubscribed) {
                       const hasSubscribedGroup =
                         userGroups.includes(KNOX_USER_GROUPS.SUBSCRIBED) ||
                         userGroups.includes(KNOX_USER_GROUPS.A16_SUBSCRIBED);
