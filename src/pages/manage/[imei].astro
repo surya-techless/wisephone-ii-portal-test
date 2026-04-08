@@ -1718,6 +1718,13 @@ try {
                     const BLOCK_TD = "ADD_ON_BLOCK_TOOL_DRAWER";
                     devLog.log("[TDIP] getFeatures() refreshed — ADD_ON_BLOCK_TOOL_DRAWER present:", this.features.some(f => f.includes("BLOCK_TOOL_DRAWER")));
                     devLog.log("[TDIP] getFeatures() full list:", JSON.stringify(this.features));
+
+                    // Build a reverse map: Knox group ID → name
+                    const knoxGroupIdToName = Object.fromEntries(
+                      Object.entries(KNOX_USER_GROUPS).map(([name, id]) => [id.trim(), name])
+                    );
+                    const mappedGroups = this.features.map((id: string) => knoxGroupIdToName[id.trim()] ?? `UNKNOWN (${id})`);
+                    devLog.log(`[Knox Groups] IMEI ${this.imei} belongs to:`, mappedGroups);
                   } catch (error) {
                     devLog.error("Error fetching features:", error);
                     this.showErrorToast("Failed to load device features. Please try again.");
