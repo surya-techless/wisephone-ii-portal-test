@@ -76,7 +76,7 @@ export const KNOX_USER_GROUPS = {
   A16_UNPAID: "bc9ef35416a74023a26b28b46827bbf7",
   A16_ADD_ON_GOOGLE_APPS: "3a4c1a51878f4610a2de2d54a50bc31b",
   A16_ADD_ON_BLOCK_TOOL_DRAWER: "07adbb1d5145473eaf5fd911e017e75e",
-  CSPIRE_WPII_Unpaid_v2:"Fa681b06021142e3bc5595a4e5c9983f ",
+  CSPIRE_WPII_Unpaid_v2:"fa681b06021142e3bc5595a4e5c9983f",
   CSPIRE_WPII_Subscribed:"10a69871e5d145078520b352120b2b72"
   // "Add-on- WPII - Block-Tool Drawer" Knox group — applying this group blocks the Tool Drawer on the phone
 
@@ -103,8 +103,8 @@ export const FEATURES: Record<string, Feature> = {
     a16KnoxManageId: KNOX_USER_GROUPS.A16_ADD_ON_BLOCK_TOOL_DRAWER,
     lucideIcon: "smartphone",
     isEnabled: true,
-    name: "Allow Tool Drawer",
-    description: "Allow the Tool Drawer to be accessible on the phone.",
+    name: "Allow Access Directly on Device",
+    description: "Controls whether the Tool Drawer is directly accessible on the device without needing to log in to the Wisephone Portal.",
     enableMessage: "I acknowledge turning on this feature will allow the Tool Drawer to be accessible directly from the device. This change may take up to an hour to take effect.",
     disableMessage: "I acknowledge turning off this feature will remove the Tool Drawer from the device. Apps may still be downloaded from the Wisephone Portal. This change may take up to an hour to take effect.",
     isInverse: true
@@ -184,7 +184,7 @@ export const FEATURES: Record<string, Feature> = {
     isEnabled: true,
     isPortalOnly: true,
     name: "Screen Time",
-    description: "Show screen time and data usage on the Device Info tab for this device.",
+    description: "Show screen time and data usage on the Device Info tab for this device. Metrics may take up to a day to load.",
     enableMessage: "I acknowledge turning on this feature will show screen time on the Device Info tab.",
     disableMessage: "I acknowledge turning off this feature will hide screen time on the Device Info tab."
   }

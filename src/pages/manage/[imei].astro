@@ -266,7 +266,16 @@ try {
         const weeksArr = detail?.weeks ?? [];
         devLog.log("📊 DeviceScreenTimeMetrics weeks found:", weeksArr.length);
 
-        screenTimeData = weeksArr.slice(0, 4).map((week, idx) => {
+        const fourWeeksAgo = new Date();
+        fourWeeksAgo.setDate(fourWeeksAgo.getDate() - 28);
+
+        screenTimeData = weeksArr
+          .filter((week) => new Date(week.weekEndDate + "T23:59:59.999Z") >= fourWeeksAgo)
+          .sort(
+            (a, b) => new Date(b.weekStartDate).getTime() - new Date(a.weekStartDate).getTime()
+          )
+          .slice(0, 4)
+          .map((week, idx) => {
           const weekStartDate = new Date(week.weekStartDate + "T00:00:00.000Z");
           const weekEndDate = new Date(week.weekEndDate + "T23:59:59.999Z");
           const totalScreenTimeMs = week.totalScreenTimeMs ?? 0;
@@ -889,54 +898,90 @@ try {
                 <div class="space-y-3" :class="{ 'opacity-50 pointer-events-none': !isSubscribed }">
                   <template x-for="feature in availableFeatures.filter(f => f.featureKey !== 'TOOL_DRAWER_IN_PHONE' && !f.isPortalOnly)" :key="feature.knoxManageId">
                     <div
-                      class="flex items-center justify-between p-4 border border-gray-300 rounded-lg transition-colors"
+                      class="border border-gray-300 rounded-lg transition-colors"
                       :class="{ 'hover:bg-gray-50 cursor-pointer': isSubscribed, 'cursor-not-allowed': !isSubscribed }"
                     >
-                      <div class="flex-1 pr-4">
-                        <div class="flex items-center gap-2 mb-0.5 relative">
-                          <h4 class="text-sm font-semibold text-gray-900" x-text="feature.name"></h4>
-                          <button
-                            x-show="feature.disclosure"
-                            @click.stop="showDisclosureFor = (showDisclosureFor === feature.featureKey ? null : feature.featureKey)"
-                            class="text-gray-500 hover:text-gray-700 transition-colors"
-                          >
-                            <Icon name="lucide:info" class="w-4 h-4" />
-                          </button>
-                          <span class="text-xs text-gray-500" x-show="feature.isBeta">(beta)</span>
+                      <!-- Main feature row -->
+                      <div class="flex items-center justify-between p-4">
+                        <div class="flex-1 pr-4">
+                          <div class="flex items-center gap-2 mb-0.5 relative">
+                            <h4 class="text-sm font-semibold text-gray-900" x-text="feature.name"></h4>
+                            <button
+                              x-show="feature.disclosure"
+                              @click.stop="showDisclosureFor = (showDisclosureFor === feature.featureKey ? null : feature.featureKey)"
+                              class="text-gray-500 hover:text-gray-700 transition-colors"
+                            >
+                              <Icon name="lucide:info" class="w-4 h-4" />
+                            </button>
+                            <span class="text-xs text-gray-500" x-show="feature.isBeta">(beta)</span>
 
-                          <!-- Disclosure Popup -->
-                          <div
-                            x-show="showDisclosureFor === feature.featureKey"
-                            x-cloak
-                            @click.outside="showDisclosureFor = null"
-                            class="absolute left-0 top-full mt-2 z-10 bg-white border border-gray-300 rounded-lg shadow-lg p-4 w-80 max-w-md"
-                          >
-                            <div class="flex items-start justify-between gap-2 mb-2">
-                              <p class="text-sm font-medium text-gray-900">Disclosure:</p>
-                              <button
-                                @click.stop="showDisclosureFor = null"
-                                class="text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0"
-                              >
-                                <Icon name="lucide:x" class="w-4 h-4" />
-                              </button>
+                            <!-- Disclosure Popup -->
+                            <div
+                              x-show="showDisclosureFor === feature.featureKey"
+                              x-cloak
+                              @click.outside="showDisclosureFor = null"
+                              class="absolute left-0 top-full mt-2 z-10 bg-white border border-gray-300 rounded-lg shadow-lg p-4 w-80 max-w-md"
+                            >
+                              <div class="flex items-start justify-between gap-2 mb-2">
+                                <p class="text-sm font-medium text-gray-900">Disclosure:</p>
+                                <button
+                                  @click.stop="showDisclosureFor = null"
+                                  class="text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0"
+                                >
+                                  <Icon name="lucide:x" class="w-4 h-4" />
+                                </button>
+                              </div>
+                              <p class="text-sm text-gray-700 leading-relaxed" x-text="feature.disclosure"></p>
                             </div>
-                            <p class="text-sm text-gray-700 leading-relaxed" x-text="feature.disclosure"></p>
                           </div>
+                          <p class="text-sm text-gray-600 leading-snug" x-text="feature.description"></p>
                         </div>
-                        <p class="text-sm text-gray-600 leading-snug" x-text="feature.description"></p>
+                        <label class="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                          <input
+                            type="checkbox"
+                            class="sr-only peer"
+                            :checked="isFeatureEnabledForFeature(feature)"
+                            @click.prevent="toggleFeature(feature)"
+                          />
+                          <div
+                            class="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-5 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-teal-600"
+                          >
+                          </div>
+                        </label>
                       </div>
-                      <label class="relative inline-flex items-center cursor-pointer flex-shrink-0">
-                        <input
-                          type="checkbox"
-                          class="sr-only peer"
-                          :checked="isFeatureEnabledForFeature(feature)"
-                          @click.prevent="toggleFeature(feature)"
-                        />
-                        <div
-                          class="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-5 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-teal-600"
-                        >
+
+                      <!-- Allow Access Directly on Device — inside Tool Drawer box, only when Tool Drawer is ON -->
+                      <div
+                        x-show="feature.featureKey === 'TOOL_DRAWER' && isFeatureEnabledForFeature(feature) && toolDrawerInPhoneFeature"
+                        x-cloak
+                        class="border-t border-gray-200 mx-4 pb-4"
+                        @click.stop
+                      >
+                        <div class="flex items-center justify-between pt-3">
+                          <div class="flex-1 pr-4">
+                            <h4
+                              class="text-sm font-semibold text-gray-900"
+                              x-text="toolDrawerInPhoneFeature && toolDrawerInPhoneFeature.name"
+                            ></h4>
+                            <p
+                              class="text-sm text-gray-600 leading-snug mt-0.5"
+                              x-text="toolDrawerInPhoneFeature && toolDrawerInPhoneFeature.description"
+                            ></p>
+                          </div>
+                          <label class="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                            <input
+                              type="checkbox"
+                              class="sr-only peer"
+                              :checked="toolDrawerInPhoneFeature && isFeatureEnabledForFeature(toolDrawerInPhoneFeature)"
+                              @click.prevent="toolDrawerInPhoneFeature && toggleFeature(toolDrawerInPhoneFeature)"
+                              :disabled="!isSubscribed"
+                            />
+                            <div
+                              class="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-5 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-teal-600"
+                            ></div>
+                          </label>
                         </div>
-                      </label>
+                      </div>
                     </div>
                   </template>
 
@@ -950,7 +995,7 @@ try {
                       <div class="flex-1 min-w-0">
                         <h4 class="text-sm font-semibold text-gray-900">Screen Time</h4>
                         <p class="text-sm text-gray-600 mt-0.5">
-                          Show screen time on the Device Info tab for this device.
+                          Show screen time on the Device Info tab for this device. Metrics may take up to a day to load.
                         </p>
                       </div>
                       <label class="relative inline-flex items-center cursor-pointer flex-shrink-0">
@@ -1146,40 +1191,6 @@ try {
                   </div>
                 </div>
 
-                <!-- Allow Tool Drawer Toggle -->
-                <div
-                  x-show="toolDrawerInPhoneFeature"
-                  x-cloak
-                  class="mt-4 md:max-w-[500px]"
-                >
-                  <div
-                    class="flex items-center justify-between p-4 border border-gray-300 rounded-lg transition-colors"
-                    :class="isSubscribed ? 'hover:bg-gray-50 cursor-pointer' : 'opacity-50 cursor-not-allowed'"
-                  >
-                    <div class="flex-1 pr-4">
-                      <h4
-                        class="text-sm font-semibold text-gray-900"
-                        x-text="toolDrawerInPhoneFeature && toolDrawerInPhoneFeature.name"
-                      ></h4>
-                      <p
-                        class="text-sm text-gray-600 leading-snug mt-0.5"
-                        x-text="toolDrawerInPhoneFeature && toolDrawerInPhoneFeature.description"
-                      ></p>
-                    </div>
-                    <label class="relative inline-flex items-center cursor-pointer flex-shrink-0">
-                      <input
-                        type="checkbox"
-                        class="sr-only peer"
-                        :checked="toolDrawerInPhoneFeature && isFeatureEnabledForFeature(toolDrawerInPhoneFeature)"
-                        @click.prevent="toolDrawerInPhoneFeature && toggleFeature(toolDrawerInPhoneFeature)"
-                        :disabled="!isSubscribed"
-                      />
-                      <div
-                        class="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-5 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-teal-600"
-                      ></div>
-                    </label>
-                  </div>
-                </div>
               </div>
             </div>
 
@@ -1503,6 +1514,7 @@ try {
                 /** Portal-only: show Screen Time block on Device Info tab (persisted in localStorage per IMEI) */
                 showScreenTimeComponent: true,
                 deviceInfo: null as { resultValue?: { [key: string]: any } } | null,
+                deviceType: "" as "CSPIRE" | "WPII" | "",
 
                 isEditing: false,
                 devicePhone: "",
@@ -1706,15 +1718,19 @@ try {
                     const data = await res.json();
 
                     // Handle both old format (array) and new format (object with groups and deviceInfo)
-                    if (Array.isArray(data)) {
-                      // Old format - backward compatibility
-                      this.features = data;
-                      this.deviceInfo = null;
-                    } else {
-                      // New format - includes device info
-                      this.features = data.groups || [];
-                      this.deviceInfo = data.deviceInfo || null;
-                    }
+                    const groups: string[] = Array.isArray(data) ? data : (data.groups || []);
+                    const deviceInfo = Array.isArray(data) ? null : (data.deviceInfo || null);
+
+                    // Compute deviceType BEFORE assigning to this.features so the $watch("features")
+                    // watcher fires with the correct deviceType already set
+                    const cspireGroupIds = [KNOX_USER_GROUPS.CSPIRE_WPII_Unpaid_v2, KNOX_USER_GROUPS.CSPIRE_WPII_Subscribed];
+                    this.deviceType = groups.some((id: string) => cspireGroupIds.includes(id)) ? "CSPIRE" : "WPII";
+                    devLog.log(`[Device Type] IMEI ${this.imei} device type:`, this.deviceType);
+
+                    // Now assign — the watcher will fire with deviceType already correct
+                    this.features = groups;
+                    this.deviceInfo = deviceInfo;
+
                     const BLOCK_TD = "ADD_ON_BLOCK_TOOL_DRAWER";
                     devLog.log("[TDIP] getFeatures() refreshed — ADD_ON_BLOCK_TOOL_DRAWER present:", this.features.some(f => f.includes("BLOCK_TOOL_DRAWER")));
                     devLog.log("[TDIP] getFeatures() full list:", JSON.stringify(this.features));
@@ -1805,10 +1821,52 @@ try {
 
                 /**
                  * Checks device model and assigns appropriate subscription group
+                 * - CSPIRE devices -> CSPIRE_WPII_Subscribed group (always A16, skip model detection)
                  * - A16 devices -> A16_SUBSCRIBED group
                  * - A15 and other devices -> SUBSCRIBED group (default)
                  */
                 async assignSubscriptionGroupByDeviceModel() {
+                  // Bail out early if the correct subscription group is already present —
+                  // prevents duplicate Knox calls and double-push on concurrent invocations
+                  const alreadyHasSubscribedGroup =
+                    this.features.includes(KNOX_USER_GROUPS.SUBSCRIBED) ||
+                    this.features.includes(KNOX_USER_GROUPS.A16_SUBSCRIBED) ||
+                    this.features.includes(KNOX_USER_GROUPS.CSPIRE_WPII_Subscribed);
+                  if (alreadyHasSubscribedGroup) {
+                    devLog.log("[assignSubscriptionGroup] Subscription group already present, skipping");
+                    return;
+                  }
+
+                  // If deviceType not yet set, infer it from current Knox groups in this.features
+                  if (!this.deviceType && this.features?.length) {
+                    const cspireGroupIds = [KNOX_USER_GROUPS.CSPIRE_WPII_Unpaid_v2, KNOX_USER_GROUPS.CSPIRE_WPII_Subscribed];
+                    this.deviceType = this.features.some((g: string) => cspireGroupIds.includes(g)) ? "CSPIRE" : "WPII";
+                    devLog.log(`[assignSubscriptionGroup] Inferred deviceType from features: ${this.deviceType}`);
+                  }
+                  if (this.deviceType === "CSPIRE") {
+                    devLog.log("[CSPIRE] Assigning CSPIRE_WPII_Subscribed group");
+                    // Do all Knox API calls BEFORE touching reactive state so $watch only fires once
+                    if (this.features.includes(KNOX_USER_GROUPS.CSPIRE_WPII_Unpaid_v2)) {
+                      devLog.log("[CSPIRE] Removing CSPIRE_WPII_Unpaid_v2 before assigning subscribed group");
+                      await this.removeFeatureFromDevice(KNOX_USER_GROUPS.CSPIRE_WPII_Unpaid_v2);
+                    }
+                    await this.addFeatureToDevice(KNOX_USER_GROUPS.CSPIRE_WPII_Subscribed);
+                    const needsAddOn = !this.features.includes(KNOX_USER_GROUPS.A16_ADD_ON_BLOCK_TOOL_DRAWER);
+                    if (needsAddOn) {
+                      await this.addFeatureToDevice(KNOX_USER_GROUPS.A16_ADD_ON_BLOCK_TOOL_DRAWER);
+                    }
+                    // Single reactive update — fires $watch exactly once with the complete final state
+                    const updatedFeatures = this.features
+                      .filter((g: string) => g !== KNOX_USER_GROUPS.CSPIRE_WPII_Unpaid_v2);
+                    if (!updatedFeatures.includes(KNOX_USER_GROUPS.CSPIRE_WPII_Subscribed)) {
+                      updatedFeatures.push(KNOX_USER_GROUPS.CSPIRE_WPII_Subscribed);
+                    }
+                    if (needsAddOn) {
+                      updatedFeatures.push(KNOX_USER_GROUPS.A16_ADD_ON_BLOCK_TOOL_DRAWER);
+                    }
+                    this.features = updatedFeatures;
+                    return;
+                  }
                   try {
                     const deviceModel = await this.getDeviceModelFromKnox();
                     if (!deviceModel) {
@@ -1865,10 +1923,19 @@ try {
 
                 /**
                  * Checks device model and assigns appropriate unpaid group
+                 * - CSPIRE devices -> no-op (CSPIRE devices stay in CSPIRE_WPII_Subscribed after unsubscribe)
                  * - A16 devices -> A16_UNPAID group
                  * - A15 and other devices -> UNPAID group (default)
                  */
                 async assignUnpaidGroupByDeviceModel() {
+                  if (this.deviceType === "CSPIRE") {
+                    devLog.log("[CSPIRE] Unsubscribe detected — no group change for CSPIRE devices");
+                    if (!this.features.includes(KNOX_USER_GROUPS.A16_ADD_ON_BLOCK_TOOL_DRAWER)) {
+                      await this.addFeatureToDevice(KNOX_USER_GROUPS.A16_ADD_ON_BLOCK_TOOL_DRAWER);
+                      this.features.push(KNOX_USER_GROUPS.A16_ADD_ON_BLOCK_TOOL_DRAWER);
+                    }
+                    return;
+                  }
                   try {
                     const deviceModel = await this.getDeviceModelFromKnox();
                     if (!deviceModel) {
@@ -1939,7 +2006,9 @@ try {
                       group === KNOX_USER_GROUPS.UNPAID ||
                       group === KNOX_USER_GROUPS.SUBSCRIBED ||
                       group === KNOX_USER_GROUPS.A16_SUBSCRIBED ||
-                      group === KNOX_USER_GROUPS.A16_UNPAID
+                      group === KNOX_USER_GROUPS.A16_UNPAID ||
+                      group === KNOX_USER_GROUPS.CSPIRE_WPII_Subscribed ||
+                      group === KNOX_USER_GROUPS.CSPIRE_WPII_Unpaid_v2
                   );
                 },
 
@@ -1959,7 +2028,9 @@ try {
                       group === KNOX_USER_GROUPS.UNPAID ||
                       group === KNOX_USER_GROUPS.SUBSCRIBED ||
                       group === KNOX_USER_GROUPS.A16_SUBSCRIBED ||
-                      group === KNOX_USER_GROUPS.A16_UNPAID
+                      group === KNOX_USER_GROUPS.A16_UNPAID ||
+                      group === KNOX_USER_GROUPS.CSPIRE_WPII_Subscribed ||
+                      group === KNOX_USER_GROUPS.CSPIRE_WPII_Unpaid_v2
                   );
                   if (!hasBaseGroup) {
                     if (this.isSubscribed) {
@@ -2021,6 +2092,22 @@ try {
                     userGroups.includes(KNOX_USER_GROUPS.A16_UNPAID)
                   ) {
                     featuresToRemove.push(KNOX_USER_GROUPS.UNPAID);
+                  }
+
+                  // Remove CSPIRE_WPII_Unpaid_v2 if CSPIRE_WPII_Subscribed is also present
+                  const hasCspireSubscribed = userGroups.includes(KNOX_USER_GROUPS.CSPIRE_WPII_Subscribed);
+                  const hasCspireUnpaid = userGroups.includes(KNOX_USER_GROUPS.CSPIRE_WPII_Unpaid_v2);
+                  if (hasCspireSubscribed && hasCspireUnpaid) {
+                    featuresToRemove.push(KNOX_USER_GROUPS.CSPIRE_WPII_Unpaid_v2);
+                  }
+
+                  // Recovery: remove wrong WPII subscription group if a CSPIRE unpaid group is present
+                  // (happens when assignSubscriptionGroupByDeviceModel was called before deviceType was set)
+                  if (hasCspireUnpaid && userGroups.includes(KNOX_USER_GROUPS.SUBSCRIBED)) {
+                    featuresToRemove.push(KNOX_USER_GROUPS.SUBSCRIBED);
+                  }
+                  if (hasCspireUnpaid && userGroups.includes(KNOX_USER_GROUPS.A16_SUBSCRIBED)) {
+                    featuresToRemove.push(KNOX_USER_GROUPS.A16_SUBSCRIBED);
                   }
 
                   return featuresToRemove;
@@ -3392,8 +3479,9 @@ try {
                     flagMap.forEach(({ value }: { value: boolean }, key: string) => {
                       flags[key] = value ? 1 : 0;
                     });
-                    await actions.features.upsertFeatureFlags({ imei: this.imei, flags });
-                    devLog.log("[FeatureFlags] Synced to DB from Knox for IMEI:", this.imei);
+                    const phoneType = this.deviceType === "CSPIRE" || this.deviceType === "WPII" ? this.deviceType : "WPII";
+                    await actions.features.upsertFeatureFlags({ imei: this.imei, flags, phoneType });
+                    devLog.log("[FeatureFlags] Synced to DB from Knox for IMEI:", this.imei, "| phoneType:", phoneType);
                   } catch (err) {
                     devLog.error("[FeatureFlags] Failed to sync to DB:", err);
                   }
@@ -3709,6 +3797,42 @@ try {
                   devLog.log("PAY DEBUG: [M0.7] Final IMEI after extraction:", this.imei);
                   devLog.log("PAY DEBUG: [M0.8] Final Device Phone after extraction:", this.devicePhone);
 
+                  // Watch for features changes to manage Knox groups and load Tool Drawer
+                  // MUST be registered before getFeatures() so the watcher fires on initial load
+                  this.$watch("features", async (userGroups: string[]) => {
+                    // Check if device is subscribed but doesn't have any subscription group
+                    if (this.isSubscribed) {
+                      const hasSubscribedGroup =
+                        userGroups.includes(KNOX_USER_GROUPS.SUBSCRIBED) ||
+                        userGroups.includes(KNOX_USER_GROUPS.A16_SUBSCRIBED) ||
+                        userGroups.includes(KNOX_USER_GROUPS.CSPIRE_WPII_Subscribed);
+                      if (!hasSubscribedGroup) {
+                        // Assign appropriate subscription group based on device model
+                        await this.assignSubscriptionGroupByDeviceModel();
+                      }
+                    }
+
+                    // Ensure no conflicting Knox groups
+                    await this.removeExclusiveGroups(userGroups);
+
+                    // Load Tool Drawer data client-side when Tool Drawer feature is enabled
+                    if (this.isToolDrawerEnabled && !this.isToolDrawerLoaded) {
+                      this.loadToolDrawer();
+                    }
+                  });
+
+                  // Fetch features BEFORE payment validation so deviceType is set correctly
+                  // when assignSubscriptionGroupByDeviceModel() is called below
+                  if (this.imei) {
+                    try {
+                      await this.getFeatures();
+                    } catch (error) {
+                      devLog.error("Failed to load features:", error);
+                      this.isLoading = false;
+                    }
+                  } else {
+                    this.isLoading = false;
+                  }
 
                   // Check URL params to determine flow
                   const urlParams = new URLSearchParams(window.location.search);
@@ -3872,47 +3996,10 @@ try {
                     }
                   });
 
-                  // Watch for features changes to manage Knox groups and load Tool Drawer
-                  this.$watch("features", async (userGroups: string[]) => {
-                    // Check if device is subscribed but doesn't have any subscription group
-                    if (this.isSubscribed) {
-                      const hasSubscribedGroup =
-                        userGroups.includes(KNOX_USER_GROUPS.SUBSCRIBED) ||
-                        userGroups.includes(KNOX_USER_GROUPS.A16_SUBSCRIBED);
-                      if (!hasSubscribedGroup) {
-                        // Assign appropriate subscription group based on device model
-                        await this.assignSubscriptionGroupByDeviceModel();
-                      }
-                    }
-
-                    // Ensure no conflicting Knox groups
-                    await this.removeExclusiveGroups(userGroups);
-
-                    // Load Tool Drawer data client-side when Tool Drawer feature is enabled
-                    if (this.isToolDrawerEnabled && !this.isToolDrawerLoaded) {
-                      this.loadToolDrawer();
-                    }
-                  });
-
                   // Watch for installedApps changes
                   this.$watch("installedApps", (apps) => {
                     this.logGoogleManagedApps();
                   });
-
-                  // If IMEI is already set, fetch features immediately (but not apps - wait for tab click)
-                  // This is the main blocking operation - keep loading until it completes
-                  if (this.imei) {
-                    try {
-                      // getFeatures() will set isLoading = false when done
-                      await this.getFeatures();
-                    } catch (error) {
-                      devLog.error("Failed to load features:", error);
-                      this.isLoading = false;
-                    }
-                  } else {
-                    // If no IMEI, don't show loading
-                    this.isLoading = false;
-                  }
 
                   // Log feature flag map after features are loaded
                   this.logFeatureFlagMap();

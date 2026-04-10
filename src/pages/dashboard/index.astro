@@ -856,9 +856,6 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
       )}
       </div>
     </div>
-  </div>
-
-  </Fragment>
 
   <!-- Activate Plan Modal -->
   <div
@@ -998,6 +995,10 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
       <button>close</button>
     </form>
   </dialog>
+
+  </div>
+
+  </Fragment>
 
 </main>
 
@@ -1313,56 +1314,80 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
        * Initialize background polling for unsubscribed devices
        */
       initializeBackgroundPolling(): void {
-        // Wait for device cards to be initialized
+        devLog.log("[POLL] initializeBackgroundPolling() called");
+
+        // Initialize polling service immediately so it's available for addDevice() calls
+        if (!subscriptionPollingService) {
+          devLog.log("[POLL] Creating SubscriptionPollingService (pollInterval: 10s)");
+          subscriptionPollingService = new SubscriptionPollingService({
+            pollInterval: 10000, // 10 seconds
+            checkSubscription: async (imei: string, phoneNumber: string) => {
+              devLog.log("[POLL] Checking subscription status - IMEI:", imei, "Phone:", phoneNumber);
+              try {
+                const normalizedImei = imei.replace(/[^0-9]/g, '');
+                const result = await actions.wisephones.validateIsUserSubscribed.orThrow({
+                  imei: normalizedImei,
+                  phoneNumber: phoneNumber
+                });
+                devLog.log("[POLL] Subscription check result - IMEI:", imei, "isSubscribed:", result?.isSubscribed);
+                return result?.isSubscribed === true;
+              } catch (error) {
+                devLog.error("[POLL] Subscription check failed - IMEI:", imei, "Error:", error);
+                return false;
+              }
+            },
+            onSubscriptionDetected: (device) => {
+              devLog.log("[POLL] Subscription detected via callback - IMEI:", device.imei, "Phone:", device.phoneNumber);
+              this.updateDeviceCardSubscription(device.imei, true);
+            }
+          });
+          devLog.log("[POLL] SubscriptionPollingService created");
+        } else {
+          devLog.log("[POLL] SubscriptionPollingService already exists, reusing");
+        }
+
+        // Register event listener immediately so no subscription-detected events are missed
+        window.addEventListener('subscription-detected', ((event: CustomEvent) => {
+          const { imei } = event.detail;
+          devLog.log("[POLL] subscription-detected window event received - IMEI:", imei);
+          this.updateDeviceCardSubscription(imei, true);
+        }) as EventListener);
+
+        // Wait for Alpine to finish initializing device cards, then start polling
         setTimeout(() => {
+          devLog.log("[POLL] 500ms timeout fired — scanning for unsubscribed device cards");
           const unsubscribedDevices: Device[] = [];
 
-          // Find all unsubscribed device cards
           const deviceCards = document.querySelectorAll('[x-data*="deviceCard"]');
+          devLog.log("[POLL] Total device cards found:", deviceCards.length);
+
           for (const card of Array.from(deviceCards)) {
             const cardData = (window as any).Alpine?.$data?.(card);
-            if (cardData && !cardData.isSubscribed && cardData.phoneNumber) {
+            if (!cardData) {
+              devLog.warn("[POLL] Could not read Alpine data for card:", card);
+              continue;
+            }
+            devLog.log("[POLL] Device card - IMEI:", cardData.imei, "isSubscribed:", cardData.isSubscribed, "phoneNumber:", cardData.phoneNumber || '(empty)');
+            if (!cardData.isSubscribed && cardData.phoneNumber) {
+              devLog.log("[POLL] Adding to polling list - IMEI:", cardData.imei);
               unsubscribedDevices.push({
                 imei: cardData.imei,
                 phoneNumber: cardData.phoneNumber
               });
+            } else if (!cardData.isSubscribed && !cardData.phoneNumber) {
+              devLog.warn("[POLL] Skipping unsubscribed device — no phone number - IMEI:", cardData.imei);
             }
           }
+
+          devLog.log("[POLL] Unsubscribed devices to poll:", unsubscribedDevices.length, unsubscribedDevices);
 
           if (unsubscribedDevices.length > 0) {
-            // Initialize polling service if not already initialized
-            if (!subscriptionPollingService) {
-              subscriptionPollingService = new SubscriptionPollingService({
-                pollInterval: 10000, // 10 seconds
-                checkSubscription: async (imei: string, phoneNumber: string) => {
-                  try {
-                    const normalizedImei = imei.replace(/[^0-9]/g, '');
-                    const result = await actions.wisephones.validateIsUserSubscribed.orThrow({
-                      imei: normalizedImei,
-                      phoneNumber: phoneNumber
-                    });
-                    return result?.isSubscribed === true;
-                  } catch (error) {
-                    return false;
-                  }
-                },
-                onSubscriptionDetected: (device) => {
-                  // Update device card state
-                  this.updateDeviceCardSubscription(device.imei, true);
-                }
-              });
-            }
-
-            // Start polling
-            subscriptionPollingService.startPolling(unsubscribedDevices);
-
-            // Listen for subscription detected events (from service)
-            window.addEventListener('subscription-detected', ((event: CustomEvent) => {
-              const { imei } = event.detail;
-              this.updateDeviceCardSubscription(imei, true);
-            }) as EventListener);
+            devLog.log("[POLL] Starting SubscriptionPollingService for", unsubscribedDevices.length, "device(s)");
+            subscriptionPollingService!.startPolling(unsubscribedDevices);
+          } else {
+            devLog.log("[POLL] No unsubscribed devices with phone numbers found — polling not started");
           }
-        }, 500); // Wait 500ms for Alpine to fully initialize device cards
+        }, 500);
       },
 
       async init() {

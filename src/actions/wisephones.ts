@@ -3,7 +3,7 @@ import { z } from "astro:schema";
 import { db, Wisephone, BypassTechlessSubscription, DeviceFeatureFlags, eq, sql } from "astro:db";
 import { SamsungKnoxService } from "@/libs/samsung-knox-service";
 import { validateIsSubscribed } from "@/libs/stripe";
-import { isValidIMEI, devLog, FEATURES } from "@/libs/utils";
+import { isValidIMEI, devLog, FEATURES, KNOX_USER_GROUPS } from "@/libs/utils";
 
 export const wisephones = {
   // Create a new Wisephone
@@ -49,14 +49,16 @@ export const wisephones = {
               (feature.a16KnoxManageId ? groups.includes(feature.a16KnoxManageId) : false);
             flags[key] = (feature.isInverse ? !hasGroup : hasGroup) ? 1 : 0;
           }
+          const cspireGroupIds = [KNOX_USER_GROUPS.CSPIRE_WPII_Unpaid_v2, KNOX_USER_GROUPS.CSPIRE_WPII_Subscribed];
+          const phoneType = groups.some(id => cspireGroupIds.includes(id)) ? "CSPIRE" : "WPII";
           await db
             .insert(DeviceFeatureFlags)
-            .values({ imei: input.imei.toString(), ...(flags as any), updatedAt: new Date() })
+            .values({ imei: input.imei.toString(), ...(flags as any), phoneType, updatedAt: new Date() })
             .onConflictDoUpdate({
               target: DeviceFeatureFlags.imei,
-              set: { ...(flags as any), updatedAt: new Date() }
+              set: { ...(flags as any), phoneType, updatedAt: new Date() }
             });
-          devLog.log("[FeatureFlags] Seeded from Knox on device add for IMEI:", input.imei);
+          devLog.log("[FeatureFlags] Seeded from Knox on device add for IMEI:", input.imei, "| phoneType:", phoneType);
         } catch (flagsError) {
           // Non-fatal — flags will be seeded on first manage page visit
           devLog.error("[FeatureFlags] Failed to seed on device add:", flagsError);
@@ -426,6 +428,17 @@ export const wisephones = {
       phoneNumber: z.string().min(12).max(12)
     }),
     handler: async (input) => {
+      // Check bypass first, consistent with server-side subscription checks
+      const bypassSubscription = await db
+        .select()
+        .from(BypassTechlessSubscription)
+        .where(eq(BypassTechlessSubscription.imei, Number(input.imei)))
+        .limit(1);
+
+      if (bypassSubscription.length > 0) {
+        return { success: "User is subscribed", isSubscribed: true };
+      }
+
       const isSubscribed = await validateIsSubscribed({ phoneNumber: input.phoneNumber, imei: input.imei });
 
       return {

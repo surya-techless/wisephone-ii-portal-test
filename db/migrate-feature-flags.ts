@@ -41,6 +41,20 @@ export default async function migrate() {
       }
     }
 
+    console.log("📊 Adding phoneType column (if not exists)...");
+    try {
+      await db.run(sql`
+        ALTER TABLE DeviceFeatureFlags ADD COLUMN phoneType TEXT NOT NULL DEFAULT 'WPII'
+      `);
+      console.log("✅ phoneType column added");
+    } catch (alterError: any) {
+      if (alterError?.message?.includes("duplicate column name")) {
+        console.log("ℹ️  phoneType column already exists, skipping");
+      } else {
+        throw alterError;
+      }
+    }
+
     console.log("========================================");
     console.log("🎉 Migration completed successfully!");
     console.log("========================================");

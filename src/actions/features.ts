@@ -21,15 +21,17 @@ export const features = {
     accept: "json",
     input: z.object({
       imei: z.string(),
-      flags: featureFlagSchema
+      flags: featureFlagSchema,
+      phoneType: z.enum(["CSPIRE", "WPII"]).optional()
     }),
-    handler: async ({ imei, flags }) => {
+    handler: async ({ imei, flags, phoneType }) => {
+      const extra = phoneType ? { phoneType } : {};
       await db
         .insert(DeviceFeatureFlags)
-        .values({ imei, ...flags, updatedAt: new Date() })
+        .values({ imei, ...flags, ...extra, updatedAt: new Date() })
         .onConflictDoUpdate({
           target: DeviceFeatureFlags.imei,
-          set: { ...flags, updatedAt: new Date() }
+          set: { ...flags, ...extra, updatedAt: new Date() }
         });
       return { success: true };
     }

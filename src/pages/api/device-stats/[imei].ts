@@ -126,7 +126,15 @@ export const GET: APIRoute = async ({ params, locals, request }) => {
       dailyAverageMs: number;
       apps?: Array<{ packageName: string; appName: string; totalTimeMs: number; dailyAverageMs?: number }>;
     }> };
-    const weeksData = (detail?.weeks ?? []).slice(0, weeksCount);
+    const fourWeeksAgo = new Date();
+    fourWeeksAgo.setDate(fourWeeksAgo.getDate() - 28);
+
+    const weeksData = (detail?.weeks ?? [])
+      .filter((week) => new Date(week.weekEndDate + "T23:59:59.999Z") >= fourWeeksAgo)
+      .sort(
+        (a, b) => new Date(b.weekStartDate).getTime() - new Date(a.weekStartDate).getTime()
+      )
+      .slice(0, weeksCount);
 
     const weeks = weeksData.map((week) => {
       const weekStartDate = new Date(week.weekStartDate + "T00:00:00.000Z");

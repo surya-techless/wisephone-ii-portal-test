@@ -67,6 +67,7 @@ const DeviceFeatureFlags = defineTable({
     ALLOW_FACTORY_RESET: column.number({ default: 1 }),
     WISEOS_PROTECT: column.number({ default: 0 }),
     SHOW_SCREEN_TIME: column.number({ default: 0 }),
+    phoneType: column.text({ default: "WPII" }),
     updatedAt: column.date({ default: new Date() })
   }
 });
