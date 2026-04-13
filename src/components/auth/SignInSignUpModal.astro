@@ -28,7 +28,7 @@ const isProd = import.meta.env.PROD;
 
 <dialog
   id="auth-modal"
-  class="modal items-start md:items-center"
+  class="modal items-start md:items-center overflow-x-hidden"
   x-data={`authModal({
     redirectUrl: ${JSON.stringify(redirectUrl)},
     publishableKey: ${JSON.stringify(publishableKey)},
@@ -36,7 +36,7 @@ const isProd = import.meta.env.PROD;
   })`}
   x-init="init()"
 >
-  <div class="modal-box max-w-md w-[calc(100%-2rem)] mx-4 mt-10 md:mt-0 relative overflow-visible">
+  <div class="modal-box max-w-md w-[calc(100%-2rem)] mx-4 mt-10 md:mt-0 relative overflow-x-hidden">
     <!-- Local error toast — rendered inside the dialog so it appears above the top layer -->
     <div
       x-show="localErrorMessage"
@@ -206,7 +206,7 @@ const isProd = import.meta.env.PROD;
           <input
             id="auth-phone-signup"
             type="tel"
-            class="input input-bordered input-sm flex-1 h-10"
+            class="input input-bordered input-sm flex-1 min-w-0 h-10"
             placeholder="Enter your phone number"
             x-model="phoneNumber"
             required
