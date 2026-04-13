@@ -881,7 +881,7 @@ try {
               </div>
 
               <!-- Features Tab -->
-              <div x-show="currentTab === 'features'" x-cloak class="max-w-full md:w-[500px]">
+              <div x-show="currentTab === 'features'" x-cloak class="max-w-full md:w-[500px] pb-6 md:pb-0">
                 <p class="text-sm text-gray-600 mb-4">
                   Use this page to manage the features of your Wisephone. Make sure the device is connected to the
                   internet before updating any features.
@@ -895,7 +895,7 @@ try {
                   </p>
                 </div>
 
-                <div class="space-y-3" :class="{ 'opacity-50 pointer-events-none': !isSubscribed }">
+                <div class="space-y-3 pb-8" :class="{ 'opacity-50 pointer-events-none': !isSubscribed }">
                   <template x-for="feature in availableFeatures.filter(f => f.featureKey !== 'TOOL_DRAWER_IN_PHONE' && !f.isPortalOnly)" :key="feature.knoxManageId">
                     <div
                       class="border border-gray-300 rounded-lg transition-colors"
@@ -1813,6 +1813,9 @@ try {
                  * Gets the appropriate group ID for a feature based on device model
                  */
                 getGroupIdForFeature(feature: Feature): string {
+                  if (this.deviceType === "CSPIRE" && feature.cspireKnoxManageId) {
+                    return feature.cspireKnoxManageId;
+                  }
                   if (this.isA16Device() && feature.a16KnoxManageId) {
                     return feature.a16KnoxManageId;
                   }
@@ -1851,9 +1854,9 @@ try {
                       await this.removeFeatureFromDevice(KNOX_USER_GROUPS.CSPIRE_WPII_Unpaid_v2);
                     }
                     await this.addFeatureToDevice(KNOX_USER_GROUPS.CSPIRE_WPII_Subscribed);
-                    const needsAddOn = !this.features.includes(KNOX_USER_GROUPS.A16_ADD_ON_BLOCK_TOOL_DRAWER);
+                    const needsAddOn = !this.features.includes(KNOX_USER_GROUPS.CSPIRE_ADD_ON_BLOCK_TOOL_DRAWER);
                     if (needsAddOn) {
-                      await this.addFeatureToDevice(KNOX_USER_GROUPS.A16_ADD_ON_BLOCK_TOOL_DRAWER);
+                      await this.addFeatureToDevice(KNOX_USER_GROUPS.CSPIRE_ADD_ON_BLOCK_TOOL_DRAWER);
                     }
                     // Single reactive update — fires $watch exactly once with the complete final state
                     const updatedFeatures = this.features
@@ -1862,7 +1865,7 @@ try {
                       updatedFeatures.push(KNOX_USER_GROUPS.CSPIRE_WPII_Subscribed);
                     }
                     if (needsAddOn) {
-                      updatedFeatures.push(KNOX_USER_GROUPS.A16_ADD_ON_BLOCK_TOOL_DRAWER);
+                      updatedFeatures.push(KNOX_USER_GROUPS.CSPIRE_ADD_ON_BLOCK_TOOL_DRAWER);
                     }
                     this.features = updatedFeatures;
                     return;
@@ -2993,14 +2996,16 @@ try {
                       imei: this.imei,
                       feature,
                       enabled: apiEnabled,
-                      isA16Device: isA16
+                      isA16Device: isA16,
+                      isCspireDevice: this.deviceType === "CSPIRE"
                     });
 
                     // Update local features array
                     // For inverse features: when enabling, remove from array; when disabling, add to array
                     // For normal features: when enabling, add to array; when disabling, remove from array
-                    // Use the correct group ID based on device type (A16 or A15)
+                    // Use the correct group ID based on device type (CSPIRE > A16 > A15)
                     const correctGroupId =
+                      this.deviceType === "CSPIRE" && feature.cspireKnoxManageId ? feature.cspireKnoxManageId :
                       isA16 && feature.a16KnoxManageId ? feature.a16KnoxManageId : feature.knoxManageId;
 
                     if (feature.featureKey === "TOOL_DRAWER_IN_PHONE") {
@@ -3010,9 +3015,9 @@ try {
 
                     if (isInverse) {
                       if (updatedValue) {
-                        // Enabling: remove both regular and A16 disable groups from the array
+                        // Enabling: remove regular, A16, and CSPIRE disable groups from the array
                         this.features = this.features.filter(
-                          (id) => id !== feature.knoxManageId && id !== feature.a16KnoxManageId
+                          (id) => id !== feature.knoxManageId && id !== feature.a16KnoxManageId && id !== feature.cspireKnoxManageId
                         );
                         if (feature.featureKey === "TOOL_DRAWER_IN_PHONE") {
                           devLog.log("[TDIP] features AFTER local update (enabled — group removed):", JSON.stringify(this.features));
@@ -3029,9 +3034,9 @@ try {
                     } else {
                       // Normal feature logic
                       if (!updatedValue) {
-                        // Disabling: remove both regular and A16 IDs from the array
+                        // Disabling: remove regular, A16, and CSPIRE IDs from the array
                         this.features = this.features.filter(
-                          (id) => id !== feature.knoxManageId && id !== feature.a16KnoxManageId
+                          (id) => id !== feature.knoxManageId && id !== feature.a16KnoxManageId && id !== feature.cspireKnoxManageId
                         );
                       } else {
                         // Enabling: add the correct feature group to the array based on device type
@@ -3102,10 +3107,12 @@ try {
                       imei: this.imei,
                       feature,
                       enabled: apiEnabled,
-                      isA16Device: isA16
+                      isA16Device: isA16,
+                      isCspireDevice: this.deviceType === "CSPIRE"
                     });
 
                     const correctGroupId =
+                      this.deviceType === "CSPIRE" && feature.cspireKnoxManageId ? feature.cspireKnoxManageId :
                       isA16 && feature.a16KnoxManageId ? feature.a16KnoxManageId : feature.knoxManageId;
 
                     if (isInverse) {
@@ -3114,7 +3121,7 @@ try {
                       }
                     } else {
                       this.features = this.features.filter(
-                        (id) => id !== feature.knoxManageId && id !== feature.a16KnoxManageId
+                        (id) => id !== feature.knoxManageId && id !== feature.a16KnoxManageId && id !== feature.cspireKnoxManageId
                       );
                     }
 
@@ -3399,7 +3406,8 @@ try {
                   if (feature.isPortalOnly) return false;
                   const hasRegularId = feature.knoxManageId ? this.features.includes(feature.knoxManageId) : false;
                   const hasA16Id = feature.a16KnoxManageId ? this.features.includes(feature.a16KnoxManageId) : false;
-                  const isEnabled = hasRegularId || hasA16Id;
+                  const hasCspireId = feature.cspireKnoxManageId ? this.features.includes(feature.cspireKnoxManageId) : false;
+                  const isEnabled = hasRegularId || hasA16Id || hasCspireId;
                   return feature.isInverse ? !isEnabled : isEnabled;
                 },
 
@@ -3412,7 +3420,8 @@ try {
                   if (feature.isPortalOnly) return false; // portal-only defaults handled separately
                   const hasRegularId = feature.knoxManageId ? featuresArray.includes(feature.knoxManageId) : false;
                   const hasA16Id = feature.a16KnoxManageId ? featuresArray.includes(feature.a16KnoxManageId) : false;
-                  const isEnabled = hasRegularId || hasA16Id;
+                  const hasCspireId = feature.cspireKnoxManageId ? featuresArray.includes(feature.cspireKnoxManageId) : false;
+                  const isEnabled = hasRegularId || hasA16Id || hasCspireId;
                   return feature.isInverse ? !isEnabled : isEnabled;
                 },
 

@@ -22,7 +22,7 @@ interface Props {
   privacyUrl?: string;
 }
 
-const { redirectUrl = "/dashboard", publishableKey, termsUrl = "#", privacyUrl = "#" } = Astro.props;
+const { redirectUrl = "/dashboard", publishableKey, termsUrl = "https://wisephone.com/policies/terms-of-service", privacyUrl = "https://wisephone.com/policies/privacy-policy" } = Astro.props;
 const isProd = import.meta.env.PROD;
 ---
 
@@ -63,10 +63,9 @@ const isProd = import.meta.env.PROD;
       </button>
     </form>
 
-    <h3 class="text-lg font-bold mb-2 pr-8" x-text="tab === 'signin' ? (signInCodeStep ? 'Verify your identity' : 'Sign in to Wisephone Portal') : (signUpPhoneStep ? 'Verify your phone' : signUpCodeStep ? 'Verify your email' : 'Create your account')"></h3>
+    <h3 class="text-lg font-bold mb-2 pr-8" x-text="tab === 'signin' ? (signInCodeStep ? 'Verify your identity' : 'Sign in to Wisephone Portal') : (signUpPhoneStep ? 'Verify your phone' : 'Create your account')"></h3>
     <p class="text-sm text-[var(--text-secondary)] mb-4" x-show="tab === 'signin' && !signInCodeStep" x-cloak>Welcome back! Please sign in to continue.</p>
-    <p class="text-sm text-[var(--text-secondary)] mb-2" x-show="tab === 'signup' && !signUpCodeStep && !signUpPhoneStep" x-cloak>Welcome! Please fill in the details to get started.</p>
-    <p class="text-sm text-[var(--text-secondary)] mb-4" x-show="tab === 'signup' && signUpCodeStep && !signUpPhoneStep" x-cloak>We sent a verification code to your email. Enter it below.</p>
+    <p class="text-sm text-[var(--text-secondary)] mb-2" x-show="tab === 'signup' && !signUpPhoneStep" x-cloak>Welcome! Please fill in the details to get started.</p>
     <p class="text-sm text-[var(--text-secondary)] mb-4" x-show="tab === 'signup' && signUpPhoneStep" x-cloak>We sent a verification code to your phone number. Enter it below.</p>
 
 
@@ -142,31 +141,7 @@ const isProd = import.meta.env.PROD;
       <button type="button" class="btn btn-ghost btn-sm w-full" @click="signInCodeStep = false; errorMessage = ''">Use a different email or phone</button>
     </form>
 
-    <!-- Sign Up: Step 2 (dev) – Email verification code -->
-    <form
-      x-show="tab === 'signup' && signUpCodeStep && !signUpPhoneStep"
-      x-cloak
-      class="space-y-2"
-      @submit.prevent="handleSignUpVerify()"
-    >
-      <div class="form-control">
-        <label class="label py-1"><span class="label-text">Verification code</span></label>
-        <input
-          type="text"
-          class="input input-bordered input-sm w-full h-10"
-          placeholder="Enter the code from your email"
-          x-model="verificationCode"
-          autocomplete="one-time-code"
-        />
-      </div>
-      <button type="submit" class="btn btn-primary w-full" :disabled="loading" x-bind:disabled="loading">
-        <span x-show="!loading">Verify email</span>
-        <span x-show="loading" x-cloak>Verifying…</span>
-      </button>
-      <button type="button" class="btn btn-ghost btn-sm w-full" @click="signUpCodeStep = false; errorMessage = ''">Use a different email</button>
-    </form>
-
-    <!-- Sign Up: Step 2 (prod) – Phone verification code -->
+    <!-- Sign Up: Step 2 – Phone verification code -->
     <form
       x-show="tab === 'signup' && signUpPhoneStep"
       x-cloak
@@ -192,7 +167,7 @@ const isProd = import.meta.env.PROD;
 
     <!-- Sign Up: Step 1 – Create account form -->
     <form
-      x-show="tab === 'signup' && !signUpCodeStep && !signUpPhoneStep"
+      x-show="tab === 'signup' && !signUpPhoneStep"
       x-cloak
       class="space-y-2"
       @submit.prevent="handleSignUp()"
@@ -257,7 +232,7 @@ const isProd = import.meta.env.PROD;
           <span x-show="loading" x-cloak>Creating…</span>
         </button>
       </div>
-      <p class="text-sm text-center text-[var(--text-secondary)]">Already have an account? <button type="button" class="link link-primary font-semibold" @click="tab = 'signin'; signInCodeStep = false; signUpCodeStep = false; errorMessage = ''">Sign in</button></p>
+      <p class="text-sm text-center text-[var(--text-secondary)]">Already have an account? <button type="button" class="link link-primary font-semibold" @click="tab = 'signin'; signInCodeStep = false; errorMessage = ''">Sign in</button></p>
     </form>
   </div>
   <form method="dialog" class="modal-backdrop bg-black/50">
@@ -283,7 +258,6 @@ const isProd = import.meta.env.PROD;
       termsAgreed: false,
       signInMethod: "email",
       signInCodeStep: false,
-      signUpCodeStep: false,
       signUpPhoneStep: false,
       verificationCode: "",
       phoneVerificationCode: "",
@@ -302,7 +276,6 @@ const isProd = import.meta.env.PROD;
         this.termsAgreed = false;
         this.signInMethod = "email";
         this.signInCodeStep = false;
-        this.signUpCodeStep = false;
         this.signUpPhoneStep = false;
         this.verificationCode = "";
         this.phoneVerificationCode = "";
@@ -324,8 +297,7 @@ const isProd = import.meta.env.PROD;
           this.tab = e.detail?.tab ?? "signin";
           this.errorMessage = "";
           this.signInCodeStep = false;
-          this.signUpCodeStep = false;
-          this.signUpPhoneStep = false;
+            this.signUpPhoneStep = false;
           if (dialog && typeof dialog.showModal === "function") dialog.showModal();
           console.log("[AuthModal] modal opened, tab:", this.tab, "clerk ready:", !!this.clerk);
         });
@@ -460,60 +432,15 @@ const isProd = import.meta.env.PROD;
             window.location.href = this.redirectUrl;
             return;
           }
-          if (this.isProd) {
-            // Production: phone OTP only
-            await signUp.preparePhoneNumberVerification({ strategy: "phone_code" });
-            this.phoneVerificationCode = "";
-            this.signUpPhoneStep = true;
-            this.errorMessage = "";
-            this.loading = false;
-          } else {
-            // Development: email OTP only
-            await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
-            this.verificationCode = "";
-            this.signUpCodeStep = true;
-            this.errorMessage = "";
-            this.loading = false;
-          }
+          // Always verify via phone OTP only — no email verification step
+          await signUp.preparePhoneNumberVerification({ strategy: "phone_code" });
+          this.phoneVerificationCode = "";
+          this.signUpPhoneStep = true;
+          this.errorMessage = "";
+          this.loading = false;
         } catch (e) {
           const err = (e && typeof e === "object" && "errors" in e && Array.isArray((e).errors) ? (e).errors[0] : e);
           this.setError(err?.longMessage ?? err?.message ?? "Sign-up failed.");
-        }
-      },
-
-      async handleSignUpVerify() {
-        const clerk = this.clerk;
-        const signUp = clerk?.client?.signUp;
-        if (!signUp || !this.verificationCode?.trim()) {
-          this.setError("Enter the verification code from your email.");
-          return;
-        }
-        this.loading = true;
-        this.errorMessage = "";
-        try {
-          await signUp.attemptEmailAddressVerification({ code: this.verificationCode.trim() });
-          if (signUp.status === "complete" && signUp.createdSessionId && clerk?.setActive) {
-            await clerk.setActive({ session: signUp.createdSessionId });
-            window.location.href = this.redirectUrl;
-            return;
-          }
-          // Email verified but phone still required by Clerk
-          if (signUp.unverifiedFields?.includes("phone_number")) {
-            await signUp.preparePhoneNumberVerification({ strategy: "phone_code" });
-            this.phoneVerificationCode = "";
-            this.signUpCodeStep = false;
-            this.signUpPhoneStep = true;
-            this.errorMessage = "";
-            this.loading = false;
-            return;
-          }
-          const err = signUp?.verifications?.emailAddress?.error;
-          this.setError(err?.longMessage ?? err?.message ?? "Verification failed. Check the code and try again.");
-        } catch (e) {
-          const err = (e && typeof e === "object" && "errors" in e && Array.isArray((e).errors) ? (e).errors[0] : e);
-          this.setError(err?.longMessage ?? err?.message ?? "Verification failed.");
-        } finally {
-          this.loading = false;
         }
       },
 

@@ -9,6 +9,10 @@ export type Feature = {
    */
   a16KnoxManageId?: string;
   /**
+   * Optional CSPIRE-specific group ID. If provided, this will be used for CSPIRE devices instead of a16KnoxManageId or knoxManageId.
+   */
+  cspireKnoxManageId?: string;
+  /**
    * If true, this feature is managed by the portal only (no Knox API call).
    * knoxManageId is not required for portal-only features.
    */
@@ -76,6 +80,8 @@ export const KNOX_USER_GROUPS = {
   A16_UNPAID: "bc9ef35416a74023a26b28b46827bbf7",
   A16_ADD_ON_GOOGLE_APPS: "3a4c1a51878f4610a2de2d54a50bc31b",
   A16_ADD_ON_BLOCK_TOOL_DRAWER: "07adbb1d5145473eaf5fd911e017e75e",
+  
+  CSPIRE_ADD_ON_BLOCK_TOOL_DRAWER:"a15c3b9f2d84454fa37fce957f490485",
   CSPIRE_WPII_Unpaid_v2:"fa681b06021142e3bc5595a4e5c9983f",
   CSPIRE_WPII_Subscribed:"10a69871e5d145078520b352120b2b72"
   // "Add-on- WPII - Block-Tool Drawer" Knox group — applying this group blocks the Tool Drawer on the phone
@@ -101,6 +107,7 @@ export const FEATURES: Record<string, Feature> = {
   TOOL_DRAWER_IN_PHONE: {
     knoxManageId: KNOX_USER_GROUPS.ADD_ON_BLOCK_TOOL_DRAWER,
     a16KnoxManageId: KNOX_USER_GROUPS.A16_ADD_ON_BLOCK_TOOL_DRAWER,
+    cspireKnoxManageId: KNOX_USER_GROUPS.CSPIRE_ADD_ON_BLOCK_TOOL_DRAWER,
     lucideIcon: "smartphone",
     isEnabled: true,
     name: "Allow Access Directly on Device",
