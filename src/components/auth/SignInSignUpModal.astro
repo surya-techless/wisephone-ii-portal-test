@@ -37,25 +37,8 @@ const isProd = import.meta.env.PROD;
   x-init="init()"
 >
   <div class="modal-box max-w-md w-[calc(100%-2rem)] mx-4 mt-10 md:mt-0 relative overflow-x-hidden">
-    <!-- Local error toast — rendered inside the dialog so it appears above the top layer -->
-    <div
-      x-show="localErrorMessage"
-      x-cloak
-      x-transition:enter="transition ease-out duration-200"
-      x-transition:enter-start="opacity-0 -translate-y-2"
-      x-transition:enter-end="opacity-100 translate-y-0"
-      x-transition:leave="transition ease-in duration-150"
-      x-transition:leave-start="opacity-100 translate-y-0"
-      x-transition:leave-end="opacity-0 -translate-y-2"
-      class="absolute left-0 right-0 -top-14 z-10 mx-2"
-    >
-      <div class="alert alert-error shadow-lg py-2 px-4 text-sm">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M12 3a9 9 0 100 18A9 9 0 0012 3z"/></svg>
-        <span x-text="localErrorMessage"></span>
-      </div>
-    </div>
 
-    <form method="dialog" class="absolute right-4 top-4">
+<form method="dialog" class="absolute right-4 top-4">
       <button type="submit" class="btn btn-ghost btn-sm btn-circle" aria-label="Close">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -77,8 +60,8 @@ const isProd = import.meta.env.PROD;
       @submit.prevent="handleSignInContinue()"
     >
       <div class="flex gap-4 mb-1">
-        <button type="button" class="pb-1 text-sm font-medium transition-colors" :class="signInMethod === 'phone' ? 'text-[var(--primary)] border-b-2 border-[var(--primary)]' : 'text-gray-500 hover:text-gray-700'" @click="signInMethod = 'phone'">Phone number</button>
         <button type="button" class="pb-1 text-sm font-medium transition-colors" :class="signInMethod === 'email' ? 'text-[var(--primary)] border-b-2 border-[var(--primary)]' : 'text-gray-500 hover:text-gray-700'" @click="signInMethod = 'email'">Email address</button>
+        <button type="button" class="pb-1 text-sm font-medium transition-colors" :class="signInMethod === 'phone' ? 'text-[var(--primary)] border-b-2 border-[var(--primary)]' : 'text-gray-500 hover:text-gray-700'" @click="signInMethod = 'phone'">Phone number</button>
       </div>
       <div class="form-control" x-show="signInMethod === 'email'">
         <label class="label py-1" for="auth-email-signin"><span class="label-text">Email address</span></label>
@@ -256,15 +239,13 @@ const isProd = import.meta.env.PROD;
       phoneCountryCode: "+1",
       phoneNumber: "",
       termsAgreed: false,
-      signInMethod: "phone",
+      signInMethod: "email",
       signInCodeStep: false,
       signUpPhoneStep: false,
       verificationCode: "",
       phoneVerificationCode: "",
       loading: false,
       errorMessage: "",
-      localErrorMessage: "",
-      _localErrorTimer: null,
       clerk: null,
 
       resetForm() {
@@ -280,8 +261,6 @@ const isProd = import.meta.env.PROD;
         this.verificationCode = "";
         this.phoneVerificationCode = "";
         this.loading = false;
-        this.localErrorMessage = "";
-        if (this._localErrorTimer) { clearTimeout(this._localErrorTimer); this._localErrorTimer = null; }
       },
 
       async init() {
@@ -332,9 +311,7 @@ const isProd = import.meta.env.PROD;
       setError(msg) {
         this.loading = false;
         const message = msg || "Something went wrong. Please try again.";
-        if (this._localErrorTimer) { clearTimeout(this._localErrorTimer); this._localErrorTimer = null; }
-        this.localErrorMessage = message;
-        this._localErrorTimer = setTimeout(() => { this.localErrorMessage = ""; this._localErrorTimer = null; }, 3000);
+        window.dispatchEvent(new CustomEvent("auth-modal-error", { detail: { message } }));
       },
 
       getSignInIdentifier() {
