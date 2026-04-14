@@ -41,6 +41,8 @@ export type Feature = {
   parentFeatureKnoxId?: string;
   /** Stable identifier derived from the FEATURES record key (e.g. "TOOL_DRAWER"). Never changes even if name does. */
   featureKey?: string;
+  /** Optional note displayed below the description in red on a new line. */
+  note?: string;
 };
 
 export const KNOX_USER_GROUPS = {
@@ -100,7 +102,7 @@ export const FEATURES: Record<string, Feature> = {
     enableMessage:
       "Third-party apps may display in-app ads, content, and experiences not managed by Techless. Enable Tool Drawer apps at your discretion. If you are battling addiction, we recommend not enabling the Tool Drawer.",
     disableMessage:
-      "I acknowledge turning off this feature will remove access to third-party apps on this device. Any installed third-party apps will be uninstalled.",
+      "I acknowledge turning off this feature will remove access to third-party apps on this device.<br><strong style=\"color: red;\">NOTE:</strong> Any installed third-party apps will be uninstalled.",
     disclosure:
       "Please note that third-party apps may display in-app ads, which are not endorsed by Techless and could contain unexpected content. Use of the Tool Drawer apps is at your discretion. If you are battling addiction, we recommend not enabling the Tool Drawer. And, at this time, in-app purchases are not supported."
   },
@@ -112,6 +114,7 @@ export const FEATURES: Record<string, Feature> = {
     isEnabled: true,
     name: "Allow Access Directly on Device",
     description: "Controls whether the Tool Drawer is directly accessible on the device without needing to log in to the Wisephone Portal. Metrics may take up to a day to load.",
+    note: "NOTE: This change may take up to 15 minutes to take effect.",
     enableMessage: "I acknowledge turning on this feature will allow the Tool Drawer to be accessible directly from the device. This change may take up to an hour to take effect.",
     disableMessage: "I acknowledge turning off this feature will remove the Tool Drawer from the device. Apps may still be downloaded from the Wisephone Portal. This change may take up to an hour to take effect.",
     isInverse: true

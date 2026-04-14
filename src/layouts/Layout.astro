@@ -202,16 +202,21 @@ const {
     setTimeout(() => Alpine.start(), 0);
   }
 
-  // Auth error popup — injected into the dialog's top-layer so it renders above the modal.
+  // Auth error popup — injected into .modal-box (the white card) so it overlays the form.
   // Not embedded in SignInSignUpModal.astro; driven by the auth-modal-error custom event.
   let _authErrorTimer: ReturnType<typeof setTimeout> | null = null;
   window.addEventListener("auth-modal-error", (e: Event) => {
     const message = (e as CustomEvent<{ message: string }>).detail?.message || "Something went wrong.";
     const dialog = document.getElementById("auth-modal") as HTMLDialogElement | null;
     if (!dialog) return;
+    // Target the white card so position:absolute covers it, not the flex dialog shell
+    const modalBox = dialog.querySelector<HTMLElement>(".modal-box") ?? dialog;
 
-    let popup = dialog.querySelector<HTMLElement>("#auth-error-overlay");
+    let popup = modalBox.querySelector<HTMLElement>("#auth-error-overlay");
     if (!popup) {
+      // Ensure the card is a positioning context
+      if (getComputedStyle(modalBox).position === "static") modalBox.style.position = "relative";
+
       popup = document.createElement("div");
       popup.id = "auth-error-overlay";
       popup.style.cssText = [
@@ -221,20 +226,23 @@ const {
         "align-items:center",
         "justify-content:center",
         "pointer-events:none",
-        "z-index:9999",
+        "z-index:50",
+        "border-radius:inherit",
+        "background:rgba(255,255,255,0.55)",
+        "backdrop-filter:blur(2px)",
       ].join(";");
       popup.innerHTML = `
         <div style="pointer-events:auto;display:flex;align-items:center;gap:12px;
           background:#fff1f2;border:1.5px solid #fca5a5;color:#7f1d1d;
           border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.18);
-          padding:14px 20px;max-width:320px;width:calc(100% - 32px);
+          padding:14px 20px;max-width:320px;width:calc(100% - 48px);
           font-size:14px;font-weight:500;line-height:1.4;">
           <svg xmlns="http://www.w3.org/2000/svg" style="width:20px;height:20px;flex-shrink:0;color:#ef4444" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M12 3a9 9 0 100 18A9 9 0 0012 3z"/>
           </svg>
           <span id="auth-error-overlay-text"></span>
         </div>`;
-      dialog.appendChild(popup);
+      modalBox.appendChild(popup);
     }
 
     const textEl = popup.querySelector<HTMLElement>("#auth-error-overlay-text");
