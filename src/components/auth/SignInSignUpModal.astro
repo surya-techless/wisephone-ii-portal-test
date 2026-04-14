@@ -86,9 +86,11 @@ const isProd = import.meta.env.PROD;
           <input
             id="auth-phone-signin"
             type="tel"
+            inputmode="numeric"
             class="input input-bordered input-sm flex-1 min-w-0 h-10"
             placeholder="Enter your phone number"
             x-model="phoneNumber"
+            @keydown="if(!/[0-9]/.test($event.key) && !['Backspace','Delete','Tab','ArrowLeft','ArrowRight','Home','End'].includes($event.key) && !$event.metaKey && !$event.ctrlKey) $event.preventDefault()"
             autocomplete="tel"
           />
         </div>
@@ -97,7 +99,7 @@ const isProd = import.meta.env.PROD;
         <span x-show="!loading">Continue</span>
         <span x-show="loading" x-cloak>Sending code…</span>
       </button>
-      <p class="text-sm text-center text-[var(--text-secondary)]">Don't have an account? <button type="button" class="link link-primary font-semibold" @click="tab = 'signup'; errorMessage = ''">Sign up</button></p>
+      <p class="text-sm text-center text-[var(--text-secondary)]">Don't have an account? <button type="button" class="link link-primary font-semibold" @click="tab = 'signup'; errorMessage = ''; email = ''; phoneNumber = ''">Sign up</button></p>
     </form>
 
     <!-- Sign In: Step 2 – Verification code -->
@@ -189,9 +191,11 @@ const isProd = import.meta.env.PROD;
           <input
             id="auth-phone-signup"
             type="tel"
+            inputmode="numeric"
             class="input input-bordered input-sm flex-1 min-w-0 h-10"
             placeholder="Enter your phone number"
             x-model="phoneNumber"
+            @keydown="if(!/[0-9]/.test($event.key) && !['Backspace','Delete','Tab','ArrowLeft','ArrowRight','Home','End'].includes($event.key) && !$event.metaKey && !$event.ctrlKey) $event.preventDefault()"
             required
             autocomplete="tel"
           />
@@ -215,7 +219,7 @@ const isProd = import.meta.env.PROD;
           <span x-show="loading" x-cloak>Creating…</span>
         </button>
       </div>
-      <p class="text-sm text-center text-[var(--text-secondary)]">Already have an account? <button type="button" class="link link-primary font-semibold" @click="tab = 'signin'; signInCodeStep = false; errorMessage = ''">Sign in</button></p>
+      <p class="text-sm text-center text-[var(--text-secondary)]">Already have an account? <button type="button" class="link link-primary font-semibold" @click="tab = 'signin'; signInCodeStep = false; errorMessage = ''; email = ''; phoneNumber = ''">Sign in</button></p>
     </form>
   </div>
   <form method="dialog" class="modal-backdrop bg-black/50">
@@ -354,7 +358,12 @@ const isProd = import.meta.env.PROD;
           this.loading = false;
         } catch (e) {
           const err = (e && typeof e === "object" && "errors" in e && Array.isArray((e).errors) ? (e).errors[0] : e);
-          this.setError(err?.longMessage ?? err?.message ?? "Could not send verification code.");
+          const rawMessage = err?.longMessage ?? err?.message ?? "";
+          const isInvalidIdentifier = rawMessage.toLowerCase().includes("identifier is invalid");
+          const friendlyMessage = isInvalidIdentifier
+            ? (this.signInMethod === "phone" ? "Phone number is invalid." : "Email is invalid.")
+            : rawMessage || "Could not send verification code.";
+          this.setError(friendlyMessage);
         }
       },
 
@@ -417,7 +426,13 @@ const isProd = import.meta.env.PROD;
           this.loading = false;
         } catch (e) {
           const err = (e && typeof e === "object" && "errors" in e && Array.isArray((e).errors) ? (e).errors[0] : e);
-          this.setError(err?.longMessage ?? err?.message ?? "Sign-up failed.");
+          const rawMessage = err?.longMessage ?? err?.message ?? "";
+          const friendlyMessage = rawMessage.toLowerCase().includes("valid email") || rawMessage.toLowerCase().includes("email address must")
+            ? "Email is invalid."
+            : rawMessage.toLowerCase().includes("valid phone") || rawMessage.toLowerCase().includes("phone number must")
+            ? "Phone number is invalid."
+            : rawMessage || "Sign-up failed.";
+          this.setError(friendlyMessage);
         }
       },
 
