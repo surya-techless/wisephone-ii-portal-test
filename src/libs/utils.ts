@@ -113,7 +113,7 @@ export const FEATURES: Record<string, Feature> = {
     lucideIcon: "smartphone",
     isEnabled: true,
     name: "Allow Access Directly on Device",
-    description: "Controls whether the Tool Drawer is directly accessible on the device without needing to log in to the Wisephone Portal. Metrics may take up to a day to load.",
+    description: "Controls whether the Tool Drawer is directly accessible on the device without needing to log in to the Wisephone Portal.",
     note: "NOTE: This change may take up to 15 minutes to take effect.",
     enableMessage: "I acknowledge turning on this feature will allow the Tool Drawer to be accessible directly from the device. This change may take up to 15 minutes to take effect.",
     disableMessage: "I acknowledge turning off this feature will remove the Tool Drawer from the device. Apps may still be downloaded from the Wisephone Portal. This change may take up to 15 minutes to take effect.",
