@@ -651,14 +651,15 @@ try {
                           <p class="text-xs text-gray-600 mb-1">Apps</p>
                           <p class="text-xl font-semibold text-gray-900" x-text="totalAppsCount">0</p>
                         </div>
-                        <div
+                        <!-- Data used counter hidden for now -->
+                        <!-- <div
                           class="text-center bg-[#f7f6f2] rounded-lg p-3 min-w-0"
                           x-show="enableScreenTime && dataUsageFormatted"
                           x-cloak
                         >
                           <p class="text-xs text-gray-600 mb-1">Data</p>
                           <p class="text-xl font-semibold text-gray-900" x-text="dataUsageFormatted || '—'">—</p>
-                        </div>
+                        </div> -->
                       </div>
 
                       <!-- Subscription & Billing -->
@@ -1048,7 +1049,7 @@ try {
                       type="text"
                       x-model.debounce.300ms="appSearchQuery"
                       placeholder="Search apps or categories (e.g, Finance, Books)"
-                      class="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-md text-sm bg-gray-100 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                      class="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-md text-sm bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-teal-500 focus:border-transparent"
                     />
                   </div>
                 </div>
