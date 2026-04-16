@@ -285,29 +285,26 @@ const isProd = import.meta.env.PROD;
           console.log("[AuthModal] modal opened, tab:", this.tab, "clerk ready:", !!this.clerk);
         });
 
-        const key = this.publishableKey;
-        const keyPreview = key ? `${key.slice(0, 10)}...${key.slice(-4)}` : "(empty)";
-        console.log("[AuthModal] publishableKey:", keyPreview, "length:", key?.length ?? 0);
-        if (!key) {
-          console.warn("[AuthModal] Skipping Clerk load: no publishableKey");
-          return;
-        }
         try {
-          console.log("[AuthModal] Importing @clerk/clerk-js...");
-          const mod = await import("@clerk/clerk-js");
-          const ClerkClass = mod.Clerk ?? mod.default;
-          console.log("[AuthModal] Import done. Clerk:", typeof ClerkClass, "keys:", mod ? Object.keys(mod) : "none");
-          if (typeof ClerkClass !== "function") {
-            throw new Error("Clerk is not a constructor. Export: " + JSON.stringify(Object.keys(mod)));
-          }
-          const clerkInstance = new ClerkClass(key);
-          console.log("[AuthModal] Clerk instance created, calling load()...");
-          await clerkInstance.load();
-          this.clerk = clerkInstance;
-          console.log("[AuthModal] Clerk load() done. client:", !!this.clerk?.client, "signIn:", typeof this.clerk?.client?.signIn, "signUp:", typeof this.clerk?.client?.signUp);
+          // Use the Clerk instance already initialized by @clerk/astro to avoid
+          // dual-instance state conflicts (which corrupt signUp between OTP send/verify).
+          console.log("[AuthModal] Waiting for window.Clerk from @clerk/astro...");
+          await new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => reject(new Error("Clerk load timeout")), 10000);
+            const check = () => {
+              if (window.Clerk?.client) {
+                clearTimeout(timeout);
+                resolve();
+              } else {
+                setTimeout(check, 50);
+              }
+            };
+            check();
+          });
+          this.clerk = window.Clerk;
+          console.log("[AuthModal] Clerk ready. client:", !!this.clerk?.client, "signIn:", typeof this.clerk?.client?.signIn, "signUp:", typeof this.clerk?.client?.signUp);
         } catch (e) {
           console.error("[AuthModal] Clerk load failed:", e);
-          console.error("[AuthModal] Error name:", e?.name, "message:", e?.message, "stack:", e?.stack);
           this.setError("Unable to load sign-in. Please refresh the page.");
         }
       },
