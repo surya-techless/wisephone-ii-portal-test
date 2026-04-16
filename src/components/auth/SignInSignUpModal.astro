@@ -404,7 +404,7 @@ const isProd = import.meta.env.PROD;
         this.loading = true;
         this.errorMessage = "";
         try {
-          const payload = { emailAddress: this.email };
+          const payload = { emailAddress: this.email, legalAccepted: true };
           if (this.firstName) payload.firstName = this.firstName;
           if (this.lastName) payload.lastName = this.lastName;
           const phone = this.phoneNumber ? this.phoneCountryCode + this.phoneNumber.replace(/\D/g, "") : null;
@@ -444,9 +444,25 @@ const isProd = import.meta.env.PROD;
         this.errorMessage = "";
         try {
           await signUp.attemptPhoneNumberVerification({ code: this.phoneVerificationCode.trim() });
+          console.log("[AuthModal] signUp after phone verify — status:", signUp.status, "missingFields:", signUp.missingFields, "unverifiedFields:", signUp.unverifiedFields);
           if (signUp.status === "complete" && signUp.createdSessionId && clerk?.setActive) {
             await clerk.setActive({ session: signUp.createdSessionId });
             window.location.href = this.redirectUrl;
+            return;
+          }
+          if (signUp.status === "missing_requirements") {
+            const missing = signUp.missingFields ?? [];
+            const unverified = signUp.unverifiedFields ?? [];
+            console.error("[AuthModal] missing_requirements — missingFields:", missing, "unverifiedFields:", unverified);
+            if (missing.length === 1 && missing[0] === "legal_accepted") {
+              await signUp.update({ legalAccepted: true });
+              if (signUp.status === "complete" && signUp.createdSessionId && clerk?.setActive) {
+                await clerk.setActive({ session: signUp.createdSessionId });
+                window.location.href = this.redirectUrl;
+                return;
+              }
+            }
+            this.setError(`Sign-up incomplete. Missing: ${[...missing, ...unverified].join(", ") || "unknown requirement"}. Check browser console for details.`);
             return;
           }
           const err = signUp?.verifications?.phoneNumber?.error;
