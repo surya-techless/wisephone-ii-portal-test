@@ -12,9 +12,11 @@ import DashboardSidebar from "@/components/DashboardSidebar.astro";
 import IsAdmin from "@/components/server-islands/IsAdmin.astro";
 import { SignOutButton } from "@clerk/astro/components";
 import { validateIsSubscribed } from "@/libs/stripe";
-import { devLog } from "@/libs/utils";
+import { devLog, KNOX_USER_GROUPS } from "@/libs/utils";
+import { SamsungKnoxService } from "@/libs/samsung-knox-service";
 import { isFeatureEnabled } from "@/config/feature-flags";
 import TypeformDeviceRegistration from "@/components/TypeformDeviceRegistration.astro";
+import CspireSubscriptionModal from "@/components/CspireSubscriptionModal.astro";
 
 if (!Astro.locals.auth().userId) {
   return Astro.redirect("/");
@@ -32,7 +34,13 @@ const derivedHasNoWisephone = wisephones.length === 0;
 // Check if Typeform feature is enabled
 const enableTypeform = isFeatureEnabled("ENABLE_TYPEFORM");
 
-// Check subscription status for each device
+const allCspireGroupIds = [
+  KNOX_USER_GROUPS.CSPIRE_WPII_Unpaid_v2,
+  KNOX_USER_GROUPS.CSPIRE_WPII_Subscribed,
+  KNOX_USER_GROUPS.CSPIRE_ADD_ON_BLOCK_TOOL_DRAWER
+];
+
+// Check subscription status and CSPIRE status for each device
 const wisephonesWithSubscription = await Promise.all(
   wisephones.map(async (wisephone) => {
     // Check for bypass subscription first
@@ -43,8 +51,9 @@ const wisephonesWithSubscription = await Promise.all(
       .limit(1);
 
     let isSubscribed = bypassTechlessSubscription.length > 0;
+    const isBypass = isSubscribed;
 
-    // If not bypassed, check actual subscription
+    // If not bypassed, check actual subscription (stripe.ts logs the provider: STRIPE or GIGS)
     if (!isSubscribed && wisephone.phoneNumber) {
       try {
         isSubscribed = await validateIsSubscribed({
@@ -56,14 +65,36 @@ const wisephonesWithSubscription = await Promise.all(
       }
     }
 
+    // Check Knox groups to determine CSPIRE status
+    let isCspire = false;
+    try {
+      const groups = await SamsungKnoxService.getGroupsForDevice(wisephone.imei.toString());
+      isCspire = groups.some(id => allCspireGroupIds.includes(id));
+    } catch {
+      // Non-fatal — isCspire stays false
+    }
+
+    console.log(
+      `[Device Details] IMEI: ${wisephone.imei} | isSubscribed: ${isSubscribed} | isCspire: ${isCspire}`
+    );
+
     return {
       ...wisephone,
-      isSubscribed
+      isSubscribed,
+      isCspire
     };
   })
 );
 
 const actionResult = Astro.getActionResult(actions.wisephones.createWisephone);
+
+// Log CSPIRE and subscription status for a newly added device before showing its card / redirecting
+if (actionResult?.data?.wisephone?.[0]?.imei) {
+  const newImei = actionResult.data.wisephone[0].imei;
+  console.log(
+    `[Device Details] IMEI: ${newImei} | isSubscribed: ${actionResult.data.isSubscribed} | isCspire: ${actionResult.data.isCspire}`
+  );
+}
 
 // If a device was just added and it's subscribed, redirect to manage page
 if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei) {
@@ -71,6 +102,26 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
   return Astro.redirect(`/manage/${imeiPadded}`);
 }
 ---
+
+<script define:vars={{ wisephonesWithSubscription, newDeviceResult: actionResult?.data ?? null }}>
+  wisephonesWithSubscription.forEach(device => {
+    console.log("[Device Details]", {
+      imei: device.imei,
+      nickname: device.nickname,
+      phoneNumber: device.phoneNumber,
+      isSubscribed: device.isSubscribed,
+      isCspire: device.isCspire
+    });
+  });
+
+  if (newDeviceResult?.wisephone?.[0]) {
+    console.log("[Device Details] Newly added device:", {
+      imei: newDeviceResult.wisephone[0].imei,
+      isSubscribed: newDeviceResult.isSubscribed,
+      isCspire: newDeviceResult.isCspire
+    });
+  }
+</script>
 
 <!-- <Layout title="Dashboard" description="Manage your Wisephone II devices.">
   {actionResult ? <AstroActionToastResponse actionResult={actionResult} /> : null}
@@ -356,7 +407,7 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
   }
 </style>
 
-<div class="dashboard-container flex h-screen w-full min-w-[360px] bg-[#f7f6f2] relative" x-data={`dashboard(${JSON.stringify({ userEmail: user?.emailAddresses?.[0]?.emailAddress || user?.primaryEmailAddress?.emailAddress || "", newDevice: actionResult?.data && !actionResult.error && !actionResult.data.isSubscribed && actionResult.data.wisephone?.[0] ? { imei: actionResult.data.wisephone[0].imei.toString().padEnd(15, "0"), phoneNumber: actionResult.data.wisephone[0].phoneNumber || "" } : null })})`} @activate-modal.window="openActivateModal($event.detail?.imei || $event.detail)">
+<div class="dashboard-container flex h-screen w-full min-w-[360px] bg-[#f7f6f2] relative" x-data={`dashboard(${JSON.stringify({ userEmail: user?.emailAddresses?.[0]?.emailAddress || user?.primaryEmailAddress?.emailAddress || "", newDevice: actionResult?.data && !actionResult.error && !actionResult.data.isSubscribed && actionResult.data.wisephone?.[0] ? { imei: actionResult.data.wisephone[0].imei.toString().padEnd(15, "0"), phoneNumber: actionResult.data.wisephone[0].phoneNumber || "" } : null })})`} @activate-modal.window="$event.detail?.isCspire ? openCspireModal($event.detail) : openActivateModal($event.detail?.imei || $event.detail)">
   <progress
     x-show="isLoading"
     x-cloak
@@ -436,13 +487,14 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
             const deviceData = {
               imei: imeiString,
               isSubscribed: Boolean(wisephone.isSubscribed),
-              phoneNumber: wisephone.phoneNumber || ''
+              phoneNumber: wisephone.phoneNumber || '',
+              isCspire: Boolean(wisephone.isCspire)
             };
             devLog.log(`Device card data for ${imeiString}:`, deviceData, `isSubscribed type: ${typeof wisephone.isSubscribed}, value: ${wisephone.isSubscribed}`);
 
             return (
-              <div class="border border-gray-300 rounded-md bg-white p-3 w-full md:w-[400px] flex items-start gap-4" x-data={`deviceCard(${JSON.stringify(deviceData)})`}>
-                <div class="w-10 h-10 bg-[#4b918e] rounded-full flex items-center justify-center text-white text-sm font-semibold flex-shrink-0">
+              <div class="border border-gray-300 rounded-md bg-white p-3 w-full md:w-[400px] flex items-stretch gap-4" x-data={`deviceCard(${JSON.stringify(deviceData)})`}>
+                <div class="w-10 h-10 bg-[#4b918e] rounded-full flex items-center justify-center text-white text-sm font-semibold flex-shrink-0 self-center">
                   {initials}
                 </div>
                 <div class="flex-1 min-w-0 flex flex-col gap-0.5">
@@ -450,24 +502,37 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
                   <p class="text-gray-500 text-sm">{wisephone.phoneNumber || '(111) 111-1111'}</p>
                   <p class="text-gray-500 text-sm whitespace-nowrap">IMEI: {imeiString}</p>
                 </div>
-                <template x-if="isSubscribed">
-                  <a
-                    href={`/manage/${imeiString}`}
-                    @click="$root.isLoading = true"
-                    class="border border-gray-300 bg-white text-gray-900 text-sm px-2.5 py-1 rounded-md hover:bg-gray-50 whitespace-nowrap flex-shrink-0"
-                  >
-                    Manage Device
-                  </a>
-                </template>
-                <template x-if="!isSubscribed">
+                <div class="flex flex-col justify-between items-end flex-shrink-0">
+                  <template x-if="isSubscribed">
+                    <a
+                      href={`/manage/${imeiString}`}
+                      @click="$root.isLoading = true"
+                      class="border border-gray-300 bg-white text-gray-900 text-sm px-2.5 py-1 rounded-md hover:bg-gray-50 whitespace-nowrap"
+                    >
+                      Manage Device
+                    </a>
+                  </template>
+                  <template x-if="!isSubscribed">
+                    <button
+                      type="button"
+                      @click="openActivateModal()"
+                      class="border border-gray-300 bg-white text-gray-900 text-sm px-2.5 py-1 rounded-md hover:bg-gray-50 whitespace-nowrap"
+                    >
+                      Activate Plan
+                    </button>
+                  </template>
                   <button
                     type="button"
-                    @click="openActivateModal()"
-                    class="border border-gray-300 bg-white text-gray-900 text-sm px-2.5 py-1 rounded-md hover:bg-gray-50 whitespace-nowrap flex-shrink-0"
+                    class="text-gray-400 hover:text-gray-600 transition-colors px-1"
+                    title="More options"
                   >
-                    Activate Plan
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                      <circle cx="5" cy="12" r="2"></circle>
+                      <circle cx="12" cy="12" r="2"></circle>
+                      <circle cx="19" cy="12" r="2"></circle>
+                    </svg>
                   </button>
-                </template>
+                </div>
               </div>
             );
           })}
@@ -986,6 +1051,9 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
     </div>
   </div>
 
+  <!-- CSPIRE Subscription Modal -->
+  <CspireSubscriptionModal />
+
   <!-- Stripe Checkout Dialog -->
   <dialog x-ref="stripeDialog" class="modal">
     <div style="background-color: rgb(247, 246, 242)" class="modal-box max-w-2xl">
@@ -1021,6 +1089,7 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
       mobileMenuOpen: false,
       showAccountMenu: false,
       showActivateModal: false,
+      showCspireModal: false,
       activeDeviceImei: null as string | null,
       activeDevicePhoneNumber: null as string | null,
       pollingSubscription: false,
@@ -1088,6 +1157,20 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
       closeActivateModal() {
         this.showActivateModal = false;
         // Don't clear activeDeviceImei if we're polling (user might have clicked X during activation)
+        if (!this.pollingSubscription) {
+          this.activeDeviceImei = null;
+          this.activeDevicePhoneNumber = null;
+        }
+      },
+      openCspireModal(imei: string | { imei?: string; phoneNumber?: string }) {
+        const imeiValue = typeof imei === 'string' ? imei : (imei?.imei || '');
+        const phoneNumber = typeof imei === 'object' ? (imei?.phoneNumber || null) : null;
+        this.activeDeviceImei = imeiValue;
+        this.activeDevicePhoneNumber = phoneNumber;
+        this.showCspireModal = true;
+      },
+      closeCspireModal() {
+        this.showCspireModal = false;
         if (!this.pollingSubscription) {
           this.activeDeviceImei = null;
           this.activeDevicePhoneNumber = null;
@@ -1586,12 +1669,13 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
       }
     }));
 
-    Alpine.data("deviceCard", (deviceData: { imei: string; isSubscribed: boolean; phoneNumber?: string }) => ({
+    Alpine.data("deviceCard", (deviceData: { imei: string; isSubscribed: boolean; phoneNumber?: string; isCspire?: boolean }) => ({
       imei: deviceData.imei,
       isSubscribed: deviceData.isSubscribed,
       phoneNumber: deviceData.phoneNumber || '',
+      isCspire: deviceData.isCspire || false,
       init() {
-        devLog.log("Device card initialized:", { imei: this.imei, isSubscribed: this.isSubscribed, phoneNumber: this.phoneNumber });
+        devLog.log("Device card initialized:", { imei: this.imei, isSubscribed: this.isSubscribed, phoneNumber: this.phoneNumber, isCspire: this.isCspire });
 
         // Update subscription status if it changed
         this.$watch('isSubscribed', (value) => {
@@ -1619,21 +1703,26 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
         });
       },
       openActivateModal() {
-        devLog.log("Device card openActivateModal called for IMEI:", this.imei, "isSubscribed:", this.isSubscribed);
+        devLog.log("Device card openActivateModal called for IMEI:", this.imei, "isSubscribed:", this.isSubscribed, "isCspire:", this.isCspire);
+        const payload = { imei: this.imei, phoneNumber: this.phoneNumber, isCspire: this.isCspire };
         // Try to find the dashboard component
         const dashboardEl = document.querySelector('[x-data="dashboard"]');
         if (dashboardEl) {
-          // Use Alpine's $data to get the dashboard component data
           const dashboardData = (window as any).Alpine?.$data?.(dashboardEl);
-          if (dashboardData && typeof dashboardData.openActivateModal === 'function') {
-            devLog.log("Found dashboard, calling openActivateModal");
-            dashboardData.openActivateModal({ imei: this.imei, phoneNumber: this.phoneNumber });
+          if (dashboardData) {
+            if (this.isCspire && typeof dashboardData.openCspireModal === 'function') {
+              devLog.log("Found dashboard, calling openCspireModal (CSPIRE device)");
+              dashboardData.openCspireModal(payload);
+            } else if (typeof dashboardData.openActivateModal === 'function') {
+              devLog.log("Found dashboard, calling openActivateModal");
+              dashboardData.openActivateModal(payload);
+            }
             return;
           }
         }
         // Fallback: dispatch event
         devLog.log("Dispatching activate-modal event");
-        (this as any).$dispatch('activate-modal', { imei: this.imei, phoneNumber: this.phoneNumber });
+        (this as any).$dispatch('activate-modal', payload);
       },
       async checkSubscriptionStatus() {
         // This can be called after user returns from activation

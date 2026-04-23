@@ -90,6 +90,8 @@ export const KNOX_USER_GROUPS = {
 
 };
 
+export const CSPIRE_SUBSCRIPTION_CHECK = true;
+
 export const FEATURES: Record<string, Feature> = {
   TOOL_DRAWER: {
     knoxManageId: KNOX_USER_GROUPS.ADD_ON_TOOL_DRAWER,

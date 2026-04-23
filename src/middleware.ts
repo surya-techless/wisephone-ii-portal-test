@@ -4,14 +4,12 @@ import { devLog } from "@/libs/utils";
 const isProtectedRoute = createRouteMatcher(["/dashboard(.*)"]);
 
 export const onRequest = clerkMiddleware((auth, context) => {
-  const { redirectToSignIn, userId } = auth();
+  const { userId } = auth();
 
   if (!userId && isProtectedRoute(context.request)) {
-    // Add custom logic to run before redirecting
     devLog.log("Unauthorized access attempt to protected route:", context.url.pathname);
-
-    return redirectToSignIn({
-      returnBackUrl: context.url.origin
-    });
+    // Redirect to portal homepage (which has the sign-in modal) instead of
+    // Clerk's Account Portal, to avoid cross-origin redirect_url issues on tunnels.
+    return context.redirect("/");
   }
 });

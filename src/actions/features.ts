@@ -1,6 +1,7 @@
 import { defineAction, ActionError } from "astro:actions";
 import { z } from "astro:schema";
 import { db, DeviceFeatureFlags, eq, sql } from "astro:db";
+import { publishFeatureFlags } from "@/libs/mqtt";
 
 const featureFlagSchema = z.object({
   TOOL_DRAWER: z.number().min(0).max(1),
@@ -33,6 +34,7 @@ export const features = {
           target: DeviceFeatureFlags.imei,
           set: { ...flags, ...extra, updatedAt: new Date() }
         });
+      await publishFeatureFlags(imei, flags);
       return { success: true };
     }
   }),
@@ -62,6 +64,7 @@ export const features = {
         .set({ [featureKey]: value, updatedAt: new Date() })
         .where(eq(DeviceFeatureFlags.imei, imei));
 
+      await publishFeatureFlags(imei, { [featureKey]: value });
       return { success: true };
     }
   })

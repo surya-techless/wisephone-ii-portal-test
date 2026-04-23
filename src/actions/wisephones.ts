@@ -39,8 +39,11 @@ export const wisephones = {
         const newWisephone = await db.insert(Wisephone).values(input).returning();
 
         // Seed DeviceFeatureFlags from live Knox groups
+        let isCspireDevice = false;
+        let deviceGroups: string[] = [];
         try {
           const groups = await SamsungKnoxService.getGroupsForDevice(input.imei.toString());
+          deviceGroups = groups;
           const flags: Record<string, number> = { SHOW_SCREEN_TIME: 0 };
           for (const [key, feature] of Object.entries(FEATURES)) {
             if (feature.isPortalOnly) continue;
@@ -49,7 +52,13 @@ export const wisephones = {
               (feature.a16KnoxManageId ? groups.includes(feature.a16KnoxManageId) : false);
             flags[key] = (feature.isInverse ? !hasGroup : hasGroup) ? 1 : 0;
           }
+          const allCspireGroupIds = [
+            KNOX_USER_GROUPS.CSPIRE_WPII_Unpaid_v2,
+            KNOX_USER_GROUPS.CSPIRE_WPII_Subscribed,
+            KNOX_USER_GROUPS.CSPIRE_ADD_ON_BLOCK_TOOL_DRAWER
+          ];
           const cspireGroupIds = [KNOX_USER_GROUPS.CSPIRE_WPII_Unpaid_v2, KNOX_USER_GROUPS.CSPIRE_WPII_Subscribed];
+          isCspireDevice = groups.some(id => allCspireGroupIds.includes(id));
           const phoneType = groups.some(id => cspireGroupIds.includes(id)) ? "CSPIRE" : "WPII";
           await db
             .insert(DeviceFeatureFlags)
@@ -63,6 +72,18 @@ export const wisephones = {
           // Non-fatal — flags will be seeded on first manage page visit
           devLog.error("[FeatureFlags] Failed to seed on device add:", flagsError);
         }
+
+        // Log CSPIRE status before subscription check
+        const cspireGroupNames = Object.entries(KNOX_USER_GROUPS)
+          .filter(([key]) => key.startsWith("CSPIRE"))
+          .filter(([, id]) => deviceGroups.includes(id))
+          .map(([key]) => key);
+        console.log(
+          `[Device Details] IMEI: ${input.imei} | isCspire: ${isCspireDevice}`,
+          isCspireDevice
+            ? `| CSPIRE Knox groups: [${cspireGroupNames.join(", ")}]`
+            : "| No CSPIRE Knox groups found"
+        );
 
         // Check if device is already subscribed
         // First check for bypass subscription
@@ -88,7 +109,8 @@ export const wisephones = {
         return {
           success: "Wisephone created successfully!",
           wisephone: newWisephone,
-          isSubscribed
+          isSubscribed,
+          isCspire: isCspireDevice
         };
       } catch (error: any) {
         if (error?.code === "SQLITE_CONSTRAINT_PRIMARYKEY" || error?.code === "SQLITE_CONSTRAINT") {

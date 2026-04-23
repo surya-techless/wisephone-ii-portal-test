@@ -46,8 +46,7 @@ export default defineConfig({
           : false,
       port: process.env.PORT ? parseInt(process.env.PORT) : 4321,
       host: process.env.HOST || true,
-      // Allow Cloudflare tunnel hosts and any trycloudflare.com subdomain
-      allowedHosts: [".trycloudflare.com", "localhost", "127.0.0.1"]
+      allowedHosts: [".ngrok-free.dev", ".ngrok-free.app", ".ngrok.io", ".ngrok.app", "localhost", "127.0.0.1"]
     }
   },
   env: {
