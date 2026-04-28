@@ -1472,6 +1472,7 @@ try {
 
           <script is:inline define:vars={{ appsJsonData }}>
             window.APPS_JSON_DATA = appsJsonData;
+            window.DEV_SKIP_KNOX_SUBSCRIPTION_PUSH = false;
           </script>
           <script>
             import Alpine from "alpinejs";
@@ -1835,6 +1836,10 @@ try {
                  * - A15 and other devices -> SUBSCRIBED group (default)
                  */
                 async assignSubscriptionGroupByDeviceModel() {
+                  if ((window as any).DEV_SKIP_KNOX_SUBSCRIPTION_PUSH) {
+                    console.log("[DEV] Skipping Knox subscription group push (DEV_SKIP_KNOX_SUBSCRIPTION_PUSH=true). Feature flags still push via MQTT.");
+                    return;
+                  }
                   // Bail out early if the correct subscription group is already present —
                   // prevents duplicate Knox calls and double-push on concurrent invocations
                   const alreadyHasSubscribedGroup =
@@ -1937,6 +1942,10 @@ try {
                  * - A15 and other devices -> UNPAID group (default)
                  */
                 async assignUnpaidGroupByDeviceModel() {
+                  if ((window as any).DEV_SKIP_KNOX_SUBSCRIPTION_PUSH) {
+                    console.log("[DEV] Skipping Knox unpaid group push (DEV_SKIP_KNOX_SUBSCRIPTION_PUSH=true). Feature flags still push via MQTT.");
+                    return;
+                  }
                   if (this.deviceType === "CSPIRE") {
                     devLog.log("[CSPIRE] Unsubscribe detected — no group change for CSPIRE devices");
                     if (!this.features.includes(KNOX_USER_GROUPS.A16_ADD_ON_BLOCK_TOOL_DRAWER)) {
@@ -3058,21 +3067,8 @@ try {
                         : `Your device is being updated. ${feature.name} will be disabled shortly.`
                     );
 
-                    // Update the DB record for this feature flag
-                    if (this.imei && feature.featureKey) {
-                      try {
-                        await actions.features.updateFeatureFlag({
-                          imei: this.imei,
-                          featureKey: feature.featureKey,
-                          value: updatedValue ? 1 : 0
-                        });
-                        devLog.log("[FeatureFlags] Updated DB:", feature.featureKey, "->", updatedValue ? 1 : 0);
-                      } catch (dbErr) {
-                        devLog.error("[FeatureFlags] Failed to update DB after toggle:", dbErr);
-                      }
-                    }
-
                     // Cascade: if TOOL_DRAWER is turned off, also force-disable TOOL_DRAWER_IN_PHONE
+                    // Run BEFORE the MQTT push so the snapshot captures both changes at once
                     if (feature.featureKey === "TOOL_DRAWER" && !updatedValue) {
                       const tdip = (this.availableFeatures as Feature[]).find(
                         (f: Feature) => f.featureKey === "TOOL_DRAWER_IN_PHONE"
@@ -3081,6 +3077,36 @@ try {
                       if (tdip && this.isFeatureEnabledForFeature(tdip)) {
                         devLog.log("[TDIP] Cascade triggered — force-disabling TOOL_DRAWER_IN_PHONE");
                         await this.forceDisableFeature(tdip);
+                      }
+                    }
+
+                    // Update DB and push all flags to MQTT in one shot (after cascade completes)
+                    if (this.imei && feature.featureKey) {
+                      try {
+                        const mqttBroker = "https://a1ota0l8psd5z9-ats.iot.us-east-1.amazonaws.com";
+                        const mqttTopic = `devices/${this.imei}/feature-flags`;
+
+                        // Build full flags snapshot — reflects both the toggled flag and any cascade changes
+                        const flagMap = this.logFeatureFlagMap();
+                        const allFlags: Record<string, 0 | 1> = {};
+                        flagMap.forEach(({ value }: { value: boolean }, key: string) => {
+                          allFlags[key] = value ? 1 : 0;
+                        });
+
+                        console.log(`[MQTT] Broker : ${mqttBroker}`);
+                        console.log(`[MQTT] Topic  : ${mqttTopic}`);
+                        console.log(`[MQTT] IMEI   : ${this.imei}`);
+                        console.log(`[MQTT] Changed flag → ${feature.featureKey}: ${allFlags[feature.featureKey]}`);
+                        console.log(`[MQTT] All flags being pushed:`, JSON.stringify(allFlags, null, 2));
+
+                        const phoneType = this.deviceType === "CSPIRE" || this.deviceType === "WPII" ? this.deviceType : "WPII";
+                        await actions.features.upsertFeatureFlags({ imei: this.imei, flags: allFlags as any, phoneType });
+
+                        console.log(`[MQTT] ✅ All flags pushed successfully to ${mqttTopic}`);
+                        devLog.log("[FeatureFlags] Upserted all flags to DB + MQTT for IMEI:", this.imei);
+                      } catch (dbErr) {
+                        console.error("[MQTT] ❌ Failed to push flags:", dbErr);
+                        devLog.error("[FeatureFlags] Failed to upsert flags after toggle:", dbErr);
                       }
                     }
 
@@ -3131,19 +3157,7 @@ try {
                       );
                     }
 
-                    if (this.imei && feature.featureKey) {
-                      try {
-                        await actions.features.updateFeatureFlag({
-                          imei: this.imei,
-                          featureKey: feature.featureKey,
-                          value: 0
-                        });
-                      } catch (dbErr) {
-                        devLog.error("[FeatureFlags] Failed to update DB for cascade disable:", dbErr);
-                      }
-                    }
-
-                    devLog.log("[FeatureFlags] Cascade disabled:", feature.featureKey);
+                    devLog.log("[FeatureFlags] Cascade disabled (Knox + state only — DB/MQTT handled by caller):", feature.featureKey);
                   } catch (error) {
                     devLog.error("[FeatureFlags] Cascade disable failed for", feature.featureKey, error);
                   }

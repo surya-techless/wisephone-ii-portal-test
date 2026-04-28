@@ -1,15 +1,27 @@
 /**
- * MQTT publish helper for the Wisephone Portal.
- * Uses the EMQX REST API to publish messages to device topics.
- * No persistent MQTT client needed on the server — one HTTP call per flag change.
+ * AWS IoT Core publish helper for the Wisephone Portal.
+ * Uses the AWS IoT Data Plane SDK to publish messages to per-device topics.
+ * No persistent MQTT client needed on the server — one SDK call per flag change.
  */
 
-const EMQX_REST_URL = import.meta.env.MQTT_BROKER_REST_URL; // e.g. http://localhost:18083
-const EMQX_API_KEY = import.meta.env.MQTT_API_KEY;
-const EMQX_API_SECRET = import.meta.env.MQTT_API_SECRET;
+import { IoTDataPlaneClient, PublishCommand } from "@aws-sdk/client-iot-data-plane";
+
+const region = import.meta.env.AWS_REGION;
+const endpoint = import.meta.env.AWS_IOT_ENDPOINT;
+const accessKeyId = import.meta.env.AWS_ACCESS_KEY_ID;
+const secretAccessKey = import.meta.env.AWS_SECRET_ACCESS_KEY;
+
+const client =
+  endpoint && accessKeyId && secretAccessKey
+    ? new IoTDataPlaneClient({
+        region,
+        endpoint: `https://${endpoint}`,
+        credentials: { accessKeyId, secretAccessKey }
+      })
+    : null;
 
 /**
- * Publish feature flags to a specific device via MQTT.
+ * Publish feature flags to a specific device via AWS IoT Core.
  * Topic: devices/{imei}/feature-flags
  * Called after every successful DeviceFeatureFlags DB write.
  */
@@ -17,38 +29,33 @@ export async function publishFeatureFlags(
   imei: string,
   flags: Record<string, number>
 ): Promise<void> {
-  if (!EMQX_REST_URL || !EMQX_API_KEY || !EMQX_API_SECRET) {
-    console.warn("[MQTT] Broker env vars not set — skipping publish");
+  if (!client) {
+    console.warn("[MQTT] ⚠️  Client not initialized — AWS env vars missing. Skipping publish.");
+    console.warn(`[MQTT]    AWS_IOT_ENDPOINT  : ${endpoint || "NOT SET"}`);
+    console.warn(`[MQTT]    AWS_ACCESS_KEY_ID : ${accessKeyId ? accessKeyId.slice(0, 8) + "..." : "NOT SET"}`);
+    console.warn(`[MQTT]    AWS_SECRET_ACCESS_KEY : ${secretAccessKey ? "SET" : "NOT SET"}`);
     return;
   }
 
   const topic = `devices/${imei}/feature-flags`;
   const payload = JSON.stringify({ ...flags, updatedAt: new Date().toISOString() });
 
-  try {
-    const credentials = btoa(`${EMQX_API_KEY}:${EMQX_API_SECRET}`);
-    const response = await fetch(`${EMQX_REST_URL}/api/v5/publish`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Basic ${credentials}`
-      },
-      body: JSON.stringify({
-        topic,
-        payload,
-        qos: 1,
-        retain: false
-      })
-    });
+  console.log(`[MQTT] Broker  : https://${endpoint}`);
+  console.log(`[MQTT] Topic   : ${topic}`);
+  console.log(`[MQTT] IMEI    : ${imei}`);
+  console.log(`[MQTT] Flags   :`, JSON.stringify(flags, null, 2));
 
-    if (!response.ok) {
-      const text = await response.text();
-      console.error(`[MQTT] Publish failed (${response.status}):`, text);
-    } else {
-      console.log(`[MQTT] Published to ${topic}`);
-    }
+  try {
+    await client.send(
+      new PublishCommand({
+        topic,
+        payload: new TextEncoder().encode(payload),
+        qos: 1
+      })
+    );
+    console.log(`[MQTT] ✅ Published successfully to ${topic}`);
   } catch (err) {
     // Non-fatal — device will pick up change on next fallback poll
-    console.error("[MQTT] Publish error:", err);
+    console.error("[MQTT] ❌ Publish error:", err);
   }
 }
