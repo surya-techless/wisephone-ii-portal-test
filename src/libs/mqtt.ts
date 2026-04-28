@@ -5,6 +5,7 @@
  */
 
 import { IoTDataPlaneClient, PublishCommand } from "@aws-sdk/client-iot-data-plane";
+import { devLog } from "@/libs/utils";
 
 const region = import.meta.env.WPII_AWS_IOT_REGION;
 const endpoint = import.meta.env.WPII_AWS_IOT_ENDPOINT;
@@ -30,20 +31,20 @@ export async function publishFeatureFlags(
   flags: Record<string, number>
 ): Promise<void> {
   if (!client) {
-    console.warn("[MQTT] ⚠️  Client not initialized — AWS env vars missing. Skipping publish.");
-    console.warn(`[MQTT]    AWS_IOT_ENDPOINT  : ${endpoint || "NOT SET"}`);
-    console.warn(`[MQTT]    AWS_ACCESS_KEY_ID : ${accessKeyId ? accessKeyId.slice(0, 8) + "..." : "NOT SET"}`);
-    console.warn(`[MQTT]    AWS_SECRET_ACCESS_KEY : ${secretAccessKey ? "SET" : "NOT SET"}`);
+    devLog.warn("[MQTT] ⚠️  Client not initialized — AWS env vars missing. Skipping publish.");
+    devLog.warn(`[MQTT]    AWS_IOT_ENDPOINT  : ${endpoint || "NOT SET"}`);
+    devLog.warn(`[MQTT]    AWS_ACCESS_KEY_ID : ${accessKeyId ? accessKeyId.slice(0, 8) + "..." : "NOT SET"}`);
+    devLog.warn(`[MQTT]    AWS_SECRET_ACCESS_KEY : ${secretAccessKey ? "SET" : "NOT SET"}`);
     return;
   }
 
   const topic = `devices/${imei}/feature-flags`;
   const payload = JSON.stringify({ ...flags, updatedAt: new Date().toISOString() });
 
-  console.log(`[MQTT] Broker  : https://${endpoint}`);
-  console.log(`[MQTT] Topic   : ${topic}`);
-  console.log(`[MQTT] IMEI    : ${imei}`);
-  console.log(`[MQTT] Flags   :`, JSON.stringify(flags, null, 2));
+  devLog.log(`[MQTT] Broker  : https://${endpoint}`);
+  devLog.log(`[MQTT] Topic   : ${topic}`);
+  devLog.log(`[MQTT] IMEI    : ${imei}`);
+  devLog.log(`[MQTT] Flags   :`, JSON.stringify(flags, null, 2));
 
   try {
     await client.send(
@@ -53,9 +54,9 @@ export async function publishFeatureFlags(
         qos: 1
       })
     );
-    console.log(`[MQTT] ✅ Published successfully to ${topic}`);
+    devLog.log(`[MQTT] ✅ Published successfully to ${topic}`);
   } catch (err) {
     // Non-fatal — device will pick up change on next fallback poll
-    console.error("[MQTT] ❌ Publish error:", err);
+    devLog.error("[MQTT] ❌ Publish error:", err);
   }
 }

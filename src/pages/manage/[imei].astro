@@ -1837,7 +1837,7 @@ try {
                  */
                 async assignSubscriptionGroupByDeviceModel() {
                   if ((window as any).DEV_SKIP_KNOX_SUBSCRIPTION_PUSH) {
-                    console.log("[DEV] Skipping Knox subscription group push (DEV_SKIP_KNOX_SUBSCRIPTION_PUSH=true). Feature flags still push via MQTT.");
+                    devLog.log("[DEV] Skipping Knox subscription group push (DEV_SKIP_KNOX_SUBSCRIPTION_PUSH=true). Feature flags still push via MQTT.");
                     return;
                   }
                   // Bail out early if the correct subscription group is already present —
@@ -1943,7 +1943,7 @@ try {
                  */
                 async assignUnpaidGroupByDeviceModel() {
                   if ((window as any).DEV_SKIP_KNOX_SUBSCRIPTION_PUSH) {
-                    console.log("[DEV] Skipping Knox unpaid group push (DEV_SKIP_KNOX_SUBSCRIPTION_PUSH=true). Feature flags still push via MQTT.");
+                    devLog.log("[DEV] Skipping Knox unpaid group push (DEV_SKIP_KNOX_SUBSCRIPTION_PUSH=true). Feature flags still push via MQTT.");
                     return;
                   }
                   if (this.deviceType === "CSPIRE") {
@@ -3093,19 +3093,19 @@ try {
                           allFlags[key] = value ? 1 : 0;
                         });
 
-                        console.log(`[MQTT] Broker : ${mqttBroker}`);
-                        console.log(`[MQTT] Topic  : ${mqttTopic}`);
-                        console.log(`[MQTT] IMEI   : ${this.imei}`);
-                        console.log(`[MQTT] Changed flag → ${feature.featureKey}: ${allFlags[feature.featureKey]}`);
-                        console.log(`[MQTT] All flags being pushed:`, JSON.stringify(allFlags, null, 2));
+                        devLog.log(`[MQTT] Broker : ${mqttBroker}`);
+                        devLog.log(`[MQTT] Topic  : ${mqttTopic}`);
+                        devLog.log(`[MQTT] IMEI   : ${this.imei}`);
+                        devLog.log(`[MQTT] Changed flag → ${feature.featureKey}: ${allFlags[feature.featureKey]}`);
+                        devLog.log(`[MQTT] All flags being pushed:`, JSON.stringify(allFlags, null, 2));
 
                         const phoneType = this.deviceType === "CSPIRE" || this.deviceType === "WPII" ? this.deviceType : "WPII";
                         await actions.features.upsertFeatureFlags({ imei: this.imei, flags: allFlags as any, phoneType });
 
-                        console.log(`[MQTT] ✅ All flags pushed successfully to ${mqttTopic}`);
+                        devLog.log(`[MQTT] ✅ All flags pushed successfully to ${mqttTopic}`);
                         devLog.log("[FeatureFlags] Upserted all flags to DB + MQTT for IMEI:", this.imei);
                       } catch (dbErr) {
-                        console.error("[MQTT] ❌ Failed to push flags:", dbErr);
+                        devLog.error("[MQTT] ❌ Failed to push flags:", dbErr);
                         devLog.error("[FeatureFlags] Failed to upsert flags after toggle:", dbErr);
                       }
                     }
