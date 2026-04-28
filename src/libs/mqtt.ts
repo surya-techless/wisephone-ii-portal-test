@@ -6,10 +6,10 @@
 
 import { IoTDataPlaneClient, PublishCommand } from "@aws-sdk/client-iot-data-plane";
 
-const region = import.meta.env.AWS_REGION;
-const endpoint = import.meta.env.AWS_IOT_ENDPOINT;
-const accessKeyId = import.meta.env.AWS_ACCESS_KEY_ID;
-const secretAccessKey = import.meta.env.AWS_SECRET_ACCESS_KEY;
+const region = import.meta.env.WPII_AWS_IOT_REGION;
+const endpoint = import.meta.env.WPII_AWS_IOT_ENDPOINT;
+const accessKeyId = import.meta.env.WPII_AWS_ACCESS_KEY_ID;
+const secretAccessKey = import.meta.env.WPII_AWS_SECRET_ACCESS_KEY;
 
 const client =
   endpoint && accessKeyId && secretAccessKey
