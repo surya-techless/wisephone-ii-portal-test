@@ -147,7 +147,7 @@ export async function validateIsSubscribed({
 
       if (stripeResult) {
         devLog.log("PAY DEBUG: [L2.5] Stripe subscription found, returning true");
-        console.log(`[Device Details] IMEI: ${imei} | isSubscribed: true | provider: STRIPE`);
+        devLog.log(`[Device Details] IMEI: ${imei} | isSubscribed: true | provider: STRIPE`);
         return true;
       }
     }
@@ -156,7 +156,7 @@ export async function validateIsSubscribed({
     const gigsResult = await validateSubscription("gigs", { imei, phoneNumber });
     devLog.log("PAY DEBUG: [L2.7] Gigs subscription check result:", gigsResult);
     devLog.log("PAY DEBUG: [L2.8] Final result:", gigsResult);
-    console.log(`[Device Details] IMEI: ${imei} | isSubscribed: ${gigsResult} | provider: ${gigsResult ? "GIGS" : "NONE (not subscribed)"}`);
+    devLog.log(`[Device Details] IMEI: ${imei} | isSubscribed: ${gigsResult} | provider: ${gigsResult ? "GIGS" : "NONE (not subscribed)"}`);
 
     return gigsResult;
   } catch (err: any) {

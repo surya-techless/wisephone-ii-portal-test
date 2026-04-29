@@ -78,7 +78,7 @@ export const wisephones = {
           .filter(([key]) => key.startsWith("CSPIRE"))
           .filter(([, id]) => deviceGroups.includes(id))
           .map(([key]) => key);
-        console.log(
+        devLog.log(
           `[Device Details] IMEI: ${input.imei} | isCspire: ${isCspireDevice}`,
           isCspireDevice
             ? `| CSPIRE Knox groups: [${cspireGroupNames.join(", ")}]`

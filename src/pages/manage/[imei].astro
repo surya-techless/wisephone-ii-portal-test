@@ -1472,7 +1472,7 @@ try {
 
           <script is:inline define:vars={{ appsJsonData }}>
             window.APPS_JSON_DATA = appsJsonData;
-            window.DEV_SKIP_KNOX_SUBSCRIPTION_PUSH = true;
+            window.DEV_SKIP_KNOX_SUBSCRIPTION_PUSH = false;
           </script>
           <script>
             import Alpine from "alpinejs";
@@ -4127,13 +4127,13 @@ try {
             (window as any).testFeatureFlags = async (imei: string) => {
               const res = await fetch(`/api/device-features/${imei}.json`);
               if (!res.ok) {
-                console.error(`[testFeatureFlags] Error ${res.status}:`, await res.text());
+                devLog.error(`[testFeatureFlags] Error ${res.status}:`, await res.text());
                 return null;
               }
               const data = await res.json();
-              console.log(`[testFeatureFlags] IMEI: ${data.imei}`);
-              console.log(`[testFeatureFlags] Updated: ${data.updatedAt}`);
-              console.log("[testFeatureFlags] Flags:", JSON.stringify(data.flags, null, 2));
+              devLog.log(`[testFeatureFlags] IMEI: ${data.imei}`);
+              devLog.log(`[testFeatureFlags] Updated: ${data.updatedAt}`);
+              devLog.log("[testFeatureFlags] Flags:", JSON.stringify(data.flags, null, 2));
               return data;
             };
           </script>

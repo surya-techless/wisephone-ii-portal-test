@@ -229,6 +229,7 @@ const isProd = import.meta.env.PROD;
 
 <script>
   // @ts-nocheck - Alpine/Clerk are runtime globals; @clerk/clerk-js is dynamically imported
+  import { devLog } from "@/libs/utils";
   document.addEventListener("alpine:init", () => {
     const Alpine = window.Alpine;
     Alpine.data("authModal", (config) => ({
@@ -268,7 +269,7 @@ const isProd = import.meta.env.PROD;
       },
 
       async init() {
-        console.log("[AuthModal] init() started");
+        devLog.log("[AuthModal] init() started");
         const dialog = this.$el;
 
         // Reset all form data whenever the modal is closed
@@ -282,13 +283,13 @@ const isProd = import.meta.env.PROD;
           this.signInCodeStep = false;
             this.signUpPhoneStep = false;
           if (dialog && typeof dialog.showModal === "function") dialog.showModal();
-          console.log("[AuthModal] modal opened, tab:", this.tab, "clerk ready:", !!this.clerk);
+          devLog.log("[AuthModal] modal opened, tab:", this.tab, "clerk ready:", !!this.clerk);
         });
 
         try {
           // Use the Clerk instance already initialized by @clerk/astro to avoid
           // dual-instance state conflicts (which corrupt signUp between OTP send/verify).
-          console.log("[AuthModal] Waiting for window.Clerk from @clerk/astro...");
+          devLog.log("[AuthModal] Waiting for window.Clerk from @clerk/astro...");
           await new Promise((resolve, reject) => {
             const timeout = setTimeout(() => reject(new Error("Clerk load timeout")), 10000);
             const check = () => {
@@ -302,9 +303,9 @@ const isProd = import.meta.env.PROD;
             check();
           });
           this.clerk = window.Clerk;
-          console.log("[AuthModal] Clerk ready. client:", !!this.clerk?.client, "signIn:", typeof this.clerk?.client?.signIn, "signUp:", typeof this.clerk?.client?.signUp);
+          devLog.log("[AuthModal] Clerk ready. client:", !!this.clerk?.client, "signIn:", typeof this.clerk?.client?.signIn, "signUp:", typeof this.clerk?.client?.signUp);
         } catch (e) {
-          console.error("[AuthModal] Clerk load failed:", e);
+          devLog.error("[AuthModal] Clerk load failed:", e);
           this.setError("Unable to load sign-in. Please refresh the page.");
         }
       },
@@ -444,7 +445,7 @@ const isProd = import.meta.env.PROD;
         this.errorMessage = "";
         try {
           await signUp.attemptPhoneNumberVerification({ code: this.phoneVerificationCode.trim() });
-          console.log("[AuthModal] signUp after phone verify — status:", signUp.status, "missingFields:", signUp.missingFields, "unverifiedFields:", signUp.unverifiedFields);
+          devLog.log("[AuthModal] signUp after phone verify — status:", signUp.status, "missingFields:", signUp.missingFields, "unverifiedFields:", signUp.unverifiedFields);
           if (signUp.status === "complete" && signUp.createdSessionId && clerk?.setActive) {
             await clerk.setActive({ session: signUp.createdSessionId });
             window.location.href = this.redirectUrl;
@@ -453,7 +454,7 @@ const isProd = import.meta.env.PROD;
           if (signUp.status === "missing_requirements") {
             const missing = signUp.missingFields ?? [];
             const unverified = signUp.unverifiedFields ?? [];
-            console.error("[AuthModal] missing_requirements — missingFields:", missing, "unverifiedFields:", unverified);
+            devLog.error("[AuthModal] missing_requirements — missingFields:", missing, "unverifiedFields:", unverified);
             if (missing.length === 1 && missing[0] === "legal_accepted") {
               await signUp.update({ legalAccepted: true });
               if (signUp.status === "complete" && signUp.createdSessionId && clerk?.setActive) {
