@@ -60,3 +60,33 @@ export async function publishFeatureFlags(
     devLog.error("[MQTT] ❌ Publish error:", err);
   }
 }
+
+// TODO: find better place for hearbeat -- this is a heartbeat utilizing an MQTT client, not the other way around
+// TODO: add typing to initialSignalPayload param
+export async function sendSysProbe(initialSignalPayload: any) {
+  const topic = `sysprobe/probe`;
+
+  if (!client) {
+    devLog.warn("[MQTT] ⚠️  Client not initialized — AWS env vars missing. Skipping publish.");
+    devLog.warn(`[MQTT]    AWS_IOT_ENDPOINT  : ${endpoint || "NOT SET"}`);
+    devLog.warn(`[MQTT]    AWS_ACCESS_KEY_ID : ${accessKeyId ? accessKeyId.slice(0, 8) + "..." : "NOT SET"}`);
+    devLog.warn(`[MQTT]    AWS_SECRET_ACCESS_KEY : ${secretAccessKey ? "SET" : "NOT SET"}`);
+    return;
+  }
+
+  try {
+    await client.send(
+      new PublishCommand({
+        topic,
+        payload: new TextEncoder().encode(JSON.stringify({
+          ...initialSignalPayload,
+          portalSysprobeSignalMQTTPublishedAt: new Date().toISOString()
+        })),
+        qos: 1
+      })
+    );
+    devLog.log(`[MQTT] ✅ heartbeat published successfully to ${topic}`);
+  } catch (err) {
+    devLog.error("[MQTT] ❌ heartbeat publish error:", err);
+  }
+}
