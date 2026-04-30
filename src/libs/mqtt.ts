@@ -11,6 +11,8 @@ const region = import.meta.env.WPII_AWS_IOT_REGION;
 const endpoint = import.meta.env.WPII_AWS_IOT_ENDPOINT;
 const accessKeyId = import.meta.env.WPII_AWS_ACCESS_KEY_ID;
 const secretAccessKey = import.meta.env.WPII_AWS_SECRET_ACCESS_KEY;
+const sysprobeAccessKeyId = import.meta.env.WPII_SYSPROBE_AWS_ACCESS_KEY_ID;
+const sysprobeSecretAccessKey = import.meta.env.WPII_SYSPROBE_AWS_SECRET_ACCESS_KEY;
 
 const client =
   endpoint && accessKeyId && secretAccessKey
@@ -20,6 +22,13 @@ const client =
         credentials: { accessKeyId, secretAccessKey }
       })
     : null;
+
+// seperate concerns with dedicated sysprobe IAM access keys
+const sysprobeClient = endpoint && accessKeyId && secretAccessKey ? new IoTDataPlaneClient({
+  region,
+  endpoint: `https://${endpoint}`,
+  credentials: { accessKeyId: sysprobeAccessKeyId, secretAccessKey: sysprobeSecretAccessKey }
+}) : null;
 
 /**
  * Publish feature flags to a specific device via AWS IoT Core.
@@ -66,16 +75,16 @@ export async function publishFeatureFlags(
 export async function sendSysProbe(initialSignalPayload: any) {
   const topic = `sysprobe/probe`;
 
-  if (!client) {
+  if (!sysprobeClient) {
     devLog.warn("[MQTT] ⚠️  Client not initialized — AWS env vars missing. Skipping publish.");
     devLog.warn(`[MQTT]    AWS_IOT_ENDPOINT  : ${endpoint || "NOT SET"}`);
-    devLog.warn(`[MQTT]    AWS_ACCESS_KEY_ID : ${accessKeyId ? accessKeyId.slice(0, 8) + "..." : "NOT SET"}`);
-    devLog.warn(`[MQTT]    AWS_SECRET_ACCESS_KEY : ${secretAccessKey ? "SET" : "NOT SET"}`);
+    devLog.warn(`[MQTT]    WPII_SYSPROBE_AWS_ACCESS_KEY_ID : ${sysprobeAccessKeyId ? sysprobeAccessKeyId.slice(0, 8) + "..." : "NOT SET"}`);
+    devLog.warn(`[MQTT]    WPII_SYSPROBE_AWS_SECRET_ACCESS_KEY : ${sysprobeSecretAccessKey ? "SET" : "NOT SET"}`);
     return;
   }
 
   try {
-    await client.send(
+    await sysprobeClient.send(
       new PublishCommand({
         topic,
         payload: new TextEncoder().encode(JSON.stringify({
@@ -88,5 +97,6 @@ export async function sendSysProbe(initialSignalPayload: any) {
     devLog.log(`[MQTT] ✅ heartbeat published successfully to ${topic}`);
   } catch (err) {
     devLog.error("[MQTT] ❌ heartbeat publish error:", err);
+    throw err;
   }
 }
