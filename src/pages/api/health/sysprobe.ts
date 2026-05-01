@@ -1,34 +1,30 @@
 import type { APIRoute } from "astro";
-import { db, App } from "astro:db";
+
+import { HTTP } from "@/lib/server/api.response";
+import { successResponse, errorResponse } from "@/lib/server/api.response";
+import validateBearerToken from "@/lib/server/authentication";
+import { WisephoneIIPortalAPIError } from "@/lib/server/api.response";
 
 import { sendSysProbe } from "@/libs/mqtt";
 
-// TODO configure auth
-export const GET: APIRoute = async () => {
+// simple endpoint to process and propagate system probe beats
+// it's backed by a bearer token to protect against random traffic on the internet
+export const POST: APIRoute = async ({ request }) => {
   const now = new Date().toISOString();
   const payload = { awsSysprobeSignalReceivedAt: now };
 
-  try {  
-    // await db.select().from(App).limit(1);  // TODO: confirm that probe will not burn through db capacity
-    await sendSysProbe(payload);
+  if (!validateBearerToken(request)) {
+    return errorResponse("unauthorized", HTTP.UNAUTHORIZED);
+  }
 
-    return new Response(JSON.stringify({ success: true }), {
-      status: 200,
-      headers: { 
-        "Content-Type": "application/json",
-        "Cache-Control": "no-cache, no-store, must-revalidate"
-      }
-    });
+  try {  
+    await sendSysProbe(payload);
+    return successResponse("Ok", HTTP.OK);
   } catch (error) {
-      return new Response(JSON.stringify({
-        payload,
-        error: error instanceof Error ? error.message : "Unknown error",
-      }), {
-        status: 500,
-        headers: { 
-          "Content-Type": "application/json",
-          "Cache-Control": "no-cache, no-store, must-revalidate"
-        }
-      });
+      if (error instanceof WisephoneIIPortalAPIError) {
+        return errorResponse("Unauthorized", HTTP.UNAUTHORIZED);
+      }
+
+      return errorResponse("Internal Server Error", HTTP.INTERNAL_SERVER_ERROR);
   }
 };

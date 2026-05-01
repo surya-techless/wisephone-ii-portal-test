@@ -7,6 +7,16 @@
 import { IoTDataPlaneClient, PublishCommand } from "@aws-sdk/client-iot-data-plane";
 import { devLog } from "@/libs/utils";
 
+import { WisephoneIIPortalAPIError } from "@/lib/server/api.response";
+
+
+export class WisephoneIIPortalMQTTError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "WisephoneIIPortalMQTTError";
+  }
+}
+
 const region = import.meta.env.WPII_AWS_IOT_REGION;
 const endpoint = import.meta.env.WPII_AWS_IOT_ENDPOINT;
 const accessKeyId = import.meta.env.WPII_AWS_ACCESS_KEY_ID;
@@ -80,7 +90,7 @@ export async function sendSysProbe(initialSignalPayload: any) {
     devLog.warn(`[MQTT]    AWS_IOT_ENDPOINT  : ${endpoint || "NOT SET"}`);
     devLog.warn(`[MQTT]    WPII_SYSPROBE_AWS_ACCESS_KEY_ID : ${sysprobeAccessKeyId ? sysprobeAccessKeyId.slice(0, 8) + "..." : "NOT SET"}`);
     devLog.warn(`[MQTT]    WPII_SYSPROBE_AWS_SECRET_ACCESS_KEY : ${sysprobeSecretAccessKey ? "SET" : "NOT SET"}`);
-    return;
+    throw new WisephoneIIPortalAPIError("Unauthorized");
   }
 
   try {
@@ -97,6 +107,6 @@ export async function sendSysProbe(initialSignalPayload: any) {
     devLog.log(`[MQTT] ✅ heartbeat published successfully to ${topic}`);
   } catch (err) {
     devLog.error("[MQTT] ❌ heartbeat publish error:", err);
-    throw err;
+    throw new WisephoneIIPortalMQTTError(`there was an issue publishing heartbeat to AWS IoT broker: ${err}`);
   }
 }
