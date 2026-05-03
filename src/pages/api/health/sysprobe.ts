@@ -11,12 +11,12 @@ import { getSysprobeEMFPayload } from "@/libs/aws/cloudwatch/sysprobe/payloads";
 // simple endpoint to process and propagate system probe beats
 // it's backed by a bearer token to protect against random traffic on the internet
 export const POST: APIRoute = async ({ request }) => {
-  const awsEMFNamespace = "Sysprobe";
-  const payload = { ...getSysprobeEMFPayload(awsEMFNamespace) };
-
   if (!validateBearerToken(request)) {
     return errorResponse("unauthorized", HTTP.UNAUTHORIZED);
   }
+
+  const awsEMFNMetricamespace = "Sysprobe";  // WARNING: CHANGING THIS WILL BREAK HEARTBEAT METRICS AND ALARMS!!!
+  const payload = { ...getSysprobeEMFPayload(awsEMFNMetricamespace) };
 
   try {  
     await sendSysProbe(payload);
