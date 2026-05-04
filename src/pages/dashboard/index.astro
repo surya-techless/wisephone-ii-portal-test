@@ -1095,7 +1095,7 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
   import Alpine from "alpinejs";
   import { isValidIMEI, STRIPE_PUBLIC_KEY, updateUnreachableAlpineState, devLog } from "@/libs/utils";
   import { actions } from "astro:actions";
-  import { loadStripe, type Stripe } from "@stripe/stripe-js";
+  import { loadStripe, type Stripe, type StripeEmbeddedCheckout } from "@stripe/stripe-js";
   import { SubscriptionPollingService, type Device } from "@/services/SubscriptionPollingService";
 
   // Initialize subscription polling service
@@ -1120,7 +1120,7 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
       isStripeLoaded: false,
       isStripeEmbedded: false,
       stripeInstance: undefined as Stripe | undefined,
-      stripeCheckout: undefined as any,
+      stripeCheckout: undefined as StripeEmbeddedCheckout | undefined,
       sessionClientSecret: undefined as string | undefined,
       stripeSessionId: undefined as string | undefined,
       customerEmail: initialData?.userEmail || "",
