@@ -80,8 +80,6 @@ export async function publishFeatureFlags(
   }
 }
 
-// TODO: find better place for hearbeat -- this is a heartbeat utilizing an MQTT client, not the other way around
-// TODO: add typing to initialSignalPayload param
 export async function sendSysProbe(initialSignalPayload: any) {
   const topic = `sysprobe/probe`;
 
