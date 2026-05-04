@@ -953,9 +953,8 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
               </ul>
             </div>
             <button
-              @click="devLog.log('[BYOC] Button clicked!', { isStripeLoaded, activeDeviceImei, customerEmail }); handleStripeCheckout()"
-              :disabled="!isStripeLoaded || !activeDeviceImei"
-              class="flex items-center justify-center gap-1 w-full px-4 py-2 bg-[#C07F53] text-white rounded-md text-sm font-medium hover:bg-[#A06F43] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed mt-auto"
+              @click="openByocModal()"
+              class="flex items-center justify-center gap-1 w-full px-4 py-2 bg-[#C07F53] text-white rounded-md text-sm font-medium hover:bg-[#A06F43] transition-colors cursor-pointer mt-auto"
             >
               Activate BYOC Plan
             </button>
@@ -982,6 +981,94 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
             </button>
           </form>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BYOC Plans Modal -->
+  <div
+    x-show="showByocModal"
+    x-cloak
+    x-transition.opacity
+    class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+    @click.self="closeByocModal()"
+  >
+    <div class="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+      <!-- Header -->
+      <div class="sticky top-0 bg-white border-b border-gray-200 p-4 md:p-6 flex justify-between items-center">
+        <div class="flex items-center gap-2">
+          <button @click="closeByocModal()" class="text-gray-400 hover:text-gray-600 mr-1">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m15 18-6-6 6-6"></path>
+            </svg>
+          </button>
+          <h2 class="text-xl font-semibold text-gray-800">Bring Your Own Carrier</h2>
+        </div>
+        <button @click="closeActivateModal()" class="text-gray-400 hover:text-gray-600">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 6 6 18"></path>
+            <path d="m6 6 12 12"></path>
+          </svg>
+        </button>
+      </div>
+
+      <div class="p-4 md:p-6">
+        <!-- Billing cycle toggle -->
+        <div class="flex items-center rounded-full bg-gray-200 p-1 mb-6 h-11">
+          <button
+            @click="byocBillingCycle = 'monthly'"
+            class="flex-1 min-w-0 h-full rounded-full text-sm font-medium transition-all duration-200 focus:outline-none"
+            :class="byocBillingCycle === 'monthly' ? 'bg-[#C07F53] text-white shadow-sm' : 'text-gray-500'"
+          >
+            Monthly
+          </button>
+          <button
+            @click="byocBillingCycle = 'yearly'"
+            class="flex-1 min-w-0 h-full px-3 rounded-full text-sm font-medium transition-all duration-200 focus:outline-none leading-tight text-center"
+            :class="byocBillingCycle === 'yearly' ? 'bg-[#C07F53] text-white shadow-sm' : 'text-gray-500'"
+          >
+            Yearly (Get one month free)
+          </button>
+        </div>
+
+        <!-- Plan card -->
+        <div class="border border-gray-200 rounded-xl p-5 mb-5">
+          <h3 class="text-base font-semibold text-gray-900 mb-1">WiseOS Subscription</h3>
+          <p class="text-xs text-gray-500 mb-4">No carrier service included — bring your own plan</p>
+          <ul class="space-y-2 mb-5">
+            <li class="flex items-start gap-2 text-sm text-gray-700">
+              <svg class="w-4 h-4 text-[#C07F53] mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              WiseOS Subscription
+            </li>
+            <li class="flex items-start gap-2 text-sm text-gray-700">
+              <svg class="w-4 h-4 text-[#C07F53] mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              Full feature access
+            </li>
+            <li class="flex items-start gap-2 text-sm text-gray-700">
+              <svg class="w-4 h-4 text-[#C07F53] mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              Works with any carrier
+            </li>
+          </ul>
+          <div x-show="byocBillingCycle === 'monthly'">
+            <p class="text-3xl font-bold text-gray-900">$14.99<span class="text-base font-normal text-gray-500">/mo</span></p>
+            <p class="text-xs text-gray-500 mt-1">Billed monthly</p>
+          </div>
+          <div x-show="byocBillingCycle === 'yearly'" x-cloak>
+            <p class="text-3xl font-bold text-gray-900">$13.74<span class="text-base font-normal text-gray-500">/mo</span></p>
+            <p class="text-xs text-gray-500 mt-1">Billed annually · Save ~1 month</p>
+          </div>
+        </div>
+
+        <!-- Activate button -->
+        <button
+          @click="handleStripeCheckout(byocBillingCycle)"
+          :disabled="!isStripeLoaded || !activeDeviceImei"
+          class="w-full px-4 py-3 bg-[#C07F53] text-white rounded-md text-sm font-medium hover:bg-[#A06F43] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <span x-text="byocBillingCycle === 'yearly' ? 'Activate BYOC Plan (Yearly)' : 'Activate BYOC Plan (Monthly)'"></span>
+        </button>
+
+        <p class="text-xs text-gray-400 text-center mt-3">Secure checkout powered by Stripe</p>
       </div>
     </div>
   </div>
@@ -1021,6 +1108,9 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
       mobileMenuOpen: false,
       showAccountMenu: false,
       showActivateModal: false,
+      showByocModal: false,
+      byocBillingCycle: 'monthly' as 'monthly' | 'yearly',
+      byocSessionCycle: null as 'monthly' | 'yearly' | null,
       activeDeviceImei: null as string | null,
       activeDevicePhoneNumber: null as string | null,
       pollingSubscription: false,
@@ -1030,6 +1120,7 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
       isStripeLoaded: false,
       isStripeEmbedded: false,
       stripeInstance: undefined as Stripe | undefined,
+      stripeCheckout: undefined as any,
       sessionClientSecret: undefined as string | undefined,
       stripeSessionId: undefined as string | undefined,
       customerEmail: initialData?.userEmail || "",
@@ -1085,8 +1176,18 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
         this.activeDevicePhoneNumber = phoneNumber;
         this.showActivateModal = true;
       },
+      openByocModal() {
+        this.byocBillingCycle = 'monthly';
+        this.showActivateModal = false;
+        this.showByocModal = true;
+      },
+      closeByocModal() {
+        this.showByocModal = false;
+        this.showActivateModal = true;
+      },
       closeActivateModal() {
         this.showActivateModal = false;
+        this.showByocModal = false;
         // Don't clear activeDeviceImei if we're polling (user might have clicked X during activation)
         if (!this.pollingSubscription) {
           this.activeDeviceImei = null;
@@ -1105,20 +1206,33 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
           // Error initializing Stripe
         }
       },
-      async handleStripeCheckout() {
+      async handleStripeCheckout(cycle: 'monthly' | 'yearly' = 'monthly') {
         if (!this.activeDeviceImei || !this.customerEmail) {
           return;
         }
 
         try {
+          // Reset session if billing cycle changed
+          if (this.byocSessionCycle && this.byocSessionCycle !== cycle) {
+            try { this.stripeCheckout?.destroy(); } catch {}
+            this.stripeCheckout = undefined;
+            const el = document.getElementById('stripe-subscription-element');
+            if (el) el.innerHTML = '';
+            this.sessionClientSecret = undefined;
+            this.stripeSessionId = undefined;
+            this.isStripeEmbedded = false;
+          }
+
           // Create Stripe session if not already created
           if (!this.sessionClientSecret) {
             const imeiString = this.activeDeviceImei.replace(/[^0-9]/g, '').padEnd(15, '0');
 
             const data = await actions.stripe.createSubscriptionPage.orThrow({
               customerEmail: this.customerEmail,
-              deviceIMEI: imeiString
+              deviceIMEI: imeiString,
+              plan: cycle
             });
+            this.byocSessionCycle = cycle;
             this.sessionClientSecret = data.session.client_secret as string;
             this.stripeSessionId = data.session.id;
           }
@@ -1133,10 +1247,10 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
               sessionStorage.setItem('stripeCheckoutImei', imeiString);
             }
 
-            const checkout = await this.stripeInstance.initEmbeddedCheckout({
+            this.stripeCheckout = await this.stripeInstance.initEmbeddedCheckout({
               clientSecret: this.sessionClientSecret
             });
-            checkout?.mount("#stripe-subscription-element");
+            this.stripeCheckout?.mount("#stripe-subscription-element");
 
             // Note: Stripe embedded checkout doesn't have an 'on' method
             // Instead, it will redirect to the return_url when complete
@@ -1151,8 +1265,10 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
           if (dialog) {
             dialog.showModal();
           }
-        } catch (error) {
-          alert("Failed to open checkout. Please try again.");
+        } catch (error: any) {
+          devLog.error("[BYOC] Stripe checkout error:", error);
+          const msg = error?.message || error?.error?.message || JSON.stringify(error);
+          alert("Failed to open checkout: " + msg);
         }
       },
       async checkSubscriptionStatus(imei: string, phoneNumber?: string | null): Promise<boolean> {
