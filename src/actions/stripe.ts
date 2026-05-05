@@ -1,6 +1,6 @@
 import { defineAction } from "astro:actions";
 import { STRIPE_SECRET_KEY } from "astro:env/server";
-import { z } from "astro:content";
+import { z } from "astro:schema";
 import Stripe from "stripe";
 import { db, Wisephone, sql } from "astro:db";
 import { devLog } from "@/libs/utils";

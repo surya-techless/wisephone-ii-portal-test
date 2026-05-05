@@ -12,9 +12,11 @@ import DashboardSidebar from "@/components/DashboardSidebar.astro";
 import IsAdmin from "@/components/server-islands/IsAdmin.astro";
 import { SignOutButton } from "@clerk/astro/components";
 import { validateIsSubscribed } from "@/libs/stripe";
-import { devLog } from "@/libs/utils";
+import { devLog, KNOX_USER_GROUPS } from "@/libs/utils";
+import { SamsungKnoxService } from "@/libs/samsung-knox-service";
 import { isFeatureEnabled } from "@/config/feature-flags";
 import TypeformDeviceRegistration from "@/components/TypeformDeviceRegistration.astro";
+import CspireSubscriptionModal from "@/components/CspireSubscriptionModal.astro";
 
 if (!Astro.locals.auth().userId) {
   return Astro.redirect("/");
@@ -32,7 +34,13 @@ const derivedHasNoWisephone = wisephones.length === 0;
 // Check if Typeform feature is enabled
 const enableTypeform = isFeatureEnabled("ENABLE_TYPEFORM");
 
-// Check subscription status for each device
+const allCspireGroupIds = [
+  KNOX_USER_GROUPS.CSPIRE_WPII_Unpaid_v2,
+  KNOX_USER_GROUPS.CSPIRE_WPII_Subscribed,
+  KNOX_USER_GROUPS.CSPIRE_ADD_ON_BLOCK_TOOL_DRAWER
+];
+
+// Check subscription status and CSpire status for each device
 const wisephonesWithSubscription = await Promise.all(
   wisephones.map(async (wisephone) => {
     // Check for bypass subscription first
@@ -56,9 +64,19 @@ const wisephonesWithSubscription = await Promise.all(
       }
     }
 
+    // Check Knox groups to determine CSpire status
+    let isCspire = false;
+    try {
+      const groups = await SamsungKnoxService.getGroupsForDevice(wisephone.imei.toString());
+      isCspire = groups.some(id => allCspireGroupIds.includes(id));
+    } catch {
+      // Non-fatal — isCspire stays false
+    }
+
     return {
       ...wisephone,
-      isSubscribed
+      isSubscribed,
+      isCspire
     };
   })
 );
@@ -356,7 +374,7 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
   }
 </style>
 
-<div class="dashboard-container flex h-screen w-full min-w-[360px] bg-[#f7f6f2] relative" x-data={`dashboard(${JSON.stringify({ userEmail: user?.emailAddresses?.[0]?.emailAddress || user?.primaryEmailAddress?.emailAddress || "", newDevice: actionResult?.data && !actionResult.error && !actionResult.data.isSubscribed && actionResult.data.wisephone?.[0] ? { imei: actionResult.data.wisephone[0].imei.toString().padEnd(15, "0"), phoneNumber: actionResult.data.wisephone[0].phoneNumber || "" } : null })})`} @activate-modal.window="openActivateModal($event.detail?.imei || $event.detail)">
+<div class="dashboard-container flex h-screen w-full min-w-[360px] bg-[#f7f6f2] relative" x-data={`dashboard(${JSON.stringify({ userEmail: user?.emailAddresses?.[0]?.emailAddress || user?.primaryEmailAddress?.emailAddress || "", newDevice: actionResult?.data && !actionResult.error && !actionResult.data.isSubscribed && actionResult.data.wisephone?.[0] ? { imei: actionResult.data.wisephone[0].imei.toString().padEnd(15, "0"), phoneNumber: actionResult.data.wisephone[0].phoneNumber || "" } : null })})`} @activate-modal.window="$event.detail?.isCspire ? openCspireModal($event.detail) : openActivateModal($event.detail?.imei || $event.detail)">
   <progress
     x-show="isLoading"
     x-cloak
@@ -436,7 +454,8 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
             const deviceData = {
               imei: imeiString,
               isSubscribed: Boolean(wisephone.isSubscribed),
-              phoneNumber: wisephone.phoneNumber || ''
+              phoneNumber: wisephone.phoneNumber || '',
+              isCspire: Boolean(wisephone.isCspire)
             };
             devLog.log(`Device card data for ${imeiString}:`, deviceData, `isSubscribed type: ${typeof wisephone.isSubscribed}, value: ${wisephone.isSubscribed}`);
 
@@ -1016,18 +1035,18 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
         <!-- Billing cycle toggle -->
         <div class="flex items-center rounded-full bg-gray-200 p-1 mb-6 h-11">
           <button
-            @click="byocBillingCycle = 'monthly'"
-            class="flex-1 min-w-0 h-full rounded-full text-sm font-medium transition-all duration-200 focus:outline-none"
-            :class="byocBillingCycle === 'monthly' ? 'bg-[#C07F53] text-white shadow-sm' : 'text-gray-500'"
-          >
-            Monthly
-          </button>
-          <button
             @click="byocBillingCycle = 'yearly'"
             class="flex-1 min-w-0 h-full px-3 rounded-full text-sm font-medium transition-all duration-200 focus:outline-none leading-tight text-center"
             :class="byocBillingCycle === 'yearly' ? 'bg-[#C07F53] text-white shadow-sm' : 'text-gray-500'"
           >
             Annually (One Month Free)
+          </button>
+          <button
+            @click="byocBillingCycle = 'monthly'"
+            class="flex-1 min-w-0 h-full rounded-full text-sm font-medium transition-all duration-200 focus:outline-none"
+            :class="byocBillingCycle === 'monthly' ? 'bg-[#C07F53] text-white shadow-sm' : 'text-gray-500'"
+          >
+            Monthly
           </button>
         </div>
 
@@ -1073,6 +1092,9 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
     </div>
   </div>
 
+  <!-- CSpire Subscription Modal -->
+  <CspireSubscriptionModal />
+
   <!-- Stripe Checkout Dialog -->
   <dialog x-ref="stripeDialog" class="modal">
     <div style="background-color: rgb(247, 246, 242)" class="modal-box max-w-2xl">
@@ -1109,8 +1131,10 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
       showAccountMenu: false,
       showActivateModal: false,
       showByocModal: false,
-      byocBillingCycle: 'monthly' as 'monthly' | 'yearly',
+      showCspireModal: false,
+      byocBillingCycle: 'yearly' as 'monthly' | 'yearly',
       byocSessionCycle: null as 'monthly' | 'yearly' | null,
+      byocFromCspire: false,
       activeDeviceImei: null as string | null,
       activeDevicePhoneNumber: null as string | null,
       pollingSubscription: false,
@@ -1168,26 +1192,68 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
         this.hasBlurredImeiVerification = false;
         this.isImeiValid = true;
       },
-      openActivateModal(imei: string | { imei?: string; phoneNumber?: string }) {
-        // Handle both direct call and event detail
+      openActivateModal(imei: string | { imei?: string; phoneNumber?: string; isCspire?: boolean }) {
         const imeiValue = typeof imei === 'string' ? imei : (imei?.imei || '');
         const phoneNumber = typeof imei === 'object' ? (imei?.phoneNumber || null) : null;
+        const isCspire = typeof imei === 'object' ? Boolean((imei as any)?.isCspire) : false;
+        if (isCspire) {
+          this.openCspireModal(imei);
+          return;
+        }
         this.activeDeviceImei = imeiValue;
         this.activeDevicePhoneNumber = phoneNumber;
         this.showActivateModal = true;
       },
-      openByocModal() {
-        this.byocBillingCycle = 'monthly';
+      openCspireModal(imei?: string | { imei?: string; phoneNumber?: string; isCspire?: boolean }) {
+        if (imei) {
+          const imeiValue = typeof imei === 'string' ? imei : (imei?.imei || '');
+          const phoneNumber = typeof imei === 'object' ? (imei?.phoneNumber || null) : null;
+          this.activeDeviceImei = imeiValue;
+          this.activeDevicePhoneNumber = phoneNumber;
+        }
+        this.showActivateModal = false;
+        this.showByocModal = false;
+        this.showCspireModal = true;
+      },
+      closeCspireModal() {
+        this.showCspireModal = false;
+        if (!this.pollingSubscription) {
+          this.activeDeviceImei = null;
+          this.activeDevicePhoneNumber = null;
+        }
+      },
+      proceedToByocFromCspire() {
+        this.showCspireModal = false;
+        this.byocFromCspire = true;
+        this.byocBillingCycle = 'yearly';
+        this.showByocModal = true;
+      },
+      openByocModal(imei?: string | { imei?: string; phoneNumber?: string; isCspire?: boolean }) {
+        if (imei) {
+          const imeiValue = typeof imei === 'string' ? imei : (imei?.imei || '');
+          const phoneNumber = typeof imei === 'object' ? (imei?.phoneNumber || null) : null;
+          this.activeDeviceImei = imeiValue;
+          this.activeDevicePhoneNumber = phoneNumber;
+          this.byocFromCspire = typeof imei === 'object' && Boolean((imei as any)?.isCspire);
+        } else {
+          this.byocFromCspire = false;
+        }
+        this.byocBillingCycle = 'yearly';
         this.showActivateModal = false;
         this.showByocModal = true;
       },
       closeByocModal() {
         this.showByocModal = false;
-        this.showActivateModal = true;
+        if (this.byocFromCspire) {
+          this.showCspireModal = true;
+        } else {
+          this.showActivateModal = true;
+        }
       },
       closeActivateModal() {
         this.showActivateModal = false;
         this.showByocModal = false;
+        this.showCspireModal = false;
         // Don't clear activeDeviceImei if we're polling (user might have clicked X during activation)
         if (!this.pollingSubscription) {
           this.activeDeviceImei = null;
@@ -1509,6 +1575,11 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
       async init() {
         devLog.log("[BYOC] Dashboard component initialized");
         devLog.log("[BYOC] Initial state - customerEmail:", this.customerEmail, "activeDeviceImei:", this.activeDeviceImei);
+
+        // Always reset billing cycle to yearly whenever the BYOC modal opens
+        this.$watch('showByocModal', (val: boolean) => {
+          if (val) this.byocBillingCycle = 'yearly';
+        });
         
         // Initialize mobile detection
         this.checkMobile();
@@ -1702,10 +1773,11 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
       }
     }));
 
-    Alpine.data("deviceCard", (deviceData: { imei: string; isSubscribed: boolean; phoneNumber?: string }) => ({
+    Alpine.data("deviceCard", (deviceData: { imei: string; isSubscribed: boolean; phoneNumber?: string; isCspire?: boolean }) => ({
       imei: deviceData.imei,
       isSubscribed: deviceData.isSubscribed,
       phoneNumber: deviceData.phoneNumber || '',
+      isCspire: deviceData.isCspire || false,
       init() {
         devLog.log("Device card initialized:", { imei: this.imei, isSubscribed: this.isSubscribed, phoneNumber: this.phoneNumber });
 
@@ -1736,7 +1808,7 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
       },
       openActivateModal() {
         devLog.log("Device card openActivateModal called for IMEI:", this.imei, "isSubscribed:", this.isSubscribed);
-        const payload = { imei: this.imei, phoneNumber: this.phoneNumber };
+        const payload = { imei: this.imei, phoneNumber: this.phoneNumber, isCspire: this.isCspire };
         // Try to find the dashboard component
         const dashboardEl = document.querySelector('[x-data="dashboard"]');
         if (dashboardEl) {
