@@ -25069,6 +25069,26 @@
       }
     },
     {
+      "id": "sr_b53f85be0e65422Memorial",
+      "cells": {
+        "Tool Name": "The Memorials",
+        "Play Store URL": "https://play.google.com/store/apps/details?id=com.thememorials.app&hl=en_US",
+        "Tool Drawer": "Yes",
+        "Play Store Icon URL": "https://play-lh.googleusercontent.com/GbPjU3TCwkWV3Acbe4WResLaQ2y0oDVPkRj99bAGMkBqrORl91SHmuUmAYt0P0lQJeQ=w480-h960-rw",
+        "Play Store Category": "FINANCE"
+      }
+    },
+    {
+      "id": "sr_b53f85be0e65422Memorial2",
+      "cells": {
+        "Tool Name": "My Memorial",
+        "Play Store URL": "https://play.google.com/store/apps/details?id=com.memorialmedical.expresscarewaittimes&hl=en_US",
+        "Tool Drawer": "Yes",
+        "Play Store Icon URL": "https://play-lh.googleusercontent.com/raFoRd9Pl-iqZyc_XULN9FGLiw0W0wQpxyG54VEdI-IybqhQhURfyEzg3LhdQXkYsRDV=w480-h960-rw",
+        "Play Store Category": "FINANCE"
+      }
+    },
+    {
       "id": "sr_35916c616a904f89",
       "cells": {
         "Tool Name": "The Citizens Bank MS Mobile",
