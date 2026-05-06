@@ -374,7 +374,7 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
   }
 </style>
 
-<div class="dashboard-container flex h-screen w-full min-w-[360px] bg-[#f7f6f2] relative" x-data={`dashboard(${JSON.stringify({ userEmail: user?.emailAddresses?.[0]?.emailAddress || user?.primaryEmailAddress?.emailAddress || "", newDevice: actionResult?.data && !actionResult.error && !actionResult.data.isSubscribed && actionResult.data.wisephone?.[0] ? { imei: actionResult.data.wisephone[0].imei.toString().padEnd(15, "0"), phoneNumber: actionResult.data.wisephone[0].phoneNumber || "" } : null })})`} @activate-modal.window="$event.detail?.isCspire ? openCspireModal($event.detail) : openActivateModal($event.detail?.imei || $event.detail)">
+<div class="dashboard-container flex h-screen w-full min-w-[360px] bg-[#f7f6f2] relative" x-data={`dashboard(${JSON.stringify({ userEmail: user?.emailAddresses?.[0]?.emailAddress || user?.primaryEmailAddress?.emailAddress || "", newDevice: actionResult?.data && !actionResult.error && !actionResult.data.isSubscribed && actionResult.data.wisephone?.[0] ? { imei: actionResult.data.wisephone[0].imei.toString().padEnd(15, "0"), phoneNumber: actionResult.data.wisephone[0].phoneNumber || "", isCspire: Boolean(actionResult.data.isCspire) } : null })})`} @activate-modal.window="$event.detail?.isCspire ? openCspireModal($event.detail) : openActivateModal($event.detail?.imei || $event.detail)">
   <progress
     x-show="isLoading"
     x-cloak
@@ -1604,10 +1604,14 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
           devLog.log("New unsubscribed device detected, opening activate modal:", initialData.newDevice);
           // Wait a bit for Alpine to fully initialize
           await new Promise(resolve => setTimeout(resolve, 300));
-          this.openActivateModal({
-            imei: initialData.newDevice.imei,
-            phoneNumber: initialData.newDevice.phoneNumber
-          });
+          if (initialData.newDevice.isCspire) {
+            this.openCspireModal(initialData.newDevice);
+          } else {
+            this.openActivateModal({
+              imei: initialData.newDevice.imei,
+              phoneNumber: initialData.newDevice.phoneNumber
+            });
+          }
 
           // Add device to polling service
           if (subscriptionPollingService && initialData.newDevice.phoneNumber) {
