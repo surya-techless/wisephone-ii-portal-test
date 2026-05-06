@@ -1124,7 +1124,7 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
   let subscriptionPollingService: SubscriptionPollingService | null = null;
 
   document.addEventListener("alpine:init", () => {
-    Alpine.data("dashboard", (initialData?: { userEmail?: string; newDevice?: { imei: string; phoneNumber: string } | null }) => ({
+    Alpine.data("dashboard", (initialData?: { userEmail?: string; newDevice?: { imei: string; phoneNumber: string; isCspire?: boolean } | null }) => ({
       showForm: false,
       isLoading: false,
       mobileMenuOpen: false,
