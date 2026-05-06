@@ -34,7 +34,7 @@ const client =
     : null;
 
 // seperate concerns with dedicated sysprobe IAM access keys
-const sysprobeClient = endpoint && accessKeyId && secretAccessKey ? new IoTDataPlaneClient({
+const sysprobeClient = endpoint && sysprobeAccessKeyId && sysprobeSecretAccessKey ? new IoTDataPlaneClient({
   region,
   endpoint: `https://${endpoint}`,
   credentials: { accessKeyId: sysprobeAccessKeyId, secretAccessKey: sysprobeSecretAccessKey }
