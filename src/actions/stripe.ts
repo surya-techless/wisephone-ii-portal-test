@@ -18,8 +18,8 @@ const TECHLESS_MONTHLY_PRICE_ID = isStripeTestMode
   : "price_1Q0nXWATGtdZ0VDDDU27pLKx";
 
 const TECHLESS_YEARLY_PRICE_ID = isStripeTestMode
-  ? "price_1TSGXJATGtdZ0VDD3HyP6eD2"
-  : "price_1TSGXJATGtdZ0VDD3HyP6eD2";
+  ? "price_1TTQqfATGtdZ0VDDjCCHI6ZO"
+  : "price_1TTQqfATGtdZ0VDDjCCHI6ZO";
 
 export const stripe = {
   createSubscriptionPage: defineAction({
