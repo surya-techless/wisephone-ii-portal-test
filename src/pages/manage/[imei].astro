@@ -216,6 +216,14 @@ try {
 
   devLog.log("PAY DEBUG: [S1.8] Final server-side isSubscribed:", isSubscribed);
 
+  // Only redirect to dashboard if this is a normal page load (not a post-payment redirect).
+  // When payment_status=checking is in the URL, the client-side code handles validation
+  // via sessionStorage fallback and must be allowed to run first.
+  const isPostPaymentRedirect = paymentStatusParam === "checking";
+  if (!isSubscribed && !isPostPaymentRedirect) {
+    return Astro.redirect("/dashboard");
+  }
+
   // const formData = new FormData();
   // formData.append("imei", String(wisephone?.imei || ""));
   // try {
@@ -766,118 +774,6 @@ try {
                     </div>
                   </template>
 
-                  <!-- Activate Subscription (Non-Paying Customers) -->
-                  <div x-show="!isSubscribed" x-cloak>
-                    <div>
-                      <h3 class="text-base font-semibold text-gray-900 mb-1">Activate Your Wisephone</h3>
-                      <p class="text-sm text-gray-600 mb-4">
-                        To unlock your Wisephone's full potential, a WiseOS Subscription is required. Choose your
-                        preferred connectivity option below.
-                      </p>
-
-                      <div class="grid grid-cols-2 gap-4 mb-3 max-w-3xl">
-                        <!-- WiseOS with Data -->
-                        <div class="border border-gray-300 rounded-lg p-4 flex flex-col h-full">
-                          <h4 class="text-sm font-semibold text-gray-900 mb-1">WiseOS with Data</h4>
-                          <p class="text-xs text-gray-600 mb-1">(All-in-One Subscription)</p>
-                          <p class="text-sm text-gray-700 mb-3 leading-snug">
-                            Get everything in one place: WiseOS, talk, text, and data bundled together for a seamless,
-                            hassle-free experience.
-                            <a
-                              class="text-blue-600 underline text-xs"
-                              href="https://wisephone.com/pages/plans"
-                              target="_blank">Learn more</a
-                            >
-                          </p>
-                          <div class="text-xs text-gray-600 mb-3">
-                            <p class="font-semibold mb-1">Includes:</p>
-                            <ul class="list-disc list-inside space-y-1">
-                              <li>WiseOS Subscription</li>
-                              <li>Carrier Service (Data, Talk, and Text)</li>
-                            </ul>
-                          </div>
-                          <a
-                            href="https://plans.techless.com"
-                            target="_blank"
-                            class="flex items-center justify-center gap-1 w-full btn btn-primary mt-auto"
-                          >
-                            Activate All‑In‑One Plan
-                            <Icon name="lucide:external-link" class="w-4 h-4" />
-                          </a>
-                        </div>
-
-                        <!-- Bring Your Own Carrier -->
-                        <div class="border border-gray-300 rounded-lg p-4 flex flex-col h-full">
-                          <h4 class="text-sm font-semibold text-gray-900 mb-1">Bring Your Own Carrier</h4>
-                          <p class="text-xs text-gray-600 mb-1">(WiseOS Subscription - no data included)</p>
-                          <p class="text-sm text-gray-700 mb-3 leading-snug">
-                            Perfect if you already have a carrier you love. Enjoy all the features of WiseOS while
-                            keeping your existing mobile plan.
-                            <a
-                              class="text-blue-600 underline text-xs"
-                              href="https://wisephone.com/pages/plans"
-                              target="_blank">Learn more</a
-                            >
-                          </p>
-                          <div class="text-xs text-gray-600 mb-3">
-                            <p class="font-semibold mb-1">Includes:</p>
-                            <ul class="list-disc list-inside space-y-1">
-                              <li>WiseOS Subscription</li>
-                              <li>No carrier service included — bring your own plan</li>
-                            </ul>
-                          </div>
-                          <div class="mt-auto">
-                            <TechlessSubscriptionButton
-                              deviceIMEI={wisephone?.imei || ""}
-                              customerEmail={user?.emailAddresses?.[0]?.emailAddress || ""}
-                            />
-                          </div>
-                        </div>
-                      </div>
-
-                      <p class="text-xs text-gray-500 italic mb-6">
-                        Both subscription options are managed through third party portals.
-                      </p>
-
-                      <!-- Device Removal (Non-Paying - only at 2xl+ where layout is side-by-side) -->
-                      <div class="hidden 2xl:block md:w-[500px]">
-                        <div class="border-t border-gray-200 w-full md:w-[500px] mb-4"></div>
-                        <h4 class="text-sm font-semibold text-gray-900 mb-2">Device Removal</h4>
-                        <p class="text-sm text-gray-600 mb-2">
-                          Remove this device from this list of managed devices. Perform this action if you want to
-                          manage this device on a different account.
-                        </p>
-                        <p class="text-sm text-gray-600 mb-4">
-                          If you need to re-add this device in the future, select "Add Device" on the Devices page.
-                        </p>
-                        <button
-                          @click="showRemoveModal = true"
-                          class="px-4 py-2 bg-white border border-red-300 rounded-md text-sm font-medium text-red-600 hover:bg-red-50 inline-flex items-center gap-2"
-                        >
-                          <Icon name="lucide:trash-2" class="w-4 h-4" />
-                          Remove Device
-                        </button>
-                      </div>
-                      <!-- Device Removal (Non-Paying - below 2xl when screen time is disabled) -->
-                      <div class="pt-6 border-t border-gray-200 2xl:hidden" x-show="!enableScreenTime" x-cloak>
-                        <h4 class="text-sm font-semibold text-gray-900 mb-2">Device Removal</h4>
-                        <p class="text-sm text-gray-600 mb-2">
-                          Remove this device from this list of managed devices. Perform this action if you want to
-                          manage this device on a different account.
-                        </p>
-                        <p class="text-sm text-gray-600 mb-4">
-                          If you need to re-add this device in the future, select "Add Device" on the Devices page.
-                        </p>
-                        <button
-                          @click="showRemoveModal = true"
-                          class="px-4 py-2 bg-white border border-red-300 rounded-md text-sm font-medium text-red-600 hover:bg-red-50 inline-flex items-center gap-2"
-                        >
-                          <Icon name="lucide:trash-2" class="w-4 h-4" />
-                          Remove Device
-                        </button>
-                      </div>
-                    </div>
-                  </div>
                 </div>
               </div>
 
@@ -3709,6 +3605,7 @@ try {
                 },
 
                 fallbackPollingInterval: null as number | null,
+                subscriptionWatchInterval: null as number | null,
 
                 startFallbackPolling() {
                   devLog.log("PAY DEBUG: [M2] Starting fallback polling for subscription status");
@@ -3855,6 +3752,8 @@ try {
                   if (this.imei) {
                     try {
                       await this.getFeatures();
+                      // Keep loading until subscription checks below complete
+                      this.isLoading = true;
                     } catch (error) {
                       devLog.error("Failed to load features:", error);
                       this.isLoading = false;
@@ -3981,6 +3880,8 @@ try {
 
                   devLog.log("PAY DEBUG: [M0.15] Final isSubscribed state after all checks:", this.isSubscribed);
 
+                  this.isLoading = false;
+
                   // Load cached total apps count on initialization
                   this.loadCachedTotalApps();
 
@@ -4070,6 +3971,16 @@ try {
                     if (!condition3) devLog.log("PAY DEBUG: [M0.16.13] Reason: Phone is already set up");
                     if (!condition4) devLog.log("PAY DEBUG: [M0.16.14] Reason: Phone number is missing");
                     if (!condition5) devLog.log("PAY DEBUG: [M0.16.15] Reason: Phone number is placeholder");
+                  }
+
+                  if (this.isSubscribed) {
+                    this.subscriptionWatchInterval = window.setInterval(async () => {
+                      const stillSubscribed = await this.checkSubscriptionByImei();
+                      if (stillSubscribed === false) {
+                        window.clearInterval(this.subscriptionWatchInterval ?? undefined);
+                        window.location.href = "/dashboard";
+                      }
+                    }, 60000);
                   }
                 },
 
