@@ -3973,15 +3973,6 @@ try {
                     if (!condition5) devLog.log("PAY DEBUG: [M0.16.15] Reason: Phone number is placeholder");
                   }
 
-                  if (this.isSubscribed) {
-                    this.subscriptionWatchInterval = window.setInterval(async () => {
-                      const stillSubscribed = await this.checkSubscriptionByImei();
-                      if (stillSubscribed === false) {
-                        window.clearInterval(this.subscriptionWatchInterval ?? undefined);
-                        window.location.href = "/dashboard";
-                      }
-                    }, 60000);
-                  }
                 },
 
                 logGoogleManagedApps() {
