@@ -1,6 +1,6 @@
 import { defineAction } from "astro:actions";
 import { STRIPE_SECRET_KEY } from "astro:env/server";
-import { z } from "astro:content";
+import { z } from "astro:schema";
 import Stripe from "stripe";
 import { db, Wisephone, sql } from "astro:db";
 import { devLog } from "@/libs/utils";
@@ -13,15 +13,20 @@ const stripeInstance = new Stripe(STRIPE_SECRET_KEY || STRIPE_SECRET_KEY, {
 // Detect Stripe mode from the secret key (test keys start with sk_test_, live keys start with sk_live_)
 const isStripeTestMode = STRIPE_SECRET_KEY?.startsWith("sk_test_") ?? !import.meta.env.PROD;
 
-const TECHLESS_SUBSCRIPTION_PRICE_ID = isStripeTestMode
+const TECHLESS_MONTHLY_PRICE_ID = isStripeTestMode
   ? "price_1Q1BZYATGtdZ0VDD72eOr0Cm"
   : "price_1Q0nXWATGtdZ0VDDDU27pLKx";
+
+const TECHLESS_YEARLY_PRICE_ID = isStripeTestMode
+  ? "price_1TTQqfATGtdZ0VDDjCCHI6ZO"
+  : "price_1TTQqfATGtdZ0VDDjCCHI6ZO";
 
 export const stripe = {
   createSubscriptionPage: defineAction({
     input: z.object({
       customerEmail: z.string().email(),
-      deviceIMEI: z.string()
+      deviceIMEI: z.string(),
+      plan: z.enum(["monthly", "yearly"]).default("monthly")
     }),
     handler: async (input, context) => {
       devLog.log("PAY DEBUG: [A1] createSubscriptionPage action called");
@@ -79,7 +84,7 @@ export const stripe = {
         ui_mode: "embedded",
         line_items: [
           {
-            price: TECHLESS_SUBSCRIPTION_PRICE_ID,
+            price: input.plan === "yearly" ? TECHLESS_YEARLY_PRICE_ID : TECHLESS_MONTHLY_PRICE_ID,
             quantity: 1
           }
         ],
