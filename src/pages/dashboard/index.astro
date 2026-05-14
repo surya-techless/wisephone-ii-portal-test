@@ -12,9 +12,11 @@ import DashboardSidebar from "@/components/DashboardSidebar.astro";
 import IsAdmin from "@/components/server-islands/IsAdmin.astro";
 import { SignOutButton } from "@clerk/astro/components";
 import { validateIsSubscribed } from "@/libs/stripe";
-import { devLog } from "@/libs/utils";
+import { devLog, KNOX_USER_GROUPS } from "@/libs/utils";
+import { SamsungKnoxService } from "@/libs/samsung-knox-service";
 import { isFeatureEnabled } from "@/config/feature-flags";
 import TypeformDeviceRegistration from "@/components/TypeformDeviceRegistration.astro";
+import CspireSubscriptionModal from "@/components/CspireSubscriptionModal.astro";
 
 if (!Astro.locals.auth().userId) {
   return Astro.redirect("/");
@@ -32,7 +34,13 @@ const derivedHasNoWisephone = wisephones.length === 0;
 // Check if Typeform feature is enabled
 const enableTypeform = isFeatureEnabled("ENABLE_TYPEFORM");
 
-// Check subscription status for each device
+const allCspireGroupIds = [
+  KNOX_USER_GROUPS.CSPIRE_WPII_Unpaid_v2,
+  KNOX_USER_GROUPS.CSPIRE_WPII_Subscribed,
+  KNOX_USER_GROUPS.CSPIRE_ADD_ON_BLOCK_TOOL_DRAWER
+];
+
+// Check subscription status and CSpire status for each device
 const wisephonesWithSubscription = await Promise.all(
   wisephones.map(async (wisephone) => {
     // Check for bypass subscription first
@@ -56,9 +64,19 @@ const wisephonesWithSubscription = await Promise.all(
       }
     }
 
+    // Check Knox groups to determine CSpire status
+    let isCspire = false;
+    try {
+      const groups = await SamsungKnoxService.getGroupsForDevice(wisephone.imei.toString());
+      isCspire = groups.some(id => allCspireGroupIds.includes(id));
+    } catch {
+      // Non-fatal — isCspire stays false
+    }
+
     return {
       ...wisephone,
-      isSubscribed
+      isSubscribed,
+      isCspire
     };
   })
 );
@@ -356,7 +374,7 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
   }
 </style>
 
-<div class="dashboard-container flex h-screen w-full min-w-[360px] bg-[#f7f6f2] relative" x-data={`dashboard(${JSON.stringify({ userEmail: user?.emailAddresses?.[0]?.emailAddress || user?.primaryEmailAddress?.emailAddress || "", newDevice: actionResult?.data && !actionResult.error && !actionResult.data.isSubscribed && actionResult.data.wisephone?.[0] ? { imei: actionResult.data.wisephone[0].imei.toString().padEnd(15, "0"), phoneNumber: actionResult.data.wisephone[0].phoneNumber || "" } : null })})`} @activate-modal.window="openActivateModal($event.detail?.imei || $event.detail)">
+<div class="dashboard-container flex h-screen w-full min-w-[360px] bg-[#f7f6f2] relative" x-data={`dashboard(${JSON.stringify({ userEmail: user?.emailAddresses?.[0]?.emailAddress || user?.primaryEmailAddress?.emailAddress || "", newDevice: actionResult?.data && !actionResult.error && !actionResult.data.isSubscribed && actionResult.data.wisephone?.[0] ? { imei: actionResult.data.wisephone[0].imei.toString().padEnd(15, "0"), phoneNumber: actionResult.data.wisephone[0].phoneNumber || "", isCspire: Boolean(actionResult.data.isCspire) } : null })})`} @activate-modal.window="$event.detail?.isCspire ? openCspireModal($event.detail) : openActivateModal($event.detail?.imei || $event.detail)">
   <progress
     x-show="isLoading"
     x-cloak
@@ -436,7 +454,8 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
             const deviceData = {
               imei: imeiString,
               isSubscribed: Boolean(wisephone.isSubscribed),
-              phoneNumber: wisephone.phoneNumber || ''
+              phoneNumber: wisephone.phoneNumber || '',
+              isCspire: Boolean(wisephone.isCspire)
             };
             devLog.log(`Device card data for ${imeiString}:`, deviceData, `isSubscribed type: ${typeof wisephone.isSubscribed}, value: ${wisephone.isSubscribed}`);
 
@@ -953,9 +972,8 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
               </ul>
             </div>
             <button
-              @click="devLog.log('[BYOC] Button clicked!', { isStripeLoaded, activeDeviceImei, customerEmail }); handleStripeCheckout()"
-              :disabled="!isStripeLoaded || !activeDeviceImei"
-              class="flex items-center justify-center gap-1 w-full px-4 py-2 bg-[#C07F53] text-white rounded-md text-sm font-medium hover:bg-[#A06F43] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed mt-auto"
+              @click="openByocModal()"
+              class="flex items-center justify-center gap-1 w-full px-4 py-2 bg-[#C07F53] text-white rounded-md text-sm font-medium hover:bg-[#A06F43] transition-colors cursor-pointer mt-auto"
             >
               Activate BYOC Plan
             </button>
@@ -986,6 +1004,97 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
     </div>
   </div>
 
+  <!-- BYOC Plans Modal -->
+  <div
+    x-show="showByocModal"
+    x-cloak
+    x-transition.opacity
+    class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+    @click.self="closeByocModal()"
+  >
+    <div class="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+      <!-- Header -->
+      <div class="sticky top-0 bg-white border-b border-gray-200 p-4 md:p-6 flex justify-between items-center">
+        <div class="flex items-center gap-2">
+          <button @click="closeByocModal()" class="text-gray-400 hover:text-gray-600 mr-1">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m15 18-6-6 6-6"></path>
+            </svg>
+          </button>
+          <h2 class="text-xl font-semibold text-gray-800">Bring Your Own Carrier</h2>
+        </div>
+        <button @click="closeActivateModal()" class="text-gray-400 hover:text-gray-600">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 6 6 18"></path>
+            <path d="m6 6 12 12"></path>
+          </svg>
+        </button>
+      </div>
+
+      <div class="p-4 md:p-6">
+        <!-- Billing cycle toggle -->
+        <div class="flex items-center rounded-full bg-gray-200 p-1 mb-6 h-11">
+          <button
+            @click="byocBillingCycle = 'yearly'"
+            class="flex-1 min-w-0 h-full px-3 rounded-full text-sm font-medium transition-all duration-200 focus:outline-none leading-tight text-center"
+            :class="byocBillingCycle === 'yearly' ? 'bg-[#C07F53] text-white shadow-sm' : 'text-gray-500'"
+          >
+            Annually (One Month Free)
+          </button>
+          <button
+            @click="byocBillingCycle = 'monthly'"
+            class="flex-1 min-w-0 h-full rounded-full text-sm font-medium transition-all duration-200 focus:outline-none"
+            :class="byocBillingCycle === 'monthly' ? 'bg-[#C07F53] text-white shadow-sm' : 'text-gray-500'"
+          >
+            Monthly
+          </button>
+        </div>
+
+        <!-- Plan card -->
+        <div class="border border-gray-200 rounded-xl p-5 mb-5">
+          <h3 class="text-base font-semibold text-gray-900 mb-1">WiseOS Subscription</h3>
+          <p class="text-xs text-gray-500 mb-4">No carrier service included — bring your own plan</p>
+          <ul class="space-y-2 mb-5">
+            <li class="flex items-start gap-2 text-sm text-gray-700">
+              <svg class="w-4 h-4 text-[#C07F53] mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              WiseOS Subscription
+            </li>
+            <li class="flex items-start gap-2 text-sm text-gray-700">
+              <svg class="w-4 h-4 text-[#C07F53] mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              Full feature access
+            </li>
+            <li class="flex items-start gap-2 text-sm text-gray-700">
+              <svg class="w-4 h-4 text-[#C07F53] mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              Works with any carrier
+            </li>
+          </ul>
+          <div x-show="byocBillingCycle === 'monthly'">
+            <p class="text-3xl font-bold text-gray-900">$14.99<span class="text-base font-normal text-gray-500">/mo</span></p>
+            <p class="text-xs text-gray-500 mt-1">Billed monthly</p>
+          </div>
+          <div x-show="byocBillingCycle === 'yearly'" x-cloak>
+            <p class="text-3xl font-bold text-gray-900">$13.74<span class="text-base font-normal text-gray-500">/mo</span></p>
+            <p class="text-xs text-gray-500 mt-1">Billed annually · One Month Free</p>
+          </div>
+        </div>
+
+        <!-- Activate button -->
+        <button
+          @click="handleStripeCheckout(byocBillingCycle)"
+          :disabled="!isStripeLoaded || !activeDeviceImei"
+          class="w-full px-4 py-3 bg-[#C07F53] text-white rounded-md text-sm font-medium hover:bg-[#A06F43] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <span x-text="byocBillingCycle === 'yearly' ? 'Activate BYOC Plan (Annually)' : 'Activate BYOC Plan (Monthly)'"></span>
+        </button>
+
+        <p class="text-xs text-gray-400 text-center mt-3">Secure checkout powered by Stripe</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- CSpire Subscription Modal -->
+  <CspireSubscriptionModal />
+
   <!-- Stripe Checkout Dialog -->
   <dialog x-ref="stripeDialog" class="modal">
     <div style="background-color: rgb(247, 246, 242)" class="modal-box max-w-2xl">
@@ -1008,19 +1117,24 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
   import Alpine from "alpinejs";
   import { isValidIMEI, STRIPE_PUBLIC_KEY, updateUnreachableAlpineState, devLog } from "@/libs/utils";
   import { actions } from "astro:actions";
-  import { loadStripe, type Stripe } from "@stripe/stripe-js";
+  import { loadStripe, type Stripe, type StripeEmbeddedCheckout } from "@stripe/stripe-js";
   import { SubscriptionPollingService, type Device } from "@/services/SubscriptionPollingService";
 
   // Initialize subscription polling service
   let subscriptionPollingService: SubscriptionPollingService | null = null;
 
   document.addEventListener("alpine:init", () => {
-    Alpine.data("dashboard", (initialData?: { userEmail?: string; newDevice?: { imei: string; phoneNumber: string } | null }) => ({
+    Alpine.data("dashboard", (initialData?: { userEmail?: string; newDevice?: { imei: string; phoneNumber: string; isCspire?: boolean } | null }) => ({
       showForm: false,
       isLoading: false,
       mobileMenuOpen: false,
       showAccountMenu: false,
       showActivateModal: false,
+      showByocModal: false,
+      showCspireModal: false,
+      byocBillingCycle: 'yearly' as 'monthly' | 'yearly',
+      byocSessionCycle: null as 'monthly' | 'yearly' | null,
+      byocFromCspire: false,
       activeDeviceImei: null as string | null,
       activeDevicePhoneNumber: null as string | null,
       pollingSubscription: false,
@@ -1030,6 +1144,7 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
       isStripeLoaded: false,
       isStripeEmbedded: false,
       stripeInstance: undefined as Stripe | undefined,
+      stripeCheckout: undefined as StripeEmbeddedCheckout | undefined,
       sessionClientSecret: undefined as string | undefined,
       stripeSessionId: undefined as string | undefined,
       customerEmail: initialData?.userEmail || "",
@@ -1077,16 +1192,68 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
         this.hasBlurredImeiVerification = false;
         this.isImeiValid = true;
       },
-      openActivateModal(imei: string | { imei?: string; phoneNumber?: string }) {
-        // Handle both direct call and event detail
+      openActivateModal(imei: string | { imei?: string; phoneNumber?: string; isCspire?: boolean }) {
         const imeiValue = typeof imei === 'string' ? imei : (imei?.imei || '');
         const phoneNumber = typeof imei === 'object' ? (imei?.phoneNumber || null) : null;
+        const isCspire = typeof imei === 'object' ? Boolean((imei as any)?.isCspire) : false;
+        if (isCspire) {
+          this.openCspireModal(imei);
+          return;
+        }
         this.activeDeviceImei = imeiValue;
         this.activeDevicePhoneNumber = phoneNumber;
         this.showActivateModal = true;
       },
+      openCspireModal(imei?: string | { imei?: string; phoneNumber?: string; isCspire?: boolean }) {
+        if (imei) {
+          const imeiValue = typeof imei === 'string' ? imei : (imei?.imei || '');
+          const phoneNumber = typeof imei === 'object' ? (imei?.phoneNumber || null) : null;
+          this.activeDeviceImei = imeiValue;
+          this.activeDevicePhoneNumber = phoneNumber;
+        }
+        this.showActivateModal = false;
+        this.showByocModal = false;
+        this.showCspireModal = true;
+      },
+      closeCspireModal() {
+        this.showCspireModal = false;
+        if (!this.pollingSubscription) {
+          this.activeDeviceImei = null;
+          this.activeDevicePhoneNumber = null;
+        }
+      },
+      proceedToByocFromCspire() {
+        this.showCspireModal = false;
+        this.byocFromCspire = true;
+        this.byocBillingCycle = 'yearly';
+        this.showByocModal = true;
+      },
+      openByocModal(imei?: string | { imei?: string; phoneNumber?: string; isCspire?: boolean }) {
+        if (imei) {
+          const imeiValue = typeof imei === 'string' ? imei : (imei?.imei || '');
+          const phoneNumber = typeof imei === 'object' ? (imei?.phoneNumber || null) : null;
+          this.activeDeviceImei = imeiValue;
+          this.activeDevicePhoneNumber = phoneNumber;
+          this.byocFromCspire = typeof imei === 'object' && Boolean((imei as any)?.isCspire);
+        } else {
+          this.byocFromCspire = false;
+        }
+        this.byocBillingCycle = 'yearly';
+        this.showActivateModal = false;
+        this.showByocModal = true;
+      },
+      closeByocModal() {
+        this.showByocModal = false;
+        if (this.byocFromCspire) {
+          this.showCspireModal = true;
+        } else {
+          this.showActivateModal = true;
+        }
+      },
       closeActivateModal() {
         this.showActivateModal = false;
+        this.showByocModal = false;
+        this.showCspireModal = false;
         // Don't clear activeDeviceImei if we're polling (user might have clicked X during activation)
         if (!this.pollingSubscription) {
           this.activeDeviceImei = null;
@@ -1105,20 +1272,33 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
           // Error initializing Stripe
         }
       },
-      async handleStripeCheckout() {
+      async handleStripeCheckout(cycle: 'monthly' | 'yearly' = 'monthly') {
         if (!this.activeDeviceImei || !this.customerEmail) {
           return;
         }
 
         try {
+          // Reset session if billing cycle changed
+          if (this.byocSessionCycle && this.byocSessionCycle !== cycle) {
+            try { this.stripeCheckout?.destroy(); } catch {}
+            this.stripeCheckout = undefined;
+            const el = document.getElementById('stripe-subscription-element');
+            if (el) el.innerHTML = '';
+            this.sessionClientSecret = undefined;
+            this.stripeSessionId = undefined;
+            this.isStripeEmbedded = false;
+          }
+
           // Create Stripe session if not already created
           if (!this.sessionClientSecret) {
             const imeiString = this.activeDeviceImei.replace(/[^0-9]/g, '').padEnd(15, '0');
 
             const data = await actions.stripe.createSubscriptionPage.orThrow({
               customerEmail: this.customerEmail,
-              deviceIMEI: imeiString
+              deviceIMEI: imeiString,
+              plan: cycle
             });
+            this.byocSessionCycle = cycle;
             this.sessionClientSecret = data.session.client_secret as string;
             this.stripeSessionId = data.session.id;
           }
@@ -1133,10 +1313,10 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
               sessionStorage.setItem('stripeCheckoutImei', imeiString);
             }
 
-            const checkout = await this.stripeInstance.initEmbeddedCheckout({
+            this.stripeCheckout = await this.stripeInstance.initEmbeddedCheckout({
               clientSecret: this.sessionClientSecret
             });
-            checkout?.mount("#stripe-subscription-element");
+            this.stripeCheckout?.mount("#stripe-subscription-element");
 
             // Note: Stripe embedded checkout doesn't have an 'on' method
             // Instead, it will redirect to the return_url when complete
@@ -1151,8 +1331,10 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
           if (dialog) {
             dialog.showModal();
           }
-        } catch (error) {
-          alert("Failed to open checkout. Please try again.");
+        } catch (error: any) {
+          devLog.error("[BYOC] Stripe checkout error:", error);
+          const msg = error?.message || error?.error?.message || JSON.stringify(error);
+          alert("Failed to open checkout: " + msg);
         }
       },
       async checkSubscriptionStatus(imei: string, phoneNumber?: string | null): Promise<boolean> {
@@ -1393,6 +1575,11 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
       async init() {
         devLog.log("[BYOC] Dashboard component initialized");
         devLog.log("[BYOC] Initial state - customerEmail:", this.customerEmail, "activeDeviceImei:", this.activeDeviceImei);
+
+        // Always reset billing cycle to yearly whenever the BYOC modal opens
+        this.$watch('showByocModal', (val: boolean) => {
+          if (val) this.byocBillingCycle = 'yearly';
+        });
         
         // Initialize mobile detection
         this.checkMobile();
@@ -1417,10 +1604,14 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
           devLog.log("New unsubscribed device detected, opening activate modal:", initialData.newDevice);
           // Wait a bit for Alpine to fully initialize
           await new Promise(resolve => setTimeout(resolve, 300));
-          this.openActivateModal({
-            imei: initialData.newDevice.imei,
-            phoneNumber: initialData.newDevice.phoneNumber
-          });
+          if (initialData.newDevice.isCspire) {
+            this.openCspireModal(initialData.newDevice);
+          } else {
+            this.openActivateModal({
+              imei: initialData.newDevice.imei,
+              phoneNumber: initialData.newDevice.phoneNumber
+            });
+          }
 
           // Add device to polling service
           if (subscriptionPollingService && initialData.newDevice.phoneNumber) {
@@ -1586,10 +1777,11 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
       }
     }));
 
-    Alpine.data("deviceCard", (deviceData: { imei: string; isSubscribed: boolean; phoneNumber?: string }) => ({
+    Alpine.data("deviceCard", (deviceData: { imei: string; isSubscribed: boolean; phoneNumber?: string; isCspire?: boolean }) => ({
       imei: deviceData.imei,
       isSubscribed: deviceData.isSubscribed,
       phoneNumber: deviceData.phoneNumber || '',
+      isCspire: deviceData.isCspire || false,
       init() {
         devLog.log("Device card initialized:", { imei: this.imei, isSubscribed: this.isSubscribed, phoneNumber: this.phoneNumber });
 
@@ -1620,7 +1812,7 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
       },
       openActivateModal() {
         devLog.log("Device card openActivateModal called for IMEI:", this.imei, "isSubscribed:", this.isSubscribed);
-        const payload = { imei: this.imei, phoneNumber: this.phoneNumber };
+        const payload = { imei: this.imei, phoneNumber: this.phoneNumber, isCspire: this.isCspire };
         // Try to find the dashboard component
         const dashboardEl = document.querySelector('[x-data="dashboard"]');
         if (dashboardEl) {

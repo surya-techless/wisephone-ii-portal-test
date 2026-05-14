@@ -6,6 +6,10 @@
 
 import { db, sql } from "astro:db";
 
+import { TursoClient, WPIIPortalPersistenceError } from "./client/client";
+import WiseOSLogEvent from "./migrations/WiseOSLogEvent/Create_WiseOSLogEvent";
+
+
 export default async function migrate() {
   console.log("========================================");
   console.log("🚀 Starting database migration...");
@@ -67,6 +71,14 @@ export default async function migrate() {
       } else {
         throw alterError;
       }
+    }
+
+    try {
+      await TursoClient.connection().batch(WiseOSLogEvent.migrationStatements);  // cool! turso automatically commits this change within a transaction!
+      console.log(`✅ ran migrations for table ${WiseOSLogEvent.name}`);
+    } catch (error) {
+      console.error("❌ error:", error);
+      throw new WPIIPortalPersistenceError(`there was an issue performing database migration for table ${WiseOSLogEvent.name}: ${error}`);
     }
 
     console.log("========================================");
