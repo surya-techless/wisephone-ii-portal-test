@@ -1,6 +1,6 @@
 import type { APIRoute } from "astro";
 
-import { successResponse, errorResponse } from "@/lib/server/api.response";
+import { successResponse, errorResponse, jsonResponseForAndroid } from "@/lib/server/api.response";
 import { HTTP } from "@/lib/server/api.response";
 
 export const POST: APIRoute = async ({ request }) => {
@@ -18,7 +18,7 @@ export const POST: APIRoute = async ({ request }) => {
     // cache can probably be a simple in-memory cache
     // utilizing an external cache mechanism might be more "clean" but adds more complexity
 
-    return successResponse("Created", HTTP.CREATED);
+    return jsonResponseForAndroid("Created", HTTP.CREATED);
   } catch (error) {
       return errorResponse("Internal Server Error", HTTP.INTERNAL_SERVER_ERROR);
   }

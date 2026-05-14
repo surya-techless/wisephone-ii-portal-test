@@ -34,6 +34,17 @@ export function jsonResponse(body: unknown, status = HTTP.OK) {
   });
 }
 
+export function jsonResponseForAndroid(body: unknown, status = HTTP.OK) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      "Content-Type": "application/json",
+      "Cache-Control": "no-cache, no-store, must-revalidate",  // seems that we specifically set these values everywhere, so why not
+      "Access-Control-Allow-Origin": "https://localhost"
+    },
+  });
+}
+
 export function successResponse(message: string, status: number) {
   return jsonResponse({ message: message }, status);
 }
