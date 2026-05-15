@@ -1,6 +1,6 @@
 import type { APIRoute } from "astro";
 
-import { androidResponse, errorResponse, preflightResponse } from "@/lib/server/api.response";
+import { androidResponse, errorResponse, preflightResponse, successResponse } from "@/lib/server/api.response";
 import { HTTP } from "@/lib/server/api.response";
 
 export const POST: APIRoute = async ({ request }) => {
@@ -17,7 +17,7 @@ export const POST: APIRoute = async ({ request }) => {
 
     // cache can probably be a simple in-memory cache
     // utilizing an external cache mechanism might be more "clean" but adds more complexity
-
+    console.log("POST HIT");
     return androidResponse("Created", HTTP.CREATED);
   } catch (error) {
       return errorResponse("Internal Server Error", HTTP.INTERNAL_SERVER_ERROR);
@@ -25,8 +25,18 @@ export const POST: APIRoute = async ({ request }) => {
 };
 
 export const OPTIONS: APIRoute = async ({ request }) => {
+  console.log("OPTIONS HIT");
   try {
     return preflightResponse();
+  } catch (error) {
+      return errorResponse("Internal Server Error", HTTP.INTERNAL_SERVER_ERROR);
+  }
+};
+
+export const GET: APIRoute = async ({ request }) => {
+  console.log("GET HIT");
+  try {
+    return successResponse("Success");
   } catch (error) {
       return errorResponse("Internal Server Error", HTTP.INTERNAL_SERVER_ERROR);
   }
