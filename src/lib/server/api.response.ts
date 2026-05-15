@@ -52,12 +52,12 @@ function json(body: unknown, status: number, headers: HeadersInit = {}) {
 
 
 export function successResponse(message: string, status: number = HTTP.OK) {
-  return json({ message }, status);
+  return json({ message }, status, corsHeaders);
 }
 
 
 export function errorResponse(errorMessage: string, status: number = HTTP.INTERNAL_SERVER_ERROR) {
-  return json({ error: errorMessage }, status);
+  return json({ error: errorMessage }, status, corsHeaders);
 }
 
 export function androidResponse(body: unknown, status: number = HTTP.OK) {
