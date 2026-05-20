@@ -4,7 +4,7 @@ import { androidResponse, errorResponse, preflightResponse, successResponse } fr
 import { HTTP } from "@/lib/server/api.response";
 
 import { CacheClient } from "cache/CacheClient";
-import { LogBufferService } from "log/LogEventService";
+import { LogBufferService } from "log/LogBufferService";
 
 export const POST: APIRoute = async ({ request }) => {
   try {
