@@ -9,10 +9,12 @@ export class CacheClient {
 
   //  buffer threshold of 5000 = 1 bulk db insert every 2.5 minutes
   // 5000 buffer size is just to start us out
-  public static readonly bufferSizeNumKeys: number = 5000;  // TODO: confirm appropriate log db insert interval
+  // public static readonly bufferSizeNumKeys: number = 5000;  // TODO: confirm appropriate log db insert interval
+  public static readonly bufferSizeNumKeys: number = 2;  // NOODLES
   private static readonly CACHE_PORT: number = 6379;
   private static readonly SOCKET_TIMEOUT_MS: number = 5000;
   private static readonly errorMessageDefault: string = "An cache exception occurred: ";
+  private static readonly LOG_LIST_KEY: string = "logs";
 
   private static async getClient() {
     const client = createClient({
@@ -37,7 +39,7 @@ export class CacheClient {
 
     try {
       client = await this.getClient();
-      return await client.dbSize();  // total number of keys in cache
+      return await client.lLen(this.LOG_LIST_KEY);  // total number of keys in cache
     } catch (e) {
         console.error(this.errorMessageDefault, e);
         return -1;
@@ -48,27 +50,29 @@ export class CacheClient {
     }
   }
 
-  // public static async getAll() {
-  //   let client = null;
-
-  //   try {
-  //     client = await this.getClient();
-  //     return await client.keys("*");
-  //   } catch (e) {
-  //     console.error(this.errorMessageDefault, e);
-  //   } finally {
-  //     if (client) {
-  //       await client.quit();
-  //     }
-  //   }
-  // }
-
-  public static async flush() {
+  public static async getAll(): Promise<string[]> {  //  FOR BATCHED DB WRITES
     let client = null;
 
     try {
       client = await this.getClient();
-      await client.flushDb();
+      return await client.lRange(this.LOG_LIST_KEY, 0, -1);
+
+    } catch (e) {
+        console.error(this.errorMessageDefault, e);
+        return [];
+    } finally {
+        if (client) {
+          await client.quit();
+        }
+    }
+  }
+
+  public static async flush(batchSize: number = this.bufferSizeNumKeys) {
+    let client = null;
+
+    try {
+      client = await this.getClient();
+      await client.lTrim(this.LOG_LIST_KEY, batchSize, -1);
     } catch (e) {
       console.error(this.errorMessageDefault, e);
     } finally {
@@ -93,18 +97,18 @@ export class CacheClient {
     }
   }
 
-  public static async set(key: string, value: string) {
+  public static async push(value: string) {
     let client = null;
 
     try {
       client = await this.getClient();
-      await client.set(key, value);
+      await client.rPush(this.LOG_LIST_KEY, value);
     } catch (e) {
-      console.error(this.errorMessageDefault, e);
+        console.error(this.errorMessageDefault, e);
     } finally {
-      if (client) {
-        client.close();
-      }
+        if (client) {
+          await client.quit();
+        }
     }
   }
 }
