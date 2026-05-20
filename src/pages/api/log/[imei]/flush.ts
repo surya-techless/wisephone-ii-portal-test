@@ -4,27 +4,15 @@ import { androidResponse, errorResponse, preflightResponse, successResponse } fr
 import { HTTP } from "@/lib/server/api.response";
 
 import { CacheClient } from "cache/CacheClient";
-import type { LogEvent } from "cache/dto/LogEvent";
+import { LogBufferService } from "log/LogEventService";
 
 export const POST: APIRoute = async ({ request }) => {
-  // TODO abstract into service method and keep this logic out of the "controller"
   try {
-      let body: LogEvent = await request.json();
-      // console.log(body);
-      await CacheClient.push(JSON.stringify(body));
-
-    if (await CacheClient.getBufferSize() >= CacheClient.bufferSizeNumKeys) {
+    await LogBufferService.ingest(await request.json());
       //  TODO:
       //    confirm imei in payload
-      //    batch commit entire buffer + incoming log events to db within a transaction
       //    publish to mqtt log/<imei>/flush topic
-      let cachedContents = await CacheClient.getAll();
-      cachedContents.forEach((item) => console.log(item, "\n\n"));  // NOODLES
-      // pass collection into sanitization process then bulk insert into db
-      await CacheClient.flush();
-      console.log("cache flushed");
-    }
-    return androidResponse("Created", HTTP.CREATED);
+    return androidResponse("Ok", HTTP.OK);
   } catch (error) {
     console.log(error);
       return errorResponse("Internal Server Error", HTTP.INTERNAL_SERVER_ERROR);
