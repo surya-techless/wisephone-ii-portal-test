@@ -36,7 +36,7 @@ export class LogBufferService {
           sqlStatements.push(this.buildInsertStatement(logEvent))
           // <device imei>-<random uuid>
           // // example: 1234512345123-50657e75-545c-4fe3-941b-18bc4fde1c4a
-          mqttAckTopics.add(logEvent.batch_id);
+          mqttAckTopics.add(logEvent.pii.imei);
         });
       });
 

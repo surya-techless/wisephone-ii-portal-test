@@ -10,6 +10,9 @@ import { IoTDataPlaneClient, PublishCommand } from "@aws-sdk/client-iot-data-pla
 import { devLog } from "@/libs/utils";
 import { WisephoneIIPortalAPIError } from "@/lib/server/api.response";
 
+// NOTE: for useful MQTT SDK debugging, uncomment the below to enable verbose logging.
+// this logging is actually quite helpful
+// io.enable_logging(io.LogLevel.DEBUG);
 
 export class WisephoneIIPortalMQTTError extends Error {
   constructor(message: string) {
@@ -24,6 +27,8 @@ const accessKeyId = import.meta.env.WPII_AWS_ACCESS_KEY_ID;
 const secretAccessKey = import.meta.env.WPII_AWS_SECRET_ACCESS_KEY;
 const sysprobeAccessKeyId = import.meta.env.WPII_SYSPROBE_AWS_ACCESS_KEY_ID;
 const sysprobeSecretAccessKey = import.meta.env.WPII_SYSPROBE_AWS_SECRET_ACCESS_KEY;
+const robustAccessKeyId = import.meta.env.ROBUST_MQTT_ACCESS_KEY_ID;
+const robustSecretAccessKey = import.meta.env.ROBUST_MQTT_SECRET_ACCESS_KEY;
 
 const client =
   endpoint && accessKeyId && secretAccessKey
@@ -45,7 +50,7 @@ const sysprobeClient = endpoint && sysprobeAccessKeyId && sysprobeSecretAccessKe
 // relies on the extremely robust AWS `aws-iot-device-sdk-v2` npm package
 // uses the same credentials as `wiseos-portal-publisher` user
 const clientId = os.hostname();
-const provider = auth.AwsCredentialsProvider.newStatic(accessKeyId, secretAccessKey);
+const provider = auth.AwsCredentialsProvider.newStatic(robustAccessKeyId, robustSecretAccessKey);
 const config = iot.AwsIotMqttConnectionConfigBuilder.new_with_websockets({ region: region, credentials_provider: provider })
   .with_client_id(clientId)
   .with_endpoint(endpoint)
@@ -55,6 +60,7 @@ const config = iot.AwsIotMqttConnectionConfigBuilder.new_with_websockets({ regio
 const robustMQTTClient = new mqtt.MqttClient();
 const robustMQTTConnection = robustMQTTClient.new_connection(config);
 
+// this is just for extra debugging
 robustMQTTConnection.on('connect', () => console.log('[MQTT] CONNECT'));
 robustMQTTConnection.on('disconnect', () => console.log('[MQTT] DISCONNECT'));
 robustMQTTConnection.on('interrupt', (error) => console.log('[MQTT] INTERRUPT', error));
@@ -137,7 +143,7 @@ export async function sendSysProbe(initialSignalPayload: any) {
 export async function sendLogFlushAcks(suffixes: Set<string>): Promise<void> {
   try {
     suffixes.forEach(async (suffix) => {
-      let topic: string = `log/flush/${suffix}/ack`;
+      let topic: string = `log/flush/ack/${suffix}`;
       if (robustMQTTConnection) {
         await robustMQTTConnection.publish(topic, JSON.stringify(
           {
