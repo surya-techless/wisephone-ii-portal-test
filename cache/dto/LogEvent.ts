@@ -6,7 +6,7 @@ export type LogEvent = {
   severity: "DEBUG" | "INFO" | "WARN" | "ERROR" | "CRITICAL";
   message: string;
   event_id: string;
-
+  batch_id: string;
   pii: {
     imei: string;
     ip_address: string;

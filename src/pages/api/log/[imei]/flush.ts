@@ -9,9 +9,6 @@ import { LogBufferService } from "log/LogBufferService";
 export const POST: APIRoute = async ({ request }) => {
   try {
     await LogBufferService.ingest(await request.json());
-      //  TODO:
-      //    confirm imei in payload
-      //    publish to mqtt log/<imei>/flush topic
     return androidResponse("Ok", HTTP.OK);
   } catch (error) {
     console.log(error);
