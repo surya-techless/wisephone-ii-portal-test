@@ -4,15 +4,9 @@
  * No persistent MQTT client needed on the server — one SDK call per flag change.
  */
 
-import * as os from 'os';
-import { auth, mqtt, iot, io } from 'aws-iot-device-sdk-v2';
 import { IoTDataPlaneClient, PublishCommand } from "@aws-sdk/client-iot-data-plane";
 import { devLog } from "@/libs/utils";
 import { WisephoneIIPortalAPIError } from "@/lib/server/api.response";
-
-// NOTE: for useful MQTT SDK debugging, uncomment the below to enable verbose logging.
-// this logging is actually quite helpful
-// io.enable_logging(io.LogLevel.DEBUG);
 
 export class WisephoneIIPortalMQTTError extends Error {
   constructor(message: string) {
@@ -27,16 +21,14 @@ const accessKeyId = import.meta.env.WPII_AWS_ACCESS_KEY_ID;
 const secretAccessKey = import.meta.env.WPII_AWS_SECRET_ACCESS_KEY;
 const sysprobeAccessKeyId = import.meta.env.WPII_SYSPROBE_AWS_ACCESS_KEY_ID;
 const sysprobeSecretAccessKey = import.meta.env.WPII_SYSPROBE_AWS_SECRET_ACCESS_KEY;
-const robustAccessKeyId = import.meta.env.ROBUST_MQTT_ACCESS_KEY_ID;
-const robustSecretAccessKey = import.meta.env.ROBUST_MQTT_SECRET_ACCESS_KEY;
 
 const client =
   endpoint && accessKeyId && secretAccessKey
     ? new IoTDataPlaneClient({
-        region,
-        endpoint: `https://${endpoint}`,
-        credentials: { accessKeyId, secretAccessKey }
-      })
+      region,
+      endpoint: `https://${endpoint}`,
+      credentials: { accessKeyId, secretAccessKey }
+    })
     : null;
 
 // seperate concerns with dedicated sysprobe IAM access keys
@@ -45,31 +37,6 @@ const sysprobeClient = endpoint && sysprobeAccessKeyId && sysprobeSecretAccessKe
   endpoint: `https://${endpoint}`,
   credentials: { accessKeyId: sysprobeAccessKeyId, secretAccessKey: sysprobeSecretAccessKey }
 }) : null;
-
-// ----------------------------------------------------------------------------------------------------------------------------------------------------------
-// relies on the extremely robust AWS `aws-iot-device-sdk-v2` npm package
-// uses the same credentials as `wiseos-portal-publisher` user
-const clientId = os.hostname();
-const provider = auth.AwsCredentialsProvider.newStatic(robustAccessKeyId, robustSecretAccessKey);
-const config = iot.AwsIotMqttConnectionConfigBuilder.new_with_websockets({ region: region, credentials_provider: provider })
-  .with_client_id(clientId)
-  .with_endpoint(endpoint)
-  .with_clean_session(true)
-  .build();
-
-const robustMQTTClient = new mqtt.MqttClient();
-const robustMQTTConnection = robustMQTTClient.new_connection(config);
-
-// this is just for extra debugging
-robustMQTTConnection.on('connect', () => console.log('[MQTT] CONNECT'));
-robustMQTTConnection.on('disconnect', () => console.log('[MQTT] DISCONNECT'));
-robustMQTTConnection.on('interrupt', (error) => console.log('[MQTT] INTERRUPT', error));
-robustMQTTConnection.on('resume', (returnCode, sessionPresent) => console.log('[MQTT] RESUME', 'returnCode=', returnCode, 'sessionPresent=', sessionPresent));
-robustMQTTConnection.on('error', (error) => console.log('[MQTT] ERROR', error));
-robustMQTTConnection.on('message', (topic, payload) => console.log('[MQTT] MESSAGE', topic, new TextDecoder().decode(payload)));
-robustMQTTConnection.on('closed', () => console.log('[MQTT] CLOSED'));
-await robustMQTTConnection.connect();
-// ----------------------------------------------------------------------------------------------------------------------------------------------------------
 
 /**
  * Publish feature flags to a specific device via AWS IoT Core.
@@ -140,23 +107,35 @@ export async function sendSysProbe(initialSignalPayload: any) {
   }
 }
 
+// portal to send acknowledgements that logs have been successfully committed to db
+// this is to let mqtt-subscribed end user devices know when local log deletion is ok
 export async function sendLogFlushAcks(suffixes: Set<string>): Promise<void> {
-  try {
     suffixes.forEach(async (suffix) => {
-      let topic: string = `log/flush/ack/${suffix}`;
-      if (robustMQTTConnection) {
-        await robustMQTTConnection.publish(topic, JSON.stringify(
-          {
-            message: "ack",
-            ackSentAt: Date.now(),
-            suffix: suffix
-          }
-        ), mqtt.QoS.AtLeastOnce);
-        console.log(`[MQTT] ✅ log flush event ack publish success: ${topic}`);
+      let topic: string = `log/flush/${suffix}/ack`;
+      let payload = JSON.stringify(
+        {
+          message: "ack",
+          ackSentAt: Date.now(),
+          suffix: suffix,
+          publisher: "wisephone-portal"
+        }
+      );
+
+      if (client) {
+        try {
+          console.log("trying payload", payload);
+          await client.send(
+            new PublishCommand({
+              topic,
+              payload: new TextEncoder().encode(payload),
+              qos: 1
+            })
+          );
+          console.log(`[MQTT] ✅ log flush event ack publish success: ${topic}`);
+        } catch (err) {
+          devLog.error("[MQTT] ❌ log flush event ack publish error:", err);
+          throw new WisephoneIIPortalMQTTError(`there was an issue publishing log flush event ack to AWS IoT broker: ${err}`);
+        }
       }
     });
-  } catch (err) {
-    devLog.error("[MQTT] ❌ log flush event ack publish error:", err);
-    throw new WisephoneIIPortalMQTTError(`there was an issue publishing log flush event ack to AWS IoT broker: ${err}`);
-  }
 }
