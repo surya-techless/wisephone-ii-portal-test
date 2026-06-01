@@ -6,9 +6,7 @@
 
 import { IoTDataPlaneClient, PublishCommand } from "@aws-sdk/client-iot-data-plane";
 import { devLog } from "@/libs/utils";
-
 import { WisephoneIIPortalAPIError } from "@/lib/server/api.response";
-
 
 export class WisephoneIIPortalMQTTError extends Error {
   constructor(message: string) {
@@ -27,10 +25,10 @@ const sysprobeSecretAccessKey = import.meta.env.WPII_SYSPROBE_AWS_SECRET_ACCESS_
 const client =
   endpoint && accessKeyId && secretAccessKey
     ? new IoTDataPlaneClient({
-        region,
-        endpoint: `https://${endpoint}`,
-        credentials: { accessKeyId, secretAccessKey }
-      })
+      region,
+      endpoint: `https://${endpoint}`,
+      credentials: { accessKeyId, secretAccessKey }
+    })
     : null;
 
 // seperate concerns with dedicated sysprobe IAM access keys
@@ -107,4 +105,37 @@ export async function sendSysProbe(initialSignalPayload: any) {
     devLog.error("[MQTT] ❌ heartbeat publish error:", err);
     throw new WisephoneIIPortalMQTTError(`there was an issue publishing heartbeat to AWS IoT broker: ${err}`);
   }
+}
+
+// portal to send acknowledgements that logs have been successfully committed to db
+// this is to let mqtt-subscribed end user devices know when local log deletion is ok
+export async function sendLogFlushAcks(suffixes: Set<string>): Promise<void> {
+    suffixes.forEach(async (suffix) => {
+      let topic: string = `log/flush/${suffix}/ack`;
+      let payload = JSON.stringify(
+        {
+          message: "ack",
+          ackSentAt: Date.now(),
+          suffix: suffix,
+          publisher: "wisephone-portal"
+        }
+      );
+
+      if (client) {
+        try {
+          console.log("trying payload", payload);
+          await client.send(
+            new PublishCommand({
+              topic,
+              payload: new TextEncoder().encode(payload),
+              qos: 1
+            })
+          );
+          console.log(`[MQTT] ✅ log flush event ack publish success: ${topic}`);
+        } catch (err) {
+          devLog.error("[MQTT] ❌ log flush event ack publish error:", err);
+          throw new WisephoneIIPortalMQTTError(`there was an issue publishing log flush event ack to AWS IoT broker: ${err}`);
+        }
+      }
+    });
 }
