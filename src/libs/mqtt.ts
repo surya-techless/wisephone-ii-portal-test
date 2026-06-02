@@ -6,15 +6,15 @@
 
 import { IoTDataPlaneClient, PublishCommand } from "@aws-sdk/client-iot-data-plane";
 import { devLog } from "@/libs/utils";
-import { WisephoneIIPortalAPIError } from "@/lib/server/api.response";
+import { WPIIPortalAPIError } from "@/lib/server/api.response";
 
 import type { BatchIdentifier } from "log/LogBufferService";
 
 
-export class WisephoneIIPortalMQTTError extends Error {
+export class WPIIPortalMQTTError extends Error {
   constructor(message: string) {
     super(message);
-    this.name = "WisephoneIIPortalMQTTError";
+    this.name = "WPIIPortalMQTTError";
   }
 }
 
@@ -89,7 +89,7 @@ export async function sendSysProbe(initialSignalPayload: any) {
     devLog.warn(`[MQTT]    AWS_IOT_ENDPOINT  : ${endpoint || "NOT SET"}`);
     devLog.warn(`[MQTT]    WPII_SYSPROBE_AWS_ACCESS_KEY_ID : ${sysprobeAccessKeyId ? sysprobeAccessKeyId.slice(0, 8) + "..." : "NOT SET"}`);
     devLog.warn(`[MQTT]    WPII_SYSPROBE_AWS_SECRET_ACCESS_KEY : ${sysprobeSecretAccessKey ? "SET" : "NOT SET"}`);
-    throw new WisephoneIIPortalAPIError("Unauthorized");
+    throw new WPIIPortalAPIError("Unauthorized");
   }
 
   try {
@@ -106,7 +106,7 @@ export async function sendSysProbe(initialSignalPayload: any) {
     devLog.log(`[MQTT] ✅ heartbeat published successfully to ${topic}`);
   } catch (err) {
     devLog.error("[MQTT] ❌ heartbeat publish error:", err);
-    throw new WisephoneIIPortalMQTTError(`there was an issue publishing heartbeat to AWS IoT broker: ${err}`);
+    throw new WPIIPortalMQTTError(`there was an issue publishing heartbeat to AWS IoT broker: ${err}`);
   }
 }
 
@@ -136,7 +136,7 @@ export async function sendLogFlushAcks(identifiers: Set<BatchIdentifier>): Promi
           console.log(`[MQTT] ✅ log flush event ack publish success: ${topic}`);
         } catch (err) {
           devLog.error("[MQTT] ❌ log flush event ack publish error:", err);
-          throw new WisephoneIIPortalMQTTError(`there was an issue publishing log flush event ack to AWS IoT broker: ${err}`);
+          throw new WPIIPortalMQTTError(`there was an issue publishing log flush event ack to AWS IoT broker: ${err}`);
         }
       }
     });
