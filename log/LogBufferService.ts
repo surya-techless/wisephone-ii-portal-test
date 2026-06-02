@@ -1,4 +1,4 @@
-import { CacheClient } from "cache/CacheClient";
+import { Cache, cache } from "cache/Cache";
 import { TursoClient } from "db/client/client";
 
 import { sendLogFlushAcks } from "@/libs/mqtt";
@@ -14,19 +14,20 @@ export type BatchIdentifier = {
 export class LogBufferService {
   public static async ingest(payload: any): Promise<void> {
     payload = payload.events;
-    await CacheClient.push(JSON.stringify(payload));
-    const bufferSize = await CacheClient.getBufferSize();
+    await cache.push(JSON.stringify(payload));
+    const bufferSize = await cache.getBufferSize();
 
-    if (bufferSize >= CacheClient.bufferSizeNumKeys) {
+    if (bufferSize >= Cache.bufferSizeNumKeys) {
       await this.flush();
       console.log("cache flushed");
     }
   }
 
   private static async flush(): Promise<void> {
-    //  TODO:
-    //    confirm imei in payload
-    const globallyCachedLogs = await CacheClient.getAll();  // NOTE: each log event item in cache will be an array of a file dump of on-device log events
+      // NOTE:
+      // each log event item in cache will be an array of a file dump of on-device log events
+      // also, this will potentially be a HUGE object in memory if `bufferSizeNumKeys` is too high
+    const globallyCachedLogs = await cache.getAll();
 
     if (globallyCachedLogs.length === 0) {
       return;
@@ -51,7 +52,7 @@ export class LogBufferService {
     try {
       dbConnection = TursoClient.connection();
       await dbConnection.batch(sqlStatements);
-      await CacheClient.flush(globallyCachedLogs.length);
+      await cache.flush(globallyCachedLogs.length);
       // this is an async method but let's not block the thread before returning
       // MQTT-based acknowledgements do not have to be sent synchronously
       sendLogFlushAcks(batchIdentifiers);
