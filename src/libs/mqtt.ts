@@ -8,6 +8,9 @@ import { IoTDataPlaneClient, PublishCommand } from "@aws-sdk/client-iot-data-pla
 import { devLog } from "@/libs/utils";
 import { WisephoneIIPortalAPIError } from "@/lib/server/api.response";
 
+import type { BatchIdentifier } from "log/LogBufferService";
+
+
 export class WisephoneIIPortalMQTTError extends Error {
   constructor(message: string) {
     super(message);
@@ -109,21 +112,20 @@ export async function sendSysProbe(initialSignalPayload: any) {
 
 // portal to send acknowledgements that logs have been successfully committed to db
 // this is to let mqtt-subscribed end user devices know when local log deletion is ok
-export async function sendLogFlushAcks(suffixes: Set<string>): Promise<void> {
-    suffixes.forEach(async (suffix) => {
-      let topic: string = `log/flush/${suffix}/ack`;
+export async function sendLogFlushAcks(identifiers: Set<BatchIdentifier>): Promise<void> {
+    identifiers.forEach(async (identifier) => {
+      let topic: string = identifier.topic;
       let payload = JSON.stringify(
         {
           message: "ack",
           ackSentAt: Date.now(),
-          suffix: suffix,
+          batchId: identifier.batchId,
           publisher: "wisephone-portal"
         }
       );
 
       if (client) {
         try {
-          console.log("trying payload", payload);
           await client.send(
             new PublishCommand({
               topic,

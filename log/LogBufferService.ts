@@ -5,6 +5,12 @@ import { sendLogFlushAcks } from "@/libs/mqtt";
 import type { LogEvent } from "cache/dto/LogEvent";
 
 
+export type BatchIdentifier = {
+  topic: string,
+  batchId: string
+}
+
+
 export class LogBufferService {
   public static async ingest(payload: any): Promise<void> {
     payload = payload.events;
@@ -28,15 +34,16 @@ export class LogBufferService {
 
     const batches = globallyCachedLogs.map((batch) => JSON.parse(JSON.parse(batch)));
     const sqlStatements: string[] = [];
-    const mqttAckTopics: Set<string> = new Set();  // no dups
+    const batchIdentifiers: Set<BatchIdentifier> = new Set();  // no dups
 
     batches.forEach(
       (batch) => {
         batch.forEach((logEvent: LogEvent) => {
           sqlStatements.push(this.buildInsertStatement(logEvent))
-          // <device imei>-<random uuid>
-          // // example: 1234512345123-50657e75-545c-4fe3-941b-18bc4fde1c4a
-          mqttAckTopics.add(logEvent.pii.imei);
+          batchIdentifiers.add({
+            topic: `log/flush/${logEvent.pii.imei}/ack`,
+            batchId: logEvent.batch_id
+          });
         });
       });
 
@@ -45,7 +52,9 @@ export class LogBufferService {
       dbConnection = TursoClient.connection();
       await dbConnection.batch(sqlStatements);
       await CacheClient.flush(globallyCachedLogs.length);
-      sendLogFlushAcks(mqttAckTopics);
+      // this is an async method but let's not block the thread before returning
+      // MQTT-based acknowledgements do not have to be sent synchronously
+      sendLogFlushAcks(batchIdentifiers);
 
     } catch (e) {
         console.error("Bulk insert failed:", e);

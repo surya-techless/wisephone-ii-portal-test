@@ -3,8 +3,8 @@ import type { APIRoute } from "astro";
 import { androidResponse, errorResponse, preflightResponse, successResponse } from "@/lib/server/api.response";
 import { HTTP } from "@/lib/server/api.response";
 
-import { CacheClient } from "cache/CacheClient";
 import { LogBufferService } from "log/LogBufferService";
+
 
 export const POST: APIRoute = async ({ request }) => {
   try {
