@@ -2,10 +2,10 @@
 // it's my goal that this code can be used to help replace many of the one-off API response logic snippets in our code
 
 
-export class WisephoneIIPortalAPIError extends Error {
+export class WPIIPortalAPIError extends Error {
   constructor(message: string, public status: number = HTTP.INTERNAL_SERVER_ERROR) {
     super(message);
-    this.name = "WisephoneIIPortalAPIError";
+    this.name = "WPIIPortalAPIError";
   }
 }
 
