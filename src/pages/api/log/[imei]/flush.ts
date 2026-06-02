@@ -1,17 +1,17 @@
 import type { APIRoute } from "astro";
 
-import { androidResponse, errorResponse, preflightResponse, successResponse } from "@/lib/server/api.response";
+import { errorResponse, preflightResponse, successResponse } from "@/lib/server/api.response";
 import { HTTP } from "@/lib/server/api.response";
 
-import { CacheClient } from "cache/CacheClient";
 import { LogBufferService } from "log/LogBufferService";
+
 
 export const POST: APIRoute = async ({ request }) => {
   try {
     await LogBufferService.ingest(await request.json());
-    return androidResponse("Ok", HTTP.OK);
+    return successResponse("Ok", HTTP.OK);
   } catch (error) {
-    console.log(error);
+      console.error(error);
       return errorResponse("Internal Server Error", HTTP.INTERNAL_SERVER_ERROR);
   }
 };
@@ -20,6 +20,7 @@ export const OPTIONS: APIRoute = async ({ request }) => {
   try {
     return preflightResponse();
   } catch (error) {
+      console.error(error);
       return errorResponse("Internal Server Error", HTTP.INTERNAL_SERVER_ERROR);
   }
 };

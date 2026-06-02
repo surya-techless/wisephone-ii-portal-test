@@ -1,59 +1,67 @@
-import { CacheClient } from "cache/CacheClient";
-import { TursoClient } from "db/client/client";
+import { Cache, cache } from "cache/Cache";
+import { tursoDb } from "db/TursoDb";
 
 import { sendLogFlushAcks } from "@/libs/mqtt";
 import type { LogEvent } from "cache/dto/LogEvent";
 
 
+export type BatchIdentifier = {
+  topic: string,
+  batchId: string
+}
+
+
 export class LogBufferService {
   public static async ingest(payload: any): Promise<void> {
     payload = payload.events;
-    await CacheClient.push(JSON.stringify(payload));
-    const bufferSize = await CacheClient.getBufferSize();
+    await cache.push(JSON.stringify(payload));
+    const bufferSize = await cache.getBufferSize();
 
-    if (bufferSize >= CacheClient.bufferSizeNumKeys) {
+    if (bufferSize >= Cache.bufferSizeNumKeys) {
+      console.warn("⚠️ log buffer needs to be flushed");
       await this.flush();
-      console.log("cache flushed");
+      console.log("✅ log buffer flush success");
     }
   }
 
   private static async flush(): Promise<void> {
-    //  TODO:
-    //    confirm imei in payload
-    const globallyCachedLogs = await CacheClient.getAll();  // NOTE: each log event item in cache will be an array of a file dump of on-device log events
+      // NOTE:
+      // each log event item in cache will be an array of a file dump of on-device log events
+      // also, this will potentially be a HUGE object in memory if `bufferSizeNumKeys` is too high
+    const globallyCachedLogs = await cache.getAll();
 
     if (globallyCachedLogs.length === 0) {
+      console.warn("⚠️ log buffer empty");
       return;
     }
 
     const batches = globallyCachedLogs.map((batch) => JSON.parse(JSON.parse(batch)));
     const sqlStatements: string[] = [];
-    const mqttAckTopics: Set<string> = new Set();  // no dups
+    const batchIdentifiers: Set<BatchIdentifier> = new Set();  // no dups
 
     batches.forEach(
       (batch) => {
-        batch.forEach((logEvent: LogEvent) => {
-          sqlStatements.push(this.buildInsertStatement(logEvent))
-          // <device imei>-<random uuid>
-          // // example: 1234512345123-50657e75-545c-4fe3-941b-18bc4fde1c4a
-          mqttAckTopics.add(logEvent.pii.imei);
-        });
+        batch.forEach(
+          (logEvent: LogEvent) => {
+            sqlStatements.push(this.buildInsertStatement(logEvent))
+            batchIdentifiers.add({
+              topic: `log/flush/${logEvent.pii.imei}/ack`,
+              batchId: logEvent.batch_id
+            });
+          });
       });
 
-    let dbConnection = null;
     try {
-      dbConnection = TursoClient.connection();
-      await dbConnection.batch(sqlStatements);
-      await CacheClient.flush(globallyCachedLogs.length);
-      sendLogFlushAcks(mqttAckTopics);
+      // batch log flush and db commit to keep write amplification to a minimum
+      await tursoDb.batch(sqlStatements);
+      await cache.flush(globallyCachedLogs.length);
 
+      // this is an async method but let's not block the thread before returning
+      // MQTT-based acknowledgements do not have to be sent synchronously
+      sendLogFlushAcks(batchIdentifiers);
     } catch (e) {
-        console.error("Bulk insert failed:", e);
+        console.error("❌ Log buffer flush failure:", e);
         throw e;
-    } finally {
-      if (dbConnection) {
-        dbConnection.close();
-      }
     }
   }
 

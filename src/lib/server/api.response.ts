@@ -60,10 +60,6 @@ export function errorResponse(errorMessage: string, status: number = HTTP.INTERN
   return json({ error: errorMessage }, status, corsHeaders);
 }
 
-export function androidResponse(body: unknown, status: number = HTTP.OK) {
-  return json(body, status, corsHeaders);
-}
-
 export function preflightResponse() {
   return new Response(null, {
     status: HTTP.NO_CONTENT,
