@@ -11,7 +11,7 @@ export const POST: APIRoute = async ({ request }) => {
     await LogBufferService.ingest(await request.json());
     return successResponse("Ok", HTTP.OK);
   } catch (error) {
-    console.log(error);
+      console.error(error);
       return errorResponse("Internal Server Error", HTTP.INTERNAL_SERVER_ERROR);
   }
 };
@@ -20,6 +20,7 @@ export const OPTIONS: APIRoute = async ({ request }) => {
   try {
     return preflightResponse();
   } catch (error) {
+      console.error(error);
       return errorResponse("Internal Server Error", HTTP.INTERNAL_SERVER_ERROR);
   }
 };

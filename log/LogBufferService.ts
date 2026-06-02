@@ -1,5 +1,5 @@
 import { Cache, cache } from "cache/Cache";
-import { TursoClient } from "db/client";
+import { tursoDb } from "db/TursoDb";
 
 import { sendLogFlushAcks } from "@/libs/mqtt";
 import type { LogEvent } from "cache/dto/LogEvent";
@@ -18,8 +18,9 @@ export class LogBufferService {
     const bufferSize = await cache.getBufferSize();
 
     if (bufferSize >= Cache.bufferSizeNumKeys) {
+      console.warn("⚠️ log buffer needs to be flushed");
       await this.flush();
-      console.log("cache flushed");
+      console.log("✅ log buffer flush success");
     }
   }
 
@@ -30,6 +31,7 @@ export class LogBufferService {
     const globallyCachedLogs = await cache.getAll();
 
     if (globallyCachedLogs.length === 0) {
+      console.warn("⚠️ log buffer empty");
       return;
     }
 
@@ -39,31 +41,27 @@ export class LogBufferService {
 
     batches.forEach(
       (batch) => {
-        batch.forEach((logEvent: LogEvent) => {
-          sqlStatements.push(this.buildInsertStatement(logEvent))
-          batchIdentifiers.add({
-            topic: `log/flush/${logEvent.pii.imei}/ack`,
-            batchId: logEvent.batch_id
+        batch.forEach(
+          (logEvent: LogEvent) => {
+            sqlStatements.push(this.buildInsertStatement(logEvent))
+            batchIdentifiers.add({
+              topic: `log/flush/${logEvent.pii.imei}/ack`,
+              batchId: logEvent.batch_id
+            });
           });
-        });
       });
 
-    let dbConnection = null;
     try {
-      dbConnection = TursoClient.connection();
-      await dbConnection.batch(sqlStatements);
+      // batch log flush and db commit to keep write amplification to a minimum
+      await tursoDb.batch(sqlStatements);
       await cache.flush(globallyCachedLogs.length);
+
       // this is an async method but let's not block the thread before returning
       // MQTT-based acknowledgements do not have to be sent synchronously
       sendLogFlushAcks(batchIdentifiers);
-
     } catch (e) {
-        console.error("Bulk insert failed:", e);
+        console.error("❌ Log buffer flush failure:", e);
         throw e;
-    } finally {
-      if (dbConnection) {
-        dbConnection.close();
-      }
     }
   }
 
