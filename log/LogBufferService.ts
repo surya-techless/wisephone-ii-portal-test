@@ -1,5 +1,5 @@
 import { Cache, cache } from "cache/Cache";
-import { TursoClient } from "db/client/client";
+import { TursoClient } from "db/client";
 
 import { sendLogFlushAcks } from "@/libs/mqtt";
 import type { LogEvent } from "cache/dto/LogEvent";
