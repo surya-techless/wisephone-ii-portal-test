@@ -133,7 +133,7 @@ export async function sendLogFlushAcks(identifiers: Set<BatchIdentifier>): Promi
               qos: 1
             })
           );
-          console.log(`[MQTT] ✅ log flush event ack publish success: ${topic}`);
+          console.log(`[MQTT] ✅ log flush event ack publish success: ${topic} -- ${identifier.batchId}`);
         } catch (err) {
           devLog.error("[MQTT] ❌ log flush event ack publish error:", err);
           throw new WPIIPortalMQTTError(`there was an issue publishing log flush event ack to AWS IoT broker: ${err}`);

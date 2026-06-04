@@ -3,7 +3,7 @@ import type { APIRoute } from "astro";
 import { HTTP } from "@/lib/server/api.response";
 import { successResponse, errorResponse } from "@/lib/server/api.response";
 import validateBearerToken from "@/lib/server/authentication";
-import { WisephoneIIPortalAPIError } from "@/lib/server/api.response";
+import { WPIIPortalAPIError } from "@/lib/server/api.response";
 
 import { sendSysProbe } from "@/libs/mqtt";
 import { getSysprobeEMFPayload } from "@/libs/aws/cloudwatch/sysprobe/payloads";
@@ -22,7 +22,7 @@ export const POST: APIRoute = async ({ request }) => {
     await sendSysProbe(payload);
     return successResponse("Ok", HTTP.OK);
   } catch (error) {
-      if (error instanceof WisephoneIIPortalAPIError) {
+      if (error instanceof WPIIPortalAPIError) {
         return errorResponse("Unauthorized", HTTP.UNAUTHORIZED);
       }
 
