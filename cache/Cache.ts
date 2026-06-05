@@ -7,7 +7,7 @@ export class Cache {
   // 33.3 error events / second
 
   // buffer threshold of 5000 = 1 bulk db insert every 2.5 minutes
-  public static readonly bufferSizeNumKeys = 2; // NOODLES
+  public static readonly bufferSizeNumKeys = Number(process.env.BUFFER_SIZE_NUM_MESSAGES);
   private static readonly LOG_LIST_KEY = "logs";
   private static readonly errorMessageDefault = "A cache exception occurred:";
 
