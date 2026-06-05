@@ -141,7 +141,7 @@ export class SamsungKnoxService {
       });
 
       if (!response.ok) {
-        throw new Error("Failed to get Knox token");
+        throw new Error("Failed to get Knox token" + response.text);
       }
 
       const data = (await response.json()) as { access_token: string };
