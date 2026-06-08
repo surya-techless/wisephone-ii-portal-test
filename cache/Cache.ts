@@ -1,3 +1,4 @@
+import * as os from 'os';
 import { createClient, type RedisClientType } from "redis";
 
 export class Cache {
@@ -8,34 +9,45 @@ export class Cache {
 
   // buffer threshold of 5000 = 1 bulk db insert every 2.5 minutes
   public static readonly bufferSizeNumKeys = Number(process.env.BUFFER_SIZE_NUM_MESSAGES);
-  private static readonly LOG_LIST_KEY = "logs";
-  private static readonly errorMessageDefault = "A cache exception occurred:";
 
-  constructor(private readonly client: any) { }
+  // for concurrency safety: netlify dynamically scales app instances depedning on traffic
+  // simplest mechanism is to simply write to different cache "namespaces" across any number of app instances
+  public  bufferId: string;
+
+  private readonly errorMessageDefault = "A cache exception occurred:";
+  private bufferIdPrefix: string = `logFlushBuffer-${os.hostname}-`;
+
+  constructor(private readonly client: any) {
+    this.bufferId = this.getRefreshedBufferId();
+  }
+
+  private getRefreshedBufferId(): string { return this.bufferIdPrefix + crypto.randomUUID() }
 
   public async getBufferSize(): Promise<number> {
     try {
-      return await this.client.lLen(Cache.LOG_LIST_KEY);
+      return await this.client.lLen(this.bufferId);
     } catch (e) {
-      console.error(Cache.errorMessageDefault, e);
+      console.error(this.errorMessageDefault, e);
       return -1;
     }
   }
 
-  public async getAll(): Promise<string[]> {
+  public async getAllBufferContents(bufferId: string): Promise<string[]> {
     try {
-      return await this.client.lRange(Cache.LOG_LIST_KEY, 0, -1);
+      return await this.client.lRange(bufferId, 0, -1);
     } catch (e) {
-      console.error(Cache.errorMessageDefault, e);
+      console.error(this.errorMessageDefault, e);
       return [];
     }
   }
 
-  public async flush(batchSize: number = Cache.bufferSizeNumKeys): Promise<void> {
+  public async flush(bufferId: string): Promise<void> {
     try {
-      await this.client.lTrim(Cache.LOG_LIST_KEY, batchSize, -1);
+      let bufferLength: number = await this.getBufferSize();
+      await this.client.lTrim(this.bufferId, bufferLength, -1);
+      this.bufferId = this.getRefreshedBufferId();
     } catch (e) {
-      console.error(Cache.errorMessageDefault, e);
+      console.error(this.errorMessageDefault, e);
     }
   }
 
@@ -43,16 +55,16 @@ export class Cache {
     try {
       return await this.client.get(key);
     } catch (e) {
-      console.error(Cache.errorMessageDefault, e);
+      console.error(this.errorMessageDefault, e);
       return null;
     }
   }
 
   public async push(value: string): Promise<void> {
     try {
-      await this.client.rPush(Cache.LOG_LIST_KEY, value);
+      await this.client.rPush(this.bufferId, value);
     } catch (e) {
-      console.error(Cache.errorMessageDefault, e);
+      console.error(this.errorMessageDefault, e);
     }
   }
 }
