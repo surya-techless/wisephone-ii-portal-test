@@ -20,7 +20,10 @@ export class LogBufferService {
   public static async ingest(payload: LogFLushPayload): Promise<void> {
     // we only care about persisting serious events since crashlytcis will contain ALL logs including debug and info logs
     let seriousLogEvents = payload.events.filter((e: LogFlushEvent) => LogFlushSeverityCodesForCommit.includes(e.severity));
-    await cache.push(cache.bufferId, JSON.stringify(seriousLogEvents));
+    await cache.push(cache.bufferId, JSON.stringify({
+      events: seriousLogEvents,
+      batch_id:  payload.batch_id
+    }));
     const bufferSize = await cache.getBufferSize(cache.bufferId);
 
     if (bufferSize >= Cache.bufferSizeNumKeys) {
@@ -47,12 +50,14 @@ export class LogBufferService {
 
     batches.forEach(
       (batch) => {
-        batch.forEach(
+
+        let batchId = batch.batch_id;
+        batch.events.forEach(
           (logEvent: LogEvent) => {
-            sqlStatements.push(this.buildInsertStatement(logEvent, cache.bufferId))
+            sqlStatements.push(this.buildInsertStatement(logEvent, cache.bufferId, batchId))
             batchIdentifiers.add({
               topic: `log/flush/${logEvent.pii.imei}/ack`,
-              batchId: logEvent.batch_id,
+              batchId: batchId,
               bufferId: cache.bufferId
             });
           });
@@ -72,7 +77,7 @@ export class LogBufferService {
     }
   }
 
-  private static buildInsertStatement(log: LogEvent, bufferId: string) {
+  private static buildInsertStatement(log: LogEvent, bufferId: string, batchId: string) {
     const escape = (v: unknown): string => {
       if (v === null || v === undefined) {
         return "";
@@ -97,7 +102,7 @@ export class LogBufferService {
           '${escape(log.domain)}',
           '${escape(log.event_code)}',
           '${escape(log.severity)}',
-          '${escape(log.batch_id)}',
+          '${escape(batchId)}',
           '${escape(bufferId)}',
           '${escape(log.message)}',
           '${escape(JSON.stringify(log.metadata ?? {}))}'
