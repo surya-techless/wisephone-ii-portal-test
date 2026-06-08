@@ -33,6 +33,10 @@ export default class WiseOSLogEvent {
       event_code TEXT NOT NULL,
       severity TEXT NOT NULL,
 
+      -- Buffer context
+      batch_id TEXT NOT NULL,
+      buffer_id TEXT NOT NULL,
+
       -- Human-readable context
       message TEXT NULL,
 

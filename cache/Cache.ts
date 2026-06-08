@@ -1,4 +1,3 @@
-import * as os from 'os';
 import { createClient, type RedisClientType } from "redis";
 
 export class Cache {
@@ -9,13 +8,13 @@ export class Cache {
 
   // buffer threshold of 5000 = 1 bulk db insert every 2.5 minutes
   public static readonly bufferSizeNumKeys = Number(process.env.BUFFER_SIZE_NUM_MESSAGES);
+  private readonly errorMessageDefault = "A cache exception occurred:";
 
   // for concurrency safety: netlify dynamically scales app instances depedning on traffic
   // simplest mechanism is to simply write to different cache "namespaces" across any number of app instances
+  private currentDate: string = new Intl.DateTimeFormat('en-US').format(new Date());
+  private bufferIdPrefix: string = `wisephone-portal-logFlushBuffer-${this.currentDate}-`;
   public  bufferId: string;
-
-  private readonly errorMessageDefault = "A cache exception occurred:";
-  private bufferIdPrefix: string = `logFlushBuffer-${os.hostname}-`;
 
   constructor(private readonly client: any) {
     this.bufferId = this.getRefreshedBufferId();
@@ -23,9 +22,9 @@ export class Cache {
 
   private getRefreshedBufferId(): string { return this.bufferIdPrefix + crypto.randomUUID() }
 
-  public async getBufferSize(): Promise<number> {
+  public async getBufferSize(bufferId: string): Promise<number> {
     try {
-      return await this.client.lLen(this.bufferId);
+      return await this.client.lLen(bufferId);
     } catch (e) {
       console.error(this.errorMessageDefault, e);
       return -1;
@@ -43,8 +42,8 @@ export class Cache {
 
   public async flush(bufferId: string): Promise<void> {
     try {
-      let bufferLength: number = await this.getBufferSize();
-      await this.client.lTrim(this.bufferId, bufferLength, -1);
+      let bufferLength: number = await this.getBufferSize(bufferId);
+      await this.client.lTrim(bufferId, bufferLength, -1);
       this.bufferId = this.getRefreshedBufferId();
     } catch (e) {
       console.error(this.errorMessageDefault, e);
@@ -60,9 +59,9 @@ export class Cache {
     }
   }
 
-  public async push(value: string): Promise<void> {
+  public async push(bufferId: string, value: string): Promise<void> {
     try {
-      await this.client.rPush(this.bufferId, value);
+      await this.client.rPush(bufferId, value);
     } catch (e) {
       console.error(this.errorMessageDefault, e);
     }
