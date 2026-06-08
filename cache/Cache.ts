@@ -23,9 +23,9 @@ export class Cache {
 
   private getRefreshedBufferId(): string { return this.bufferIdPrefix + crypto.randomUUID() }
 
-  public async getBufferSize(): Promise<number> {
+  public async getBufferSize(bufferId: string): Promise<number> {
     try {
-      return await this.client.lLen(this.bufferId);
+      return await this.client.lLen(bufferId);
     } catch (e) {
       console.error(this.errorMessageDefault, e);
       return -1;
@@ -43,8 +43,8 @@ export class Cache {
 
   public async flush(bufferId: string): Promise<void> {
     try {
-      let bufferLength: number = await this.getBufferSize();
-      await this.client.lTrim(this.bufferId, bufferLength, -1);
+      let bufferLength: number = await this.getBufferSize(bufferId);
+      await this.client.lTrim(bufferId, bufferLength, -1);
       this.bufferId = this.getRefreshedBufferId();
     } catch (e) {
       console.error(this.errorMessageDefault, e);
@@ -60,9 +60,9 @@ export class Cache {
     }
   }
 
-  public async push(value: string): Promise<void> {
+  public async push(bufferId: string, value: string): Promise<void> {
     try {
-      await this.client.rPush(this.bufferId, value);
+      await this.client.rPush(bufferId, value);
     } catch (e) {
       console.error(this.errorMessageDefault, e);
     }

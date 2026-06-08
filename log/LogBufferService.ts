@@ -20,8 +20,8 @@ export class LogBufferService {
   public static async ingest(payload: LogFLushPayload): Promise<void> {
     // we only care about persisting serious events since crashlytcis will contain ALL logs including debug and info logs
     let seriousLogEvents = payload.events.filter((e: LogFlushEvent) => LogFlushSeverityCodesForCommit.includes(e.severity));
-    await cache.push(JSON.stringify(seriousLogEvents));
-    const bufferSize = await cache.getBufferSize();
+    await cache.push(cache.bufferId, JSON.stringify(seriousLogEvents));
+    const bufferSize = await cache.getBufferSize(cache.bufferId);
 
     if (bufferSize >= Cache.bufferSizeNumKeys) {
       console.warn("⚠️ log buffer needs to be flushed");
