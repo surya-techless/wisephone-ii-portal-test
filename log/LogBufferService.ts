@@ -13,8 +13,7 @@ export type BatchIdentifier = {
 
 export class LogBufferService {
   public static async ingest(payload: any): Promise<void> {
-    payload = payload.events;
-    await cache.push(JSON.stringify(payload));
+    await cache.push(JSON.stringify(payload.events));
     const bufferSize = await cache.getBufferSize();
 
     if (bufferSize >= Cache.bufferSizeNumKeys) {
@@ -35,7 +34,7 @@ export class LogBufferService {
       return;
     }
 
-    const batches = globallyCachedLogs.map((batch) => JSON.parse(JSON.parse(batch)));
+    const batches = globallyCachedLogs.map((batch) => JSON.parse(batch));
     const sqlStatements: string[] = [];
     const batchIdentifiers: Set<BatchIdentifier> = new Set();  // no dups
 
