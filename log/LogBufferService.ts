@@ -4,16 +4,23 @@ import { tursoDb } from "db/TursoDb";
 import { sendLogFlushAcks } from "@/libs/mqtt";
 import type { LogEvent } from "cache/dto/LogEvent";
 
+import type { LogFlushEvent, LogFLushPayload } from "./types/log-types";
+
 
 export type BatchIdentifier = {
   topic: string,
-  batchId: string
-}
+  batchId: string,
+  bufferId: string
+};
+
+export const LogFlushSeverityCodesForCommit = ["ERROR", "FATAL", "CRITICAL"];
 
 
 export class LogBufferService {
-  public static async ingest(payload: any): Promise<void> {
-    await cache.push(JSON.stringify(payload.events));
+  public static async ingest(payload: LogFLushPayload): Promise<void> {
+    // we only care about persisting serious events since crashlytcis will contain ALL logs including debug and info logs
+    let seriousLogEvents = payload.events.filter((e: LogFlushEvent) => LogFlushSeverityCodesForCommit.includes(e.severity));
+    await cache.push(JSON.stringify(seriousLogEvents));
     const bufferSize = await cache.getBufferSize();
 
     if (bufferSize >= Cache.bufferSizeNumKeys) {
@@ -27,14 +34,14 @@ export class LogBufferService {
       // NOTE:
       // each log event item in cache will be an array of a file dump of on-device log events
       // also, this will potentially be a HUGE object in memory if `bufferSizeNumKeys` is too high
-    const globallyCachedLogs = await cache.getAll();
+    const bufferedLogs = await cache.getAllBufferContents(cache.bufferId);
 
-    if (globallyCachedLogs.length === 0) {
+    if (bufferedLogs.length === 0) {
       console.warn("⚠️ log buffer empty");
       return;
     }
 
-    const batches = globallyCachedLogs.map((batch) => JSON.parse(batch));
+    const batches = bufferedLogs.map((batch) => JSON.parse(batch));
     const sqlStatements: string[] = [];
     const batchIdentifiers: Set<BatchIdentifier> = new Set();  // no dups
 
@@ -42,10 +49,11 @@ export class LogBufferService {
       (batch) => {
         batch.forEach(
           (logEvent: LogEvent) => {
-            sqlStatements.push(this.buildInsertStatement(logEvent))
+            sqlStatements.push(this.buildInsertStatement(logEvent, cache.bufferId))
             batchIdentifiers.add({
               topic: `log/flush/${logEvent.pii.imei}/ack`,
-              batchId: logEvent.batch_id
+              batchId: logEvent.batch_id,
+              bufferId: cache.bufferId
             });
           });
       });
@@ -53,7 +61,7 @@ export class LogBufferService {
     try {
       // batch log flush and db commit to keep write amplification to a minimum
       await tursoDb.batch(sqlStatements);
-      await cache.flush(globallyCachedLogs.length);
+      await cache.flush(cache.bufferId);
 
       // this is an async method but let's not block the thread before returning
       // MQTT-based acknowledgements do not have to be sent synchronously
@@ -64,7 +72,7 @@ export class LogBufferService {
     }
   }
 
-  private static buildInsertStatement(log: LogEvent) {
+  private static buildInsertStatement(log: LogEvent, bufferId: string) {
     const escape = (v: unknown): string => {
       if (v === null || v === undefined) {
         return "";
@@ -75,7 +83,7 @@ export class LogBufferService {
 
     return `
       INSERT INTO WiseOSLogEvent (
-        event_id, schema_version, event_timestamp, imei, ip_address, app_version, os_version, boot_id, device_name, domain, event_code, severity, message, metadata
+        event_id, schema_version, event_timestamp, imei, ip_address, app_version, os_version, boot_id, device_name, domain, event_code, severity, batch_id, buffer_id, message, metadata
       ) VALUES (
           '${escape(log.event_id)}',
           ${log.schema_version},
@@ -89,6 +97,8 @@ export class LogBufferService {
           '${escape(log.domain)}',
           '${escape(log.event_code)}',
           '${escape(log.severity)}',
+          '${escape(log.batch_id)}',
+          '${escape(bufferId)}',
           '${escape(log.message)}',
           '${escape(JSON.stringify(log.metadata ?? {}))}'
         );
