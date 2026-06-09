@@ -1,6 +1,3 @@
-import { db } from "astro:db";
-
-
 export default class WiseOSLogEvent {
   static name: string = "WiseOSLogEvent";
 
@@ -65,13 +62,6 @@ export default class WiseOSLogEvent {
                   'SUCCESS',
                   'FAILED'
               )
-          ),
-
-      -- Submission + buffer uniqueness (ingestion attempt tracking)
-      CONSTRAINT uq_wiseos_log_event_submission_buffer
-          UNIQUE (
-              submission_id,
-              buffer_id
           ),
 
       -- Event uniqueness per device
