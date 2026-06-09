@@ -14,7 +14,7 @@ export class Cache {
   // simplest mechanism is to simply write to different cache "namespaces" across any number of app instances
   private currentDate: string = new Intl.DateTimeFormat('en-US').format(new Date());
   private bufferIdPrefix: string = `wisephone-portal-logFlushBuffer-${this.currentDate}-`;
-  public  bufferId: string;
+  public bufferId: string;
 
   constructor(private readonly client: any) {
     this.bufferId = this.getRefreshedBufferId();

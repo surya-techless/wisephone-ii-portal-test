@@ -121,6 +121,7 @@ export async function sendLogFlushAcks(identifiers: Set<BatchIdentifier>): Promi
           ackSentAt: Date.now(),
           batchId: identifier.batchId,
           bufferId: identifier.bufferId,
+          submissisionId: identifier.submissionId,
           publisher: "wisephone-portal"
         }
       );
