@@ -1,3 +1,4 @@
+import { v7 } from 'uuid';
 import { Cache, cache } from "cache/Cache";
 import { tursoDb } from "db/TursoDb";
 
@@ -10,7 +11,8 @@ import type { LogFlushEvent, LogFLushPayload } from "./types/log-types";
 export type BatchIdentifier = {
   topic: string,
   batchId: string,
-  bufferId: string
+  bufferId: string,
+  submissionId: string;
 };
 
 export const LogFlushSeverityCodesForCommit = ["ERROR", "FATAL", "CRITICAL"];
@@ -39,6 +41,10 @@ export class LogBufferService {
       // also, this will potentially be a HUGE object in memory if `bufferSizeNumKeys` is too high
     const bufferedLogs = await cache.getAllBufferContents(cache.bufferId);
 
+      // NOTE: even across many compute instance in our serverless env,
+      // av4 uuid should still offer sufficient entropy such that submission id's enver clash
+    const submissionId: string = crypto.randomUUID();
+
     if (bufferedLogs.length === 0) {
       console.warn("⚠️ log buffer empty");
       return;
@@ -54,11 +60,12 @@ export class LogBufferService {
         let batchId = batch.batch_id;
         batch.events.forEach(
           (logEvent: LogEvent) => {
-            sqlStatements.push(this.buildInsertStatement(logEvent, cache.bufferId, batchId))
+            sqlStatements.push(this.buildInsertStatement(logEvent, cache.bufferId, batchId, submissionId))
             batchIdentifiers.add({
               topic: `log/flush/${logEvent.pii.imei}/ack`,
               batchId: batchId,
-              bufferId: cache.bufferId
+              bufferId: cache.bufferId,
+              submissionId: submissionId
             });
           });
       });
@@ -77,7 +84,8 @@ export class LogBufferService {
     }
   }
 
-  private static buildInsertStatement(log: LogEvent, bufferId: string, batchId: string) {
+  private static buildInsertStatement(log: LogEvent, bufferId: string, batchId: string, submissionId: string) {
+    const defaultRecordStatus: string = "SUCCESS";
     const escape = (v: unknown): string => {
       if (v === null || v === undefined) {
         return "";
@@ -88,7 +96,7 @@ export class LogBufferService {
 
     return `
       INSERT INTO WiseOSLogEvent (
-        event_id, schema_version, event_timestamp, imei, ip_address, app_version, os_version, boot_id, device_name, domain, event_code, severity, batch_id, buffer_id, message, metadata
+        event_id, schema_version, event_timestamp, imei, ip_address, app_version, os_version, boot_id, device_name, domain, event_code, severity, status, submission_id, batch_id, buffer_id, message, metadata
       ) VALUES (
           '${escape(log.event_id)}',
           ${log.schema_version},
@@ -102,6 +110,8 @@ export class LogBufferService {
           '${escape(log.domain)}',
           '${escape(log.event_code)}',
           '${escape(log.severity)}',
+          '${escape(defaultRecordStatus)}',
+          '${escape(submissionId)}',
           '${escape(batchId)}',
           '${escape(bufferId)}',
           '${escape(log.message)}',

@@ -1,4 +1,4 @@
-import { db,  } from "astro:db";
+import { db } from "astro:db";
 
 
 export default class WiseOSLogEvent {
@@ -32,8 +32,10 @@ export default class WiseOSLogEvent {
       domain TEXT NOT NULL,
       event_code TEXT NOT NULL,
       severity TEXT NOT NULL,
+      status TEXT NOT NULL,
 
       -- Buffer context
+      submission_id TEXT NOT NULL,
       batch_id TEXT NOT NULL,
       buffer_id TEXT NOT NULL,
 
@@ -54,6 +56,29 @@ export default class WiseOSLogEvent {
                   'CRITICAL',
                   'FATAL'
               )
+          ),
+
+      -- Status validation
+      CONSTRAINT chk_wiseos_log_event_status
+          CHECK (
+              status IN (
+                  'SUCCESS',
+                  'FAILED'
+              )
+          ),
+
+      -- Submission + buffer uniqueness (ingestion attempt tracking)
+      CONSTRAINT uq_wiseos_log_event_submission_buffer
+          UNIQUE (
+              submission_id,
+              buffer_id
+          ),
+
+      -- Event uniqueness per device
+      CONSTRAINT uq_wiseos_log_event_imei_event
+          UNIQUE (
+              imei,
+              event_id
           )
     );`,
     `CREATE INDEX idx_wiseos_log_event_timestamp ON WiseOSLogEvent (event_timestamp DESC);`,
@@ -63,7 +88,9 @@ export default class WiseOSLogEvent {
     `CREATE INDEX idx_wiseos_log_event_domain ON WiseOSLogEvent (domain);`,
     `CREATE INDEX idx_wiseos_log_event_event_code ON WiseOSLogEvent (event_code);`,
     `CREATE INDEX idx_wiseos_log_event_severity ON WiseOSLogEvent (severity);`,
+    `CREATE INDEX idx_wiseos_log_event_status ON WiseOSLogEvent (status);`,
     `CREATE INDEX idx_wiseos_log_event_domain_code ON WiseOSLogEvent (domain, event_code);`,
-    `CREATE INDEX idx_wiseos_log_event_imei_timestamp ON WiseOSLogEvent (imei, event_timestamp DESC);`
+    `CREATE INDEX idx_wiseos_log_event_imei_timestamp ON WiseOSLogEvent (imei, event_timestamp DESC);`,
+    `CREATE INDEX idx_wiseos_log_event_submission_id ON WiseOSLogEvent (submission_id);`
   ];
 };
