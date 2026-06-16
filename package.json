@@ -81,7 +81,7 @@
   "author": "Cameron Pak",
   "homepage": "https://portal.wisephone.com",
   "engines": {
-    "node": ">=20.3.0",
-    "npm": ">=10.0.0"
+    "node": "=22.22.3",
+    "npm": ">=10.9.8"
   }
 }
