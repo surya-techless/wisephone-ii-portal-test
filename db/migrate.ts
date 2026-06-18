@@ -6,9 +6,6 @@
 
 import { db, sql } from "astro:db";
 
-import { mySQLClient, MySQLDb, WPIIPortalPersistenceError } from "./MySQLDb";
-import WiseOSLogEvent from "./migrations/WiseOSLogEvent/Create_WiseOSLogEvent";
-
 
 export default async function migrate() {
   console.log("========================================");
@@ -71,14 +68,6 @@ export default async function migrate() {
       } else {
         throw alterError;
       }
-    }
-
-    try {
-      await mySQLClient.commitWithinTransaction(WiseOSLogEvent.migrationStatements);
-      console.log(`✅ ran migrations for table ${WiseOSLogEvent.name}`);
-    } catch (error) {
-      console.error("❌ error:", error);
-      throw new WPIIPortalPersistenceError(`there was an issue performing database migration for table ${WiseOSLogEvent.name}: ${error}`);
     }
 
     console.log("========================================");

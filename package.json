@@ -13,7 +13,7 @@
     "start": "astro dev",
     "build": "astro check && astro build --remote",
     "verifydb": "astro db verify --remote --json",
-    "migratedb": "astro db execute db/migrate.ts --remote",
+    "migratemysql": "npx drizzle-kit migrate",
     "preview": "astro preview",
     "db:update": "astro db push --remote",
     "format": "prettier -w .",
