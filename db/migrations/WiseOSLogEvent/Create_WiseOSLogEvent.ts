@@ -1,77 +1,55 @@
 export default class WiseOSLogEvent {
   static name: string = "WiseOSLogEvent";
 
-  // intended for batch writes within a transaction
   static migrationStatements = [
     `DROP TABLE IF EXISTS WiseOSLogEvent;`,
+
     `CREATE TABLE WiseOSLogEvent (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      id BIGINT NOT NULL AUTO_INCREMENT,
+
+      -- Primary key
+      PRIMARY KEY (id),
 
       -- Correlation + schema
-      event_id TEXT NOT NULL,
-      schema_version INTEGER NOT NULL,
+      event_id VARCHAR(255) NOT NULL,
+      schema_version INT NOT NULL,
 
       -- Timing
-      event_timestamp TEXT NOT NULL,
-      ingested_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      event_timestamp TIMESTAMP NOT NULL NOT NULL,
+      ingested_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
       -- Device identity
-      imei TEXT NOT NULL,
-      ip_address TEXT NOT NULL,
+      imei VARCHAR(32) NOT NULL,
+      ip_address VARCHAR(45) NOT NULL,
 
       -- Device context
-      app_version TEXT NOT NULL,
-      os_version TEXT NOT NULL,
-      boot_id TEXT NOT NULL,
-      device_name TEXT NOT NULL,
+      app_version VARCHAR(50) NOT NULL,
+      os_version VARCHAR(50) NOT NULL,
+      boot_id VARCHAR(128) NOT NULL,
+      device_name VARCHAR(255) NOT NULL,
 
       -- Event classification
-      domain TEXT NOT NULL,
-      event_code TEXT NOT NULL,
-      severity TEXT NOT NULL,
-      status TEXT NOT NULL,
+      domain VARCHAR(100) NOT NULL,
+      event_code VARCHAR(100) NOT NULL,
+      severity ENUM('DEBUG','INFO','WARN','ERROR','CRITICAL','FATAL') NOT NULL,
+      status ENUM('SUCCESS','FAILED') NOT NULL,
 
       -- Buffer context
-      submission_id TEXT NOT NULL,
-      batch_id TEXT NOT NULL,
-      buffer_id TEXT NOT NULL,
+      submission_id VARCHAR(128) NOT NULL,
+      batch_id VARCHAR(128) NOT NULL,
+      buffer_id VARCHAR(128) NOT NULL,
 
       -- Human-readable context
       message TEXT NULL,
 
       -- Flexible event enrichment
-      metadata TEXT NOT NULL DEFAULT '{}',
+      metadata JSON NOT NULL,
 
-      -- Severity validation
-      CONSTRAINT chk_wiseos_log_event_severity
-          CHECK (
-              severity IN (
-                  'DEBUG',
-                  'INFO',
-                  'WARN',
-                  'ERROR',
-                  'CRITICAL',
-                  'FATAL'
-              )
-          ),
-
-      -- Status validation
-      CONSTRAINT chk_wiseos_log_event_status
-          CHECK (
-              status IN (
-                  'SUCCESS',
-                  'FAILED'
-              )
-          ),
-
-      -- Event uniqueness per device
-      CONSTRAINT uq_wiseos_log_event_imei_event
-          UNIQUE (
-              imei,
-              event_id
-          )
+      -- Unique constraint per device
+      UNIQUE KEY uq_wiseos_log_event_imei_event (imei, event_id)
     );`,
-    `CREATE INDEX idx_wiseos_log_event_timestamp ON WiseOSLogEvent (event_timestamp DESC);`,
+
+    `CREATE INDEX idx_wiseos_log_event_timestamp ON WiseOSLogEvent (event_timestamp);`,
     `CREATE INDEX idx_wiseos_log_event_event_id ON WiseOSLogEvent (event_id);`,
     `CREATE INDEX idx_wiseos_log_event_imei ON WiseOSLogEvent (imei);`,
     `CREATE INDEX idx_wiseos_log_event_boot_id ON WiseOSLogEvent (boot_id);`,
@@ -80,7 +58,7 @@ export default class WiseOSLogEvent {
     `CREATE INDEX idx_wiseos_log_event_severity ON WiseOSLogEvent (severity);`,
     `CREATE INDEX idx_wiseos_log_event_status ON WiseOSLogEvent (status);`,
     `CREATE INDEX idx_wiseos_log_event_domain_code ON WiseOSLogEvent (domain, event_code);`,
-    `CREATE INDEX idx_wiseos_log_event_imei_timestamp ON WiseOSLogEvent (imei, event_timestamp DESC);`,
+    `CREATE INDEX idx_wiseos_log_event_imei_timestamp ON WiseOSLogEvent (imei, event_timestamp);`,
     `CREATE INDEX idx_wiseos_log_event_submission_id ON WiseOSLogEvent (submission_id);`
   ];
 };
