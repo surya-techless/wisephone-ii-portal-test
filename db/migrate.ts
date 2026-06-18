@@ -6,7 +6,7 @@
 
 import { db, sql } from "astro:db";
 
-import { tursoDb, WPIIPortalPersistenceError } from "./TursoDb";
+import { tursoDb, WPIIPortalPersistenceError } from "./MySQLDb";
 import WiseOSLogEvent from "./migrations/WiseOSLogEvent/Create_WiseOSLogEvent";
 
 

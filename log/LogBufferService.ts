@@ -1,6 +1,6 @@
 import { v7 } from 'uuid';
 import { Cache, cache } from "cache/Cache";
-import { tursoDb } from "db/TursoDb";
+import { tursoDb } from "db/MySQLDb";
 
 import { sendLogFlushAcks } from "@/libs/mqtt";
 import type { LogEvent } from "cache/dto/LogEvent";
