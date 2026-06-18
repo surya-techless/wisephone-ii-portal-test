@@ -1,7 +1,7 @@
-import { v7 } from 'uuid';
 import { Cache, cache } from "cache/Cache";
-import { tursoDb } from "db/MySQLDb";
+import { mysqldb } from '@/db';
 
+import { wiseOSLogEvent } from '@/db/schema';
 import { sendLogFlushAcks } from "@/libs/mqtt";
 import type { LogEvent } from "cache/dto/LogEvent";
 
@@ -24,7 +24,7 @@ export class LogBufferService {
     let seriousLogEvents = payload.events.filter((e: LogFlushEvent) => LogFlushSeverityCodesForCommit.includes(e.severity));
     await cache.push(cache.bufferId, JSON.stringify({
       events: seriousLogEvents,
-      batch_id:  payload.batch_id
+      batch_id: payload.batch_id
     }));
     const bufferSize = await cache.getBufferSize(cache.bufferId);
 
@@ -36,13 +36,13 @@ export class LogBufferService {
   }
 
   private static async flush(): Promise<void> {
-      // NOTE:
-      // each log event item in cache will be an array of a file dump of on-device log events
-      // also, this will potentially be a HUGE object in memory if `bufferSizeNumKeys` is too high
+    // NOTE:
+    // each log event item in cache will be an array of a file dump of on-device log events
+    // also, this will potentially be a HUGE object in memory if `bufferSizeNumKeys` is too high
     const bufferedLogs = await cache.getAllBufferContents(cache.bufferId);
 
-      // NOTE: even across many compute instance in our serverless env,
-      // av4 uuid should still offer sufficient entropy such that submission id's enver clash
+    // NOTE: even across many compute instance in our serverless env,
+    // av4 uuid should still offer sufficient entropy such that submission id's enver clash
     const submissionId: string = crypto.randomUUID();
 
     if (bufferedLogs.length === 0) {
@@ -51,7 +51,7 @@ export class LogBufferService {
     }
 
     const batches = bufferedLogs.map((batch) => JSON.parse(batch));
-    const sqlStatements: string[] = [];
+    const newLogEventData: any[] = [];
     const batchIdentifiers: Set<BatchIdentifier> = new Set();  // no dups
 
     batches.forEach(
@@ -60,7 +60,7 @@ export class LogBufferService {
         let batchId = batch.batch_id;
         batch.events.forEach(
           (logEvent: LogEvent) => {
-            sqlStatements.push(this.buildInsertStatement(logEvent, cache.bufferId, batchId, submissionId))
+            newLogEventData.push(this.prepareLogEventData(logEvent, cache.bufferId, batchId, submissionId))
             batchIdentifiers.add({
               topic: `log/flush/${logEvent.pii.imei}/ack`,
               batchId: batchId,
@@ -72,51 +72,40 @@ export class LogBufferService {
 
     try {
       // batch log flush and db commit to keep write amplification to a minimum
-      await tursoDb.batch(sqlStatements);
+      await mysqldb.insert(wiseOSLogEvent).values(newLogEventData);
       await cache.flush(cache.bufferId);
 
       // this is an async method but let's not block the thread before returning
       // MQTT-based acknowledgements do not have to be sent synchronously
       sendLogFlushAcks(batchIdentifiers);
     } catch (e) {
-        console.error("❌ Log buffer flush failure:", e);
-        throw e;
+      console.error("❌ Log buffer flush failure:", e);
+      throw e;
     }
   }
 
-  private static buildInsertStatement(log: LogEvent, bufferId: string, batchId: string, submissionId: string) {
+  private static prepareLogEventData(log: LogEvent, bufferId: string, batchId: string, submissionId: string) {
     const defaultRecordStatus: string = "SUCCESS";
-    const escape = (v: unknown): string => {
-      if (v === null || v === undefined) {
-        return "";
-      }
 
-      return String(v).replace(/'/g, "''");
+    return {
+      eventId: log.event_id,
+      schemaVersion: log.schema_version,
+      eventTimestamp: new Date(log.timestamp),
+      imei: log.pii.imei,
+      ipAddress: log.pii.ip_address ?? "x.x.x.x",
+      appVersion: log.device_context.app_version,
+      osVersion: log.device_context.os_version,
+      bootId: log.device_context.boot_id,
+      deviceName: log.knox_context.device_name,
+      domain: log.domain,
+      eventCode: log.event_code,
+      severity: log.severity,
+      status: defaultRecordStatus,
+      submissionId: submissionId,
+      batchId: batchId,
+      bufferId: bufferId,
+      message: log.message,
+      metadata: log.metadata ?? {},
     };
-
-    return `
-      INSERT INTO WiseOSLogEvent (
-        event_id, schema_version, event_timestamp, imei, ip_address, app_version, os_version, boot_id, device_name, domain, event_code, severity, status, submission_id, batch_id, buffer_id, message, metadata
-      ) VALUES (
-          '${escape(log.event_id)}',
-          ${log.schema_version},
-          '${escape(log.timestamp)}',
-          '${escape(log.pii.imei)}',
-          '${escape(log.pii.ip_address)}',
-          '${escape(log.device_context.app_version)}',
-          '${escape(log.device_context.os_version)}',
-          '${escape(log.device_context.boot_id)}',
-          '${escape(log.knox_context.device_name)}',
-          '${escape(log.domain)}',
-          '${escape(log.event_code)}',
-          '${escape(log.severity)}',
-          '${escape(defaultRecordStatus)}',
-          '${escape(submissionId)}',
-          '${escape(batchId)}',
-          '${escape(bufferId)}',
-          '${escape(log.message)}',
-          '${escape(JSON.stringify(log.metadata ?? {}))}'
-        );
-    `;
   }
 }
