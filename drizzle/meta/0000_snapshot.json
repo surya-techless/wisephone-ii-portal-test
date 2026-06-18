@@ -1,0 +1,264 @@
+{
+  "version": "5",
+  "dialect": "mysql",
+  "id": "0eb103c4-ee4e-44f7-9429-88337785dc4b",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "tables": {
+    "WiseOSLogEvent": {
+      "name": "WiseOSLogEvent",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "event_id": {
+          "name": "event_id",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "schema_version": {
+          "name": "schema_version",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "event_timestamp": {
+          "name": "event_timestamp",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "ingested_at": {
+          "name": "ingested_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "CURRENT_TIMESTAMP"
+        },
+        "imei": {
+          "name": "imei",
+          "type": "varchar(32)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "ip_address": {
+          "name": "ip_address",
+          "type": "varchar(45)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "app_version": {
+          "name": "app_version",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "os_version": {
+          "name": "os_version",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "boot_id": {
+          "name": "boot_id",
+          "type": "varchar(128)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "device_name": {
+          "name": "device_name",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "domain": {
+          "name": "domain",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "event_code": {
+          "name": "event_code",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "severity": {
+          "name": "severity",
+          "type": "enum('DEBUG','INFO','WARN','ERROR','CRITICAL','FATAL')",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "enum('SUCCESS','FAILED')",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "submission_id": {
+          "name": "submission_id",
+          "type": "varchar(128)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "batch_id": {
+          "name": "batch_id",
+          "type": "varchar(128)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "buffer_id": {
+          "name": "buffer_id",
+          "type": "varchar(128)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "message": {
+          "name": "message",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "metadata": {
+          "name": "metadata",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "idx_wiseos_log_event_timestamp": {
+          "name": "idx_wiseos_log_event_timestamp",
+          "columns": [
+            "event_timestamp"
+          ],
+          "isUnique": false
+        },
+        "idx_wiseos_log_event_event_id": {
+          "name": "idx_wiseos_log_event_event_id",
+          "columns": [
+            "event_id"
+          ],
+          "isUnique": false
+        },
+        "idx_wiseos_log_event_imei": {
+          "name": "idx_wiseos_log_event_imei",
+          "columns": [
+            "imei"
+          ],
+          "isUnique": false
+        },
+        "idx_wiseos_log_event_boot_id": {
+          "name": "idx_wiseos_log_event_boot_id",
+          "columns": [
+            "boot_id"
+          ],
+          "isUnique": false
+        },
+        "idx_wiseos_log_event_domain": {
+          "name": "idx_wiseos_log_event_domain",
+          "columns": [
+            "domain"
+          ],
+          "isUnique": false
+        },
+        "idx_wiseos_log_event_event_code": {
+          "name": "idx_wiseos_log_event_event_code",
+          "columns": [
+            "event_code"
+          ],
+          "isUnique": false
+        },
+        "idx_wiseos_log_event_severity": {
+          "name": "idx_wiseos_log_event_severity",
+          "columns": [
+            "severity"
+          ],
+          "isUnique": false
+        },
+        "idx_wiseos_log_event_status": {
+          "name": "idx_wiseos_log_event_status",
+          "columns": [
+            "status"
+          ],
+          "isUnique": false
+        },
+        "idx_wiseos_log_event_submission_id": {
+          "name": "idx_wiseos_log_event_submission_id",
+          "columns": [
+            "submission_id"
+          ],
+          "isUnique": false
+        },
+        "idx_wiseos_log_event_domain_code": {
+          "name": "idx_wiseos_log_event_domain_code",
+          "columns": [
+            "domain",
+            "event_code"
+          ],
+          "isUnique": false
+        },
+        "idx_wiseos_log_event_imei_timestamp": {
+          "name": "idx_wiseos_log_event_imei_timestamp",
+          "columns": [
+            "imei",
+            "event_timestamp"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "WiseOSLogEvent_id": {
+          "name": "WiseOSLogEvent_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "uniqueConstraints": {
+        "uq_wiseos_log_event_imei_event": {
+          "name": "uq_wiseos_log_event_imei_event",
+          "columns": [
+            "imei",
+            "event_id"
+          ]
+        }
+      },
+      "checkConstraint": {}
+    }
+  },
+  "views": {},
+  "_meta": {
+    "schemas": {},
+    "tables": {},
+    "columns": {}
+  },
+  "internal": {
+    "tables": {},
+    "indexes": {}
+  }
+}
