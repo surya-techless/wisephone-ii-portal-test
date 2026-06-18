@@ -1,6 +1,13 @@
 import mysql from "mysql2/promise";
 
 
+export type SQL = {
+  statement: string,
+  values: any[]
+}
+
+
+
 export class WPIIPortalPersistenceError extends Error {
   constructor(message: string) {
     super(message);
@@ -16,59 +23,38 @@ const defaultTimeout = 10000;  // milliseconds (10 seconds)
 export class MySQLDb {
   constructor(private readonly connection: mysql.Connection) {}
 
-  private async query<T = any>(sql: string, values?: any[]): Promise<T> {
+  private async query<T = any>(sql: SQL): Promise<T> {
     try {
-      const [rows] = await this.connection.query({ sql, values, timeout: defaultTimeout });
+      const [rows] = await this.connection.query({
+        sql: sql.statement,
+        values: sql.values,
+        timeout: defaultTimeout
+      });
       return rows as T;
     } catch (error) {
-      console.error("❌ query error:", error);
-      throw error;
+      throw new WPIIPortalPersistenceError(`❌ [MySQLDb] query error: ${error}`);
     }
   }
 
-  public async execute(statement: string, values: any[] = []) {
-    try {
-      return await this.query(statement, values);
-    } catch (error) {
-      throw new WPIIPortalPersistenceError("there was an error executing SQL statement");
-    }
-  }
-
-  public async batch(statement: string, values: any[][]) {
-    try {
-      return await this.query(statement, values);
-    } catch (error) {
-      throw new WPIIPortalPersistenceError(
-        "there was an error executing batch statement"
-      );
-    }
-  }
-
-  public async commitWithinTransaction(statements: string[]) {
+  public async commitWithinTransaction(sqls: SQL[]) {
     try {
       await this.connection.beginTransaction();
-      console.log("✅ NOODLES transaction started");
 
-      for (const statement of statements) {
-        console.log("➡️ executing:", statement);
-        await this.connection.query({ sql: statement, timeout: defaultTimeout });
+      for (const sql of sqls) {
+        console.log("➡️ executing:", sql.statement);
+        await this.query(sql);
       }
 
       await this.connection.commit();
-      console.log("✅ NOODLES committed");
     } catch (error) {
-      console.error("❌ NOODLES transaction failed:", error);
-
       try {
+        console.error("❌ [MySQLDb] there was an error executing database transaction...attempting rollback");
         await this.connection.rollback();
-        console.log("↩️ NOODLES rollback complete");
+        console.log("↩️ [MySQLDb] rollback complete");
       } catch (rollbackError) {
-        console.error("❌ rollback failed:", rollbackError);
+        console.error("❌ [MySQLDb] rollback failed:", rollbackError);
       }
-
-      throw new WPIIPortalPersistenceError(
-        "there was an error executing database transaction"
-      );
+      throw new WPIIPortalPersistenceError("❌ [MySQLDb] there was an error executing database transaction");
     }
   }
 }
@@ -79,10 +65,10 @@ async function getMySQLClient(): Promise<MySQLDb> {
     user: process.env.MYSQL_USER,
     password: process.env.MYSQL_PASSWORD,
     database: defaultDb,
-    connectTimeout: 10000,
+    connectTimeout: defaultTimeout,
   });
 
-  console.log("✅ MySQL connected");
+  console.log("✅ [MySQLDb] connected");
 
   return new MySQLDb(connection);
 }
