@@ -15,31 +15,39 @@ export type BatchIdentifier = {
   submissionId: string;
 };
 
-export const LogFlushSeverityCodesForCommit = ["ERROR", "FATAL", "CRITICAL"];
+const LogFlushSeverityCodesForCommit = ["ERROR", "FATAL", "CRITICAL"];
+const bufferIdPrefix: string = "wisephone-portal-logFlushBuffer-imei-";
 
+// assume that each device encounters 1 error event every 10 minutes:
+// 20000 error events every 10 minutes
+// 2000 error events / minute
+// 33.3 error events / second
+// buffer threshold of 5000 = 1 bulk db insert every 2.5 minutes
+const bufferSizeNumKeys: number = Number(process.env.BUFFER_SIZE_NUM_MESSAGES);
 
 export class LogBufferService {
   public static async ingest(payload: LogFLushPayload): Promise<void> {
+    let bufferId: string = bufferIdPrefix + payload.events[0].pii.imei;
     // we only care about persisting serious events since crashlytcis will contain ALL logs including debug and info logs
     let seriousLogEvents = payload.events.filter((e: LogFlushEvent) => LogFlushSeverityCodesForCommit.includes(e.severity));
-    await cache.push(cache.bufferId, JSON.stringify({
+    await cache.push(bufferId, JSON.stringify({
       events: seriousLogEvents,
       batch_id: payload.batch_id
     }));
-    const bufferSize = await cache.getBufferSize(cache.bufferId);
+    const bufferSize = await cache.getBufferSize(bufferId);
 
-    if (bufferSize >= Cache.bufferSizeNumKeys) {
+    if (bufferSize >= bufferSizeNumKeys) {
       console.warn("⚠️ log buffer needs to be flushed");
-      await this.flush();
+      await this.flush(bufferId);
       console.log("✅ log buffer flush success");
     }
   }
 
-  private static async flush(): Promise<void> {
+  private static async flush(bufferId: string): Promise<void> {
     // NOTE:
     // each log event item in cache will be an array of a file dump of on-device log events
     // also, this will potentially be a HUGE object in memory if `bufferSizeNumKeys` is too high
-    const bufferedLogs = await cache.getAllBufferContents(cache.bufferId);
+    const bufferedLogs = await cache.getAllBufferContents(bufferId);
 
     // NOTE: even across many compute instance in our serverless env,
     // av4 uuid should still offer sufficient entropy such that submission id's enver clash
@@ -60,11 +68,11 @@ export class LogBufferService {
         let batchId = batch.batch_id;
         batch.events.forEach(
           (logEvent: LogEvent) => {
-            newLogEventData.push(this.prepareLogEventData(logEvent, cache.bufferId, batchId, submissionId))
+            newLogEventData.push(this.prepareLogEventData(logEvent, bufferId, batchId, submissionId))
             batchIdentifiers.add({
               topic: `log/flush/${logEvent.pii.imei}/ack`,
               batchId: batchId,
-              bufferId: cache.bufferId,
+              bufferId: bufferId,
               submissionId: submissionId
             });
           });
@@ -73,7 +81,7 @@ export class LogBufferService {
     try {
       // batch log flush and db commit to keep write amplification to a minimum
       await mysqldb.insert(wiseOSLogEvent).values(newLogEventData);
-      await cache.flush(cache.bufferId);
+      await cache.flush(bufferId);
 
       // this is an async method but let's not block the thread before returning
       // MQTT-based acknowledgements do not have to be sent synchronously
