@@ -1,7 +1,7 @@
 import { createClient, type RedisClientType } from "redis";
 
 export class Cache {
-  private readonly errorMessageDefault = "A cache exception occurred:";
+  private readonly errorMessageDefault = "❌ [Cache] A cache exception occurred:";
   
   constructor(private readonly client: any) { }
 
@@ -61,11 +61,11 @@ const redisClient = createClient({
   .on("sharded-channel-moved", () =>
     console.log("Redis sharded-channel-moved")
   )
-  .on("connect", () => console.log("Redis connect"))
-  .on("ready", () => console.log("Redis ready"))
-  .on("reconnecting", () => console.log("Redis reconnecting"))
-  .on("end", () => console.log("Redis end"))
-  .on("error", (e) => console.log(`Redis error: ${e}`));
+  .on("connect", () => console.log("✅ [Cache] connected"))
+  .on("ready", () => console.log("✅ [Cache] ready"))
+  .on("reconnecting", () => console.log("⚠️ [Cache] reconnecting"))
+  .on("end", () => console.log("⚠️ [Cache] end"))
+  .on("error", (e) => console.log(`❌ [Cache] error: ${e}`));
 
 await redisClient.connect();
 

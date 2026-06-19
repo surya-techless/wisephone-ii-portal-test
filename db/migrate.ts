@@ -6,7 +6,6 @@
 
 import { db, sql } from "astro:db";
 
-
 export default async function migrate() {
   console.log("========================================");
   console.log("🚀 Starting database migration...");
