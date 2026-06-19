@@ -26,8 +26,8 @@ const bufferIdPrefix: string = "wisephone-portal-logFlushBuffer-imei-";
 const bufferSizeNumKeys: number = Number(process.env.BUFFER_SIZE_NUM_MESSAGES);
 
 export class LogBufferService {
-  public static async ingest(payload: LogFLushPayload): Promise<void> {
-    let bufferId: string = bufferIdPrefix + payload.events[0].pii.imei;
+  public static async ingest(imei: string, payload: LogFLushPayload): Promise<void> {
+    let bufferId: string = bufferIdPrefix + imei;
     // we only care about persisting serious events since crashlytcis will contain ALL logs including debug and info logs
     let seriousLogEvents = payload.events.filter((e: LogFlushEvent) => LogFlushSeverityCodesForCommit.includes(e.severity));
     await cache.push(bufferId, JSON.stringify({
@@ -37,9 +37,9 @@ export class LogBufferService {
     const bufferSize = await cache.getBufferSize(bufferId);
 
     if (bufferSize >= bufferSizeNumKeys) {
-      console.warn("⚠️ log buffer needs to be flushed");
+      console.warn("⚠️ [LogBufferService] log buffer needs to be flushed");
       await this.flush(bufferId);
-      console.log("✅ log buffer flush success");
+      console.log("✅ [LogBufferService] log buffer flush success");
     }
   }
 
@@ -54,7 +54,7 @@ export class LogBufferService {
     const submissionId: string = crypto.randomUUID();
 
     if (bufferedLogs.length === 0) {
-      console.warn("⚠️ log buffer empty");
+      console.warn("⚠️ [LogBufferService] log buffer empty");
       return;
     }
 
@@ -87,7 +87,7 @@ export class LogBufferService {
       // MQTT-based acknowledgements do not have to be sent synchronously
       sendLogFlushAcks(batchIdentifiers);
     } catch (e) {
-      console.error("❌ Log buffer flush failure:", e);
+      console.error("❌ [LogBufferService] Log buffer flush failure:", e);
       throw e;
     }
   }
