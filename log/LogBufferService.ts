@@ -104,7 +104,7 @@ export class LogBufferService {
       appVersion: log.device_context.app_version,
       osVersion: log.device_context.os_version,
       bootId: log.device_context.boot_id,
-      deviceName: log.knox_context.device_name,
+      deviceName: log.knox_context.device_name ?? log.pii.imei,
       domain: log.domain,
       eventCode: log.event_code,
       severity: log.severity,
