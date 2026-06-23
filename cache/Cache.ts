@@ -7,7 +7,9 @@ export class Cache {
 
   public async getBufferSize(bufferId: string): Promise<number> {
     try {
-      return await this.client.lLen(bufferId);
+      let size: number = await this.client.lLen(bufferId);
+      console.log("✅ [Cache] LLEN success");
+      return size;
     } catch (e) {
       console.error(this.errorMessageDefault, e);
       return -1;
@@ -16,7 +18,9 @@ export class Cache {
 
   public async getAllBufferContents(bufferId: string): Promise<string[]> {
     try {
-      return await this.client.lRange(bufferId, 0, -1);
+      let logs: string[] = await this.client.lRange(bufferId, 0, -1);
+      console.log("✅ [Cache] LRANGE success");
+      return logs;
     } catch (e) {
       console.error(this.errorMessageDefault, e);
       return [];
@@ -27,6 +31,7 @@ export class Cache {
     try {
       let bufferLength: number = await this.getBufferSize(bufferId);
       await this.client.lTrim(bufferId, bufferLength, -1);
+      console.log("✅ [Cache] LTRIM (FLUSH) success");
     } catch (e) {
       console.error(this.errorMessageDefault, e);
     }
@@ -34,7 +39,9 @@ export class Cache {
 
   public async get(key: string): Promise<string | null> {
     try {
-      return await this.client.get(key);
+      let value: string = await this.client.get(key);
+      console.log("✅ [Cache] GET success");
+      return value;
     } catch (e) {
       console.error(this.errorMessageDefault, e);
       return null;
@@ -44,6 +51,7 @@ export class Cache {
   public async push(bufferId: string, value: string): Promise<void> {
     try {
       await this.client.rPush(bufferId, value);
+      console.log("✅ [Cache] RPUSH success");
     } catch (e) {
       console.error(this.errorMessageDefault, e);
     }
