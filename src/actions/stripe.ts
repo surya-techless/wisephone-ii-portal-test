@@ -282,7 +282,7 @@ export const stripe = {
       devLog.log("[STRIPE] customer:", subscriptionParams.customer);
       devLog.log("[STRIPE] priceId:", priceId);
       devLog.log("[STRIPE] default_payment_method:", subscriptionParams.default_payment_method);
-      devLog.log("[STRIPE] metadata.imei:", subscriptionParams.metadata?.imei);
+      devLog.log("[STRIPE] metadata.imei:", (subscriptionParams.metadata as any)?.imei);
       devLog.log("[STRIPE] discounts:", JSON.stringify(subscriptionParams.discounts ?? []));
       devLog.log("[STRIPE] ─────────────────────────────────────────────");
       const subscription = await stripeInstance.subscriptions.create(subscriptionParams);
