@@ -17,6 +17,9 @@ import { SamsungKnoxService } from "@/libs/samsung-knox-service";
 import { isFeatureEnabled } from "@/config/feature-flags";
 import TypeformDeviceRegistration from "@/components/TypeformDeviceRegistration.astro";
 import CspireSubscriptionModal from "@/components/CspireSubscriptionModal.astro";
+import StripeCheckout from "@/components/StripeCheckout.astro";
+
+const testStripe = true; // Toggle: true = custom modal, false = legacy embedded dialog
 
 if (!Astro.locals.auth().userId) {
   return Astro.redirect("/");
@@ -374,7 +377,7 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
   }
 </style>
 
-<div class="dashboard-container flex h-screen w-full min-w-[360px] bg-[#f7f6f2] relative" x-data={`dashboard(${JSON.stringify({ userEmail: user?.emailAddresses?.[0]?.emailAddress || user?.primaryEmailAddress?.emailAddress || "", newDevice: actionResult?.data && !actionResult.error && !actionResult.data.isSubscribed && actionResult.data.wisephone?.[0] ? { imei: actionResult.data.wisephone[0].imei.toString().padEnd(15, "0"), phoneNumber: actionResult.data.wisephone[0].phoneNumber || "", isCspire: Boolean(actionResult.data.isCspire) } : null })})`} @activate-modal.window="$event.detail?.isCspire ? openCspireModal($event.detail) : openActivateModal($event.detail?.imei || $event.detail)">
+<div class="dashboard-container flex h-screen w-full min-w-[360px] bg-[#f7f6f2] relative" x-data={`dashboard(${JSON.stringify({ userEmail: user?.emailAddresses?.[0]?.emailAddress || user?.primaryEmailAddress?.emailAddress || "", newDevice: actionResult?.data && !actionResult.error && !actionResult.data.isSubscribed && actionResult.data.wisephone?.[0] ? { imei: actionResult.data.wisephone[0].imei.toString().padEnd(15, "0"), phoneNumber: actionResult.data.wisephone[0].phoneNumber || "", isCspire: Boolean(actionResult.data.isCspire) } : null, testStripe })})`} @activate-modal.window="$event.detail?.isCspire ? openCspireModal($event.detail) : openActivateModal($event.detail?.imei || $event.detail)">
   <progress
     x-show="isLoading"
     x-cloak
@@ -1095,15 +1098,45 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
   <!-- CSpire Subscription Modal -->
   <CspireSubscriptionModal />
 
-  <!-- Stripe Checkout Dialog (legacy embedded checkout) -->
-  <dialog x-ref="stripeDialog" class="modal">
-    <div style="background-color: rgb(247, 246, 242)" class="modal-box max-w-2xl">
-      <div id="stripe-subscription-element"></div>
+  {testStripe ? (
+    <!-- Custom Stripe Checkout Modal -->
+    <div
+      x-show="showStripeModal"
+      x-cloak
+      x-transition.opacity
+      class="fixed inset-0 z-50 bg-black bg-opacity-60 flex items-center justify-center p-4"
+      @click.self="closeStripeModal()"
+    >
+      <div class="bg-[#f7f6f2] rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto relative">
+        <div class="flex items-center justify-between px-5 pt-5 pb-3">
+          <h2 class="text-base font-semibold text-gray-800">Test Stripe Modal</h2>
+          <button
+            @click="closeStripeModal()"
+            class="text-gray-400 hover:text-gray-600 transition-colors p-1"
+            aria-label="Close"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M18 6 6 18"></path>
+              <path d="m6 6 12 12"></path>
+            </svg>
+          </button>
+        </div>
+        <div class="px-5 pb-6">
+          <StripeCheckout customerEmail={user?.emailAddresses?.[0]?.emailAddress || user?.primaryEmailAddress?.emailAddress || ""} />
+        </div>
+      </div>
     </div>
-    <form method="dialog" class="modal-backdrop">
-      <button>close</button>
-    </form>
-  </dialog>
+  ) : (
+    <!-- Legacy Stripe Embedded Checkout Dialog -->
+    <dialog x-ref="stripeDialog" class="modal">
+      <div style="background-color: rgb(247, 246, 242)" class="modal-box max-w-2xl">
+        <div id="stripe-subscription-element"></div>
+      </div>
+      <form method="dialog" class="modal-backdrop">
+        <button>close</button>
+      </form>
+    </dialog>
+  )}
 
   </div>
 
@@ -1117,14 +1150,344 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
   import Alpine from "alpinejs";
   import { isValidIMEI, STRIPE_PUBLIC_KEY, updateUnreachableAlpineState, devLog } from "@/libs/utils";
   import { actions } from "astro:actions";
-  import { loadStripe, type Stripe, type StripeEmbeddedCheckout } from "@stripe/stripe-js";
+  import { loadStripe, type Stripe, type StripeElements, type StripeEmbeddedCheckout } from "@stripe/stripe-js";
   import { SubscriptionPollingService, type Device } from "@/services/SubscriptionPollingService";
 
   // Initialize subscription polling service
   let subscriptionPollingService: SubscriptionPollingService | null = null;
 
+  // Module-level variables keep Stripe instances outside Alpine's reactive Proxy.
+  // WeakMap(this) was unreliable because Alpine's expression evaluator passes a different
+  // proxy reference than the one captured in init(), causing get() to always return undefined.
+  let _stripeInstance: Stripe | null = null;
+  let _stripeElementsInstance: StripeElements | null = null;
+
+  // Pre-load Stripe SDK immediately so it's ready when the payment modal opens
+  const stripePromise = loadStripe(STRIPE_PUBLIC_KEY);
+
   document.addEventListener("alpine:init", () => {
-    Alpine.data("dashboard", (initialData?: { userEmail?: string; newDevice?: { imei: string; phoneNumber: string; isCspire?: boolean } | null }) => ({
+    Alpine.data("stripeCheckout", () => ({
+      cycle: "yearly" as "monthly" | "yearly",
+      ready: false,
+      loading: false,
+      cardComplete: false,
+      errorMsg: "",
+      couponCode: "",
+      couponApplied: false,
+      couponError: "",
+      finalAmount: null as number | null,
+      _email: "",
+      _name: "",
+      _imei: "",
+      _customerId: "",
+
+      init() {
+        // Component is always in DOM (x-show). Listen for dashboard events instead
+        // of watching cross-component state (which Alpine doesn't track reactively).
+        const dashboardEl = document.querySelector('[x-data^="dashboard("]') as HTMLElement | null;
+        devLog.log("[STRIPE CHECKOUT] Component initialized");
+
+        this.$watch("_email", (val: string) => {
+          if (val) devLog.log("[STRIPE CHECKOUT] Email →", val);
+        });
+
+        window.addEventListener('stripe-checkout-open', () => {
+          this._onModalOpen(dashboardEl);
+        });
+
+        window.addEventListener('stripe-checkout-close', () => {
+          devLog.log("[STRIPE CHECKOUT] Modal closed | was couponApplied:", this.couponApplied, "| finalAmount:", this.finalAmount);
+          // Reset transient state on close but keep card form alive for instant reopen
+          this.couponCode = "";
+          this.couponApplied = false;
+          this.couponError = "";
+          this.errorMsg = "";
+          this.finalAmount = null;
+          this._name = "";
+        });
+      },
+
+      async _onModalOpen(dashboardEl: HTMLElement | null) {
+        const dashData = dashboardEl ? (window as any).Alpine?.$data?.(dashboardEl) : null;
+
+        const email = (this.$el as HTMLElement).dataset.email || dashData?.customerEmail || "";
+        const imei = dashData?.activeDeviceImei
+          ? (dashData.activeDeviceImei as string).replace(/[^0-9]/g, "").padEnd(15, "0")
+          : "";
+        const cycle = (dashData?.stripeInitialCycle || "yearly") as "monthly" | "yearly";
+
+        devLog.log("[STRIPE CHECKOUT] Modal opening | cycle:", cycle, "| email:", email, "| IMEI:", imei);
+
+        // Same session — card form already mounted, show instantly
+        if (_stripeInstance && this._email === email && this._imei === imei && this.cycle === cycle) {
+          devLog.log("[STRIPE CHECKOUT] Instant reopen — form already mounted | ready:", this.ready);
+          return;
+        }
+
+        this._email = email;
+        this._imei = imei;
+        this.cycle = cycle;
+        devLog.log("[STRIPE CHECKOUT] Loading payment form | cycle:", cycle, "| email:", email, "| IMEI:", imei);
+
+        if (!email || !imei) {
+          this.errorMsg = "Missing payment information. Please close and try again.";
+          devLog.log("[STRIPE CHECKOUT] Blocked: missing email or IMEI");
+          return;
+        }
+
+        const stripe = await stripePromise;
+        if (!stripe) {
+          this.errorMsg = "Unable to initialize Stripe. Please refresh and try again.";
+          devLog.log("[STRIPE CHECKOUT] Blocked: Stripe SDK failed to load");
+          return;
+        }
+        _stripeInstance = stripe;
+        await this._mountPaymentElement();
+      },
+
+      // Validates the coupon code against Stripe without touching the card form or creating any subscription.
+      async applyCoupon() {
+        if (!this.couponCode.trim() || this.loading) return;
+        const code = this.couponCode.trim();
+        this.couponError = "";
+        this.loading = true;
+        devLog.log("[STRIPE CHECKOUT] Applying coupon:", code);
+        try {
+          const result = await actions.stripe.validateCoupon.orThrow({
+            code,
+            plan: this.cycle
+          });
+          this.finalAmount = result.finalAmount;
+          this.couponApplied = true;
+          const original = this.cycle === "yearly" ? 13.74 : 14.99;
+          const discounted = result.finalAmount / 100;
+          const perMonth = this.cycle === "yearly" ? (discounted / 12).toFixed(2) : discounted.toFixed(2);
+          devLog.log(`[STRIPE CHECKOUT] Coupon applied: ${code} | $${original}/mo → $${perMonth}/mo | Due today: $${discounted.toFixed(2)}`);
+        } catch (err: any) {
+          this.couponApplied = false;
+          this.finalAmount = null;
+          devLog.log("[STRIPE CHECKOUT] Invalid coupon:", code, "| error:", err?.message ?? err);
+          this.couponError = "Invalid or expired coupon code.";
+        } finally {
+          this.loading = false;
+        }
+      },
+
+      _onCouponFocus() {
+        devLog.log("[STRIPE CHECKOUT] Coupon field focused | current value:", this.couponCode || "(empty)");
+      },
+
+      _onCouponBlur() {
+        if (this.couponCode.trim()) {
+          devLog.log("[STRIPE CHECKOUT] Coupon field blurred | code entered:", this.couponCode);
+        }
+      },
+
+      // Resets coupon state only. Card form stays mounted — no remount needed.
+      removeCoupon() {
+        devLog.log("[STRIPE CHECKOUT] Coupon removed:", this.couponCode);
+        this.couponApplied = false;
+        this.couponCode = "";
+        this.couponError = "";
+        this.finalAmount = null;
+      },
+
+      // Creates a SetupIntent and mounts the card form. No subscription is created here.
+      async _mountPaymentElement() {
+        devLog.log("[STRIPE CHECKOUT] _mountPaymentElement | stripeInstance:", !!_stripeInstance);
+        const stripe = _stripeInstance;
+        if (!stripe) {
+          devLog.log("[STRIPE CHECKOUT] EARLY RETURN — stripe not initialized yet");
+          return;
+        }
+
+        this.ready = false;
+        this.cardComplete = false;
+        this.errorMsg = "";
+
+        const prevElements = _stripeElementsInstance;
+        if (prevElements) {
+          devLog.log("[STRIPE CHECKOUT] Unmounting previous payment element");
+          prevElements.getElement("payment")?.unmount();
+          _stripeElementsInstance = null;
+        }
+
+        try {
+          const { clientSecret, customerId } = await actions.stripe.createSetupIntent.orThrow({
+            customerEmail: this._email,
+            deviceIMEI: this._imei
+          });
+          this._customerId = customerId;
+
+          const elements = stripe.elements({
+            clientSecret,
+            appearance: { theme: "stripe", variables: { colorPrimary: "#C07F53" } }
+          });
+          _stripeElementsInstance = elements;
+
+          // Payment Element — card number, expiry, CVC, country, ZIP, phone
+          // Name is collected by our own Full name input above and passed via payment_method_data
+          const paymentEl = elements.create("payment", {
+            fields: {
+              billingDetails: {
+                name: "never",
+                phone: "auto",
+                email: "never"
+              }
+            },
+            defaultValues: {
+              billingDetails: { email: this._email }
+            }
+          });
+          paymentEl.on("ready", () => {
+            this.ready = true;
+            devLog.log("[STRIPE CHECKOUT] Payment element ready");
+          });
+          paymentEl.on("change", (event: any) => {
+            this.cardComplete = event.complete;
+            devLog.log("[STRIPE CHECKOUT] Card field updated | complete:", event.complete, "| type:", event.value?.type ?? "card");
+          });
+          paymentEl.mount(this.$refs.paymentContainer as HTMLElement);
+          devLog.log("[STRIPE CHECKOUT] Payment element mounted | cycle:", this.cycle);
+        } catch (err: any) {
+          devLog.log("[STRIPE CHECKOUT] Failed to load payment form | message:", err?.message ?? err);
+          this.errorMsg = "Unable to load payment form. Please refresh and try again.";
+        }
+      },
+
+      async submit() {
+        if (this.loading) return;
+
+        const stripe = _stripeInstance;
+        const elements = _stripeElementsInstance;
+
+        if (!stripe || !elements) {
+          this.errorMsg = "Payment form not loaded. Please close and reopen.";
+          devLog.log("[STRIPE CHECKOUT] Submit blocked: Stripe not initialized");
+          return;
+        }
+        if (!this.ready) {
+          this.errorMsg = "Payment form is still loading. Please wait a moment.";
+          devLog.log("[STRIPE CHECKOUT] Submit blocked: payment element not ready");
+          return;
+        }
+
+        if (!this._name.trim()) {
+          this.errorMsg = "Please enter your full name.";
+          return;
+        }
+
+        const chargeAmount = this.finalAmount !== null
+          ? "$" + (this.finalAmount / 100).toFixed(2)
+          : (this.cycle === "yearly" ? "$164.88" : "$14.99");
+        devLog.log("[STRIPE CHECKOUT] Submit | cycle:", this.cycle, "| name:", this._name, "| email:", this._email, "| IMEI:", this._imei, "| charge:", chargeAmount, "| coupon:", this.couponApplied ? this.couponCode : "none", "| cardComplete:", this.cardComplete);
+
+        this.loading = true;
+        this.errorMsg = "";
+
+        // Step 1: Validate the card via SetupIntent. No subscription created yet.
+        devLog.log("[STRIPE CHECKOUT] Step 1: Confirming SetupIntent (validating card details)...");
+        const { setupIntent, error: setupError } = await stripe.confirmSetup({
+          elements,
+          confirmParams: {
+            return_url: `${window.location.origin}/manage/${this._imei}`,
+            payment_method_data: { billing_details: { name: this._name.trim(), email: this._email } }
+          },
+          redirect: "if_required"
+        });
+
+        if (setupError) {
+          devLog.log("[STRIPE CHECKOUT] Step 1 failed — SetupIntent rejected");
+          devLog.log("[STRIPE CHECKOUT] Error code:", setupError.code);
+          devLog.log("[STRIPE CHECKOUT] Error type:", setupError.type);
+          devLog.log("[STRIPE CHECKOUT] Error message:", setupError.message);
+          devLog.log("[STRIPE CHECKOUT] Decline code:", (setupError as any).decline_code ?? "none");
+          devLog.log("[STRIPE CHECKOUT] Doc URL:", (setupError as any).doc_url ?? "none");
+          devLog.log("[STRIPE CHECKOUT] Param:", (setupError as any).param ?? "none");
+          const si = (setupError as any).setup_intent;
+          if (si) {
+            devLog.log("[STRIPE CHECKOUT] SetupIntent id:", si.id, "| status:", si.status, "| last_setup_error:", JSON.stringify(si.last_setup_error));
+          }
+          devLog.log("[STRIPE CHECKOUT] Full error:", JSON.stringify(setupError));
+
+          // SetupIntent is in a terminal state (already used or cancelled).
+          // Remount the form with a fresh SetupIntent so the user can retry.
+          if (setupError.code === "setup_intent_unexpected_state") {
+            devLog.log("[STRIPE CHECKOUT] Remounting form with fresh SetupIntent after unexpected state error");
+            this.loading = false;
+            await this._mountPaymentElement();
+            this.errorMsg = "A temporary error occurred. Please try submitting again.";
+            return;
+          }
+
+          this.errorMsg = setupError.message ?? "Card validation failed. Please try again.";
+          this.loading = false;
+          return;
+        }
+
+        const paymentMethodId = typeof setupIntent?.payment_method === "string"
+          ? setupIntent.payment_method
+          : (setupIntent?.payment_method as any)?.id as string | undefined;
+
+        if (!paymentMethodId) {
+          this.errorMsg = "Failed to save payment method. Please try again.";
+          devLog.log("[STRIPE CHECKOUT] Submit blocked: no paymentMethodId returned after confirmSetup");
+          this.loading = false;
+          return;
+        }
+        devLog.log("[STRIPE CHECKOUT] Step 1 complete — card validated | paymentMethodId:", paymentMethodId);
+
+        // Step 2: Create the subscription with the validated payment method.
+        devLog.log("[STRIPE CHECKOUT] Step 2: Creating subscription...");
+        let activationResult: { requiresAction: boolean; subscriptionId: string; paymentIntentClientSecret: string | null };
+        try {
+          const raw = await actions.stripe.activateSubscription.orThrow({
+            customerId: this._customerId,
+            customerEmail: this._email,
+            customerName: this._name.trim(),
+            deviceIMEI: this._imei,
+            plan: this.cycle,
+            paymentMethodId,
+            ...(this.couponApplied && this.couponCode.trim() ? { promotionCode: this.couponCode.trim() } : {})
+          });
+          activationResult = { ...raw, paymentIntentClientSecret: raw.paymentIntentClientSecret ?? null };
+          devLog.log("[STRIPE CHECKOUT] Step 2 complete | subscriptionId:", activationResult.subscriptionId, "| requiresAction:", activationResult.requiresAction);
+        } catch (err: any) {
+          devLog.log("[STRIPE CHECKOUT] Step 2 failed | message:", err?.message ?? err);
+          this.errorMsg = err?.message ?? "Failed to activate subscription. Please try again.";
+          this.loading = false;
+          return;
+        }
+
+        // Step 3 (amount > $0 only): Confirm the PaymentIntent to charge the card.
+        if (activationResult.requiresAction && activationResult.paymentIntentClientSecret) {
+          devLog.log("[STRIPE CHECKOUT] Step 3: Confirming payment of", chargeAmount, "...");
+          const { error: payError } = await stripe.confirmPayment({
+            clientSecret: activationResult.paymentIntentClientSecret,
+            confirmParams: {
+              return_url: `${window.location.origin}/manage/${this._imei}`,
+              payment_method: paymentMethodId
+            },
+            redirect: "if_required"
+          });
+
+          if (payError) {
+            devLog.log("[STRIPE CHECKOUT] Step 3 failed | code:", payError.code, "| message:", payError.message);
+            this.errorMsg = payError.message ?? "Payment failed. Please try again.";
+            this.loading = false;
+            return;
+          }
+          devLog.log("[STRIPE CHECKOUT] Step 3 complete — charged", chargeAmount);
+        } else {
+          devLog.log("[STRIPE CHECKOUT] Step 3 skipped — $0.00 due today, card saved for future billing");
+        }
+
+        devLog.log("[STRIPE CHECKOUT] All steps complete — redirecting to manage page");
+        window.location.href = `/manage/${this._imei}`;
+      }
+    }));
+
+    Alpine.data("dashboard", (initialData?: { userEmail?: string; newDevice?: { imei: string; phoneNumber: string; isCspire?: boolean } | null; testStripe?: boolean }) => ({
       showForm: false,
       isLoading: false,
       mobileMenuOpen: false,
@@ -1141,10 +1504,13 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
       pollingInterval: null as ReturnType<typeof setTimeout> | null,
       shouldStartPolling: false,
       pollingImei: null as string | null,
+      testStripe: initialData?.testStripe ?? false,
+      stripeInitialCycle: 'yearly' as 'monthly' | 'yearly',
       isStripeLoaded: false,
       isStripeEmbedded: false,
+      showStripeModal: false,
       stripeInstance: undefined as Stripe | undefined,
-      stripeCheckout: undefined as StripeEmbeddedCheckout | undefined,
+      embeddedCheckout: undefined as StripeEmbeddedCheckout | undefined,
       sessionClientSecret: undefined as string | undefined,
       stripeSessionId: undefined as string | undefined,
       customerEmail: initialData?.userEmail || "",
@@ -1260,6 +1626,10 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
           this.activeDevicePhoneNumber = null;
         }
       },
+      closeStripeModal() {
+        this.showStripeModal = false;
+        window.dispatchEvent(new CustomEvent('stripe-checkout-close'));
+      },
       async initializeStripe() {
         try {
           const stripe = await loadStripe(STRIPE_PUBLIC_KEY);
@@ -1273,15 +1643,23 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
         }
       },
       async handleStripeCheckout(cycle: 'monthly' | 'yearly' = 'monthly') {
-        if (!this.activeDeviceImei || !this.customerEmail) {
+        if (!this.activeDeviceImei || !this.customerEmail) return;
+
+        // Custom PaymentElement form — StripeCheckout component handles everything
+        if (this.testStripe) {
+          this.stripeInitialCycle = cycle;
+          this.showStripeModal = true;
+          // Notify the checkout component (cross-component, window event is reliable)
+          window.dispatchEvent(new CustomEvent('stripe-checkout-open'));
           return;
         }
 
+        // Legacy embedded checkout
         try {
           // Reset session if billing cycle changed
           if (this.byocSessionCycle && this.byocSessionCycle !== cycle) {
-            try { this.stripeCheckout?.destroy(); } catch {}
-            this.stripeCheckout = undefined;
+            try { this.embeddedCheckout?.destroy(); } catch {}
+            this.embeddedCheckout = undefined;
             const el = document.getElementById('stripe-subscription-element');
             if (el) el.innerHTML = '';
             this.sessionClientSecret = undefined;
@@ -1292,7 +1670,6 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
           // Create Stripe session if not already created
           if (!this.sessionClientSecret) {
             const imeiString = this.activeDeviceImei.replace(/[^0-9]/g, '').padEnd(15, '0');
-
             const data = await actions.stripe.createSubscriptionPage.orThrow({
               customerEmail: this.customerEmail,
               deviceIMEI: imeiString,
@@ -1305,31 +1682,22 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
 
           // Initialize embedded checkout if not already done
           if (!this.isStripeEmbedded && this.stripeInstance) {
-            // Store session ID in sessionStorage before mounting checkout
-            // This way we can retrieve it after Stripe redirects (since return_url doesn't replace {CHECKOUT_SESSION_ID})
             if (this.stripeSessionId) {
               const imeiString = this.activeDeviceImei?.replace(/[^0-9]/g, '').padEnd(15, '0') || '';
               sessionStorage.setItem('stripeCheckoutSessionId', this.stripeSessionId);
               sessionStorage.setItem('stripeCheckoutImei', imeiString);
             }
-
-            this.stripeCheckout = await this.stripeInstance.initEmbeddedCheckout({
+            this.embeddedCheckout = await this.stripeInstance.initEmbeddedCheckout({
               clientSecret: this.sessionClientSecret
             });
-            this.stripeCheckout?.mount("#stripe-subscription-element");
-
-            // Note: Stripe embedded checkout doesn't have an 'on' method
-            // Instead, it will redirect to the return_url when complete
-            // The return_url has {CHECKOUT_SESSION_ID} placeholder which Stripe should replace
-            // But if it doesn't, we'll retrieve the session ID from sessionStorage
-
+            this.embeddedCheckout?.mount("#stripe-subscription-element");
             this.isStripeEmbedded = true;
           }
 
-          // Show the dialog
-          const dialog = this.$refs.stripeDialog as HTMLDialogElement;
-          if (dialog) {
-            dialog.showModal();
+          // Re-show dialog if already embedded
+          if (this.isStripeEmbedded) {
+            const dialog = this.$refs.stripeDialog as HTMLDialogElement;
+            if (dialog) dialog.showModal();
           }
         } catch (error: any) {
           devLog.error("[BYOC] Stripe checkout error:", error);

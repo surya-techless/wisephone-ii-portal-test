@@ -1,0 +1,154 @@
+---
+interface Props {
+  customerEmail?: string;
+  deviceIMEI?: string;
+}
+const { customerEmail = "", deviceIMEI = "" } = Astro.props;
+---
+
+<div
+  class="w-full"
+  x-data="stripeCheckout"
+  data-email={customerEmail}
+  data-imei={deviceIMEI}
+>
+  <!-- Plan summary -->
+  <div class="border border-gray-200 rounded-xl px-4 py-3 mb-3">
+    <div class="flex items-center justify-between">
+      <span class="text-sm font-semibold text-gray-800">WiseOS Subscription</span>
+      <span class="text-sm font-semibold text-gray-900">
+        <span x-show="!couponApplied || finalAmount === null">
+          <span x-show="cycle === 'yearly'">$13.74<span class="font-normal text-gray-500">/mo</span></span>
+          <span x-show="cycle === 'monthly'" x-cloak>$14.99<span class="font-normal text-gray-500">/mo</span></span>
+        </span>
+        <span x-show="couponApplied && finalAmount !== null" x-cloak class="flex items-center gap-1.5">
+          <span class="line-through text-gray-400 font-normal text-xs">
+            <span x-show="cycle === 'yearly'">$13.74</span>
+            <span x-show="cycle === 'monthly'" x-cloak>$14.99</span>
+          </span>
+          <span class="text-green-700" x-text="cycle === 'yearly' ? '$' + (finalAmount / 12 / 100).toFixed(2) : '$' + (finalAmount / 100).toFixed(2)"></span>
+          <span class="font-normal text-gray-500">/mo</span>
+        </span>
+      </span>
+    </div>
+  </div>
+
+  <!-- Order summary -->
+  <div class="bg-gray-50 rounded-xl px-4 py-3 mb-4 text-sm">
+    <div class="flex items-center justify-between mb-1.5">
+      <span class="text-gray-500">Subtotal</span>
+      <span class="text-gray-700">
+        <span x-show="cycle === 'yearly'">$164.88</span>
+        <span x-show="cycle === 'monthly'" x-cloak>$14.99</span>
+      </span>
+    </div>
+    <div x-show="couponApplied && finalAmount !== null" x-cloak class="flex items-center justify-between mb-1.5 text-green-700">
+      <span>Discount</span>
+      <span x-text="finalAmount !== null ? '-$' + (((cycle === 'yearly' ? 16488 : 1499) - finalAmount) / 100).toFixed(2) : ''"></span>
+    </div>
+    <div class="flex items-center justify-between pt-1.5 border-t border-gray-200">
+      <span class="font-semibold text-gray-800">Due today</span>
+      <span class="font-bold text-gray-900">
+        <span x-show="!couponApplied || finalAmount === null">
+          <span x-show="cycle === 'yearly'">$164.88</span>
+          <span x-show="cycle === 'monthly'" x-cloak>$14.99</span>
+        </span>
+        <span x-show="couponApplied && finalAmount !== null" x-cloak x-text="'$' + (finalAmount / 100).toFixed(2)"></span>
+      </span>
+    </div>
+  </div>
+
+  <!-- Coupon code -->
+  <div class="mb-4">
+    <div class="flex gap-2">
+      <input
+        type="text"
+        x-model="couponCode"
+        @input="couponCode = $event.target.value.toUpperCase()"
+        @focus="_onCouponFocus()"
+        @blur="_onCouponBlur()"
+        placeholder="Coupon code"
+        :disabled="loading || couponApplied"
+        class="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-[#C07F53] focus:border-[#C07F53] disabled:bg-gray-50 disabled:text-gray-400"
+        style="text-transform: uppercase;"
+      />
+      <button
+        type="button"
+        @click="couponApplied ? removeCoupon() : applyCoupon()"
+        :disabled="(!couponCode.trim() && !couponApplied) || loading"
+        class="px-4 py-2 border rounded-md text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+        :class="couponApplied ? 'border-green-300 text-green-700 bg-green-50 hover:bg-green-100' : 'border-gray-300 text-gray-700 hover:bg-gray-50'"
+        x-text="couponApplied ? 'Remove' : 'Apply'"
+      >
+      </button>
+    </div>
+    <p x-show="couponError" x-cloak x-text="couponError" class="text-xs text-red-500 mt-1.5"></p>
+    <p x-show="couponApplied" x-cloak class="text-xs text-green-600 mt-1.5 font-medium">Coupon applied ✓</p>
+  </div>
+
+  <!-- Email + Full Name -->
+  <div class="mb-4 flex flex-col gap-3">
+    <input
+      type="email"
+      x-model="_email"
+      placeholder="Email address"
+      :disabled="loading"
+      class="w-full px-3 py-2.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-[#C07F53] focus:border-[#C07F53] disabled:bg-gray-50 disabled:text-gray-400"
+    />
+    <input
+      type="text"
+      x-model="_name"
+      placeholder="Full name"
+      :disabled="loading"
+      autocomplete="name"
+      class="w-full px-3 py-2.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-[#C07F53] focus:border-[#C07F53] disabled:bg-gray-50 disabled:text-gray-400"
+    />
+  </div>
+
+  <!-- Payment form -->
+  <form @submit.prevent="submit">
+    <!-- Stripe PaymentElement (card number, expiry, CVC, country, ZIP) -->
+    <div x-ref="paymentContainer" class="mb-4 min-h-[80px]">
+      <div
+        x-show="!ready && !errorMsg"
+        class="flex items-center justify-center h-20 text-sm text-gray-400 gap-2"
+      >
+        <svg
+          class="animate-spin h-4 w-4 text-gray-400"
+          viewBox="0 0 24 24"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"
+          ></circle>
+          <path
+            class="opacity-75"
+            fill="currentColor"
+            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+        </svg>
+        Loading payment form…
+      </div>
+    </div>
+
+    <!-- Error message -->
+    <div
+      x-show="errorMsg"
+      x-cloak
+      class="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600"
+      x-text="errorMsg"
+    >
+    </div>
+
+    <!-- Submit button -->
+    <button
+      type="submit"
+      :disabled="!ready || loading"
+      class="w-full py-3 rounded-md text-sm font-medium text-white bg-[#C07F53] hover:bg-[#A06F43] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+    >
+      <span x-show="!loading" x-text="cycle === 'yearly' ? 'Subscribe Annually' : 'Subscribe Monthly'"></span>
+      <span x-show="loading" x-cloak>Processing…</span>
+    </button>
+
+    <p class="mt-3 text-xs text-center text-gray-400">Secured by Stripe</p>
+  </form>
+</div>

@@ -1,4 +1,4 @@
-import { defineAction } from "astro:actions";
+import { defineAction, ActionError } from "astro:actions";
 import { STRIPE_SECRET_KEY } from "astro:env/server";
 import { z } from "astro:schema";
 import Stripe from "stripe";
@@ -20,6 +20,16 @@ const TECHLESS_MONTHLY_PRICE_ID = isStripeTestMode
 const TECHLESS_YEARLY_PRICE_ID = isStripeTestMode
   ? "price_1TTQqfATGtdZ0VDDjCCHI6ZO"
   : "price_1TTQqfATGtdZ0VDDjCCHI6ZO";
+
+async function findOrCreateCustomer(email: string, imei: string): Promise<Stripe.Customer> {
+  const existing = await stripeInstance.customers.list({ email, limit: 1 });
+  if (existing.data.length > 0) {
+    const customer = existing.data[0];
+    await stripeInstance.customers.update(customer.id, { metadata: { imei } });
+    return customer;
+  }
+  return stripeInstance.customers.create({ email, metadata: { imei } });
+}
 
 export const stripe = {
   createSubscriptionPage: defineAction({
@@ -109,6 +119,208 @@ export const stripe = {
       return {
         session
       };
+    }
+  }),
+
+  // Phase 1: Create a SetupIntent to collect and validate card details.
+  // Always creates a fresh Stripe customer (matching the old checkout flow).
+  // Returns customerId so Phase 2 (activateSubscription) uses the exact same customer.
+  createSetupIntent: defineAction({
+    input: z.object({
+      customerEmail: z.string().email(),
+      deviceIMEI: z.string()
+    }),
+    handler: async (input, _context) => {
+      devLog.log("[STRIPE] createSetupIntent | email:", input.customerEmail, "| IMEI:", input.deviceIMEI);
+
+      devLog.log("[STRIPE] ── CUSTOMER CREATE ──────────────────────────");
+      devLog.log("[STRIPE] email:", input.customerEmail);
+      devLog.log("[STRIPE] metadata.imei:", input.deviceIMEI);
+      const customer = await stripeInstance.customers.create({
+        email: input.customerEmail,
+        metadata: { imei: input.deviceIMEI }
+      });
+      devLog.log("[STRIPE] Customer created → id:", customer.id, "| email:", customer.email, "| metadata.imei:", customer.metadata?.imei);
+      devLog.log("[STRIPE] ────────────────────────────────────────────");
+
+      // automatic_payment_methods is required when using the Payment Element for intent-based confirmation.
+      // Explicit payment_method_types conflicts with the Payment Element and causes setup_intent_unexpected_state.
+      const setupIntent = await stripeInstance.setupIntents.create({
+        customer: customer.id,
+        automatic_payment_methods: { enabled: true },
+        usage: "off_session",
+        metadata: { imei: input.deviceIMEI }
+      });
+      devLog.log("[STRIPE] SetupIntent created | id:", setupIntent.id, "| status:", setupIntent.status);
+
+      return { clientSecret: setupIntent.client_secret!, customerId: customer.id };
+    }
+  }),
+
+  // Validates a coupon code against active Stripe promotion codes and returns the discounted amount.
+  // Does NOT create any Stripe objects.
+  validateCoupon: defineAction({
+    input: z.object({
+      code: z.string(),
+      plan: z.enum(["monthly", "yearly"]).default("monthly")
+    }),
+    handler: async (input, _context) => {
+      devLog.log("[STRIPE] validateCoupon | code:", input.code, "| plan:", input.plan);
+
+      const promoCodes = await stripeInstance.promotionCodes.list({
+        code: input.code.trim(),
+        active: true,
+        limit: 1
+      });
+
+      if (promoCodes.data.length === 0) {
+        devLog.log("[STRIPE] validateCoupon | code not found or inactive:", input.code);
+        throw new ActionError({ code: "BAD_REQUEST", message: "Invalid or expired coupon code" });
+      }
+
+      const coupon = promoCodes.data[0].coupon as Stripe.Coupon;
+      devLog.log("[STRIPE] validateCoupon | coupon found | percent_off:", coupon.percent_off, "| amount_off:", coupon.amount_off);
+
+      const baseAmount = input.plan === "yearly" ? 16488 : 1499;
+      let finalAmount: number;
+
+      if (coupon.percent_off != null) {
+        finalAmount = Math.round(baseAmount * (1 - coupon.percent_off / 100));
+      } else if (coupon.amount_off != null) {
+        finalAmount = Math.max(0, baseAmount - coupon.amount_off);
+      } else {
+        throw new ActionError({ code: "BAD_REQUEST", message: "Invalid coupon configuration" });
+      }
+
+      devLog.log("[STRIPE] validateCoupon | baseAmount:", baseAmount, "| finalAmount:", finalAmount);
+      return { valid: true, finalAmount };
+    }
+  }),
+
+  // Phase 2: Create and activate the subscription using the payment method saved via SetupIntent.
+  // Updates the customer with the email and cardholder name from the checkout modal
+  // before creating the subscription.
+  activateSubscription: defineAction({
+    input: z.object({
+      customerId: z.string(),
+      customerEmail: z.string().email(),
+      customerName: z.string(),
+      deviceIMEI: z.string(),
+      plan: z.enum(["monthly", "yearly"]).default("monthly"),
+      paymentMethodId: z.string(),
+      promotionCode: z.string().optional()
+    }),
+    handler: async (input, _context) => {
+      devLog.log("[STRIPE] ── SUBSCRIPTION CREATE ───────────────────────");
+      devLog.log("[STRIPE] customerId:", input.customerId);
+      devLog.log("[STRIPE] customerEmail:", input.customerEmail);
+      devLog.log("[STRIPE] deviceIMEI:", input.deviceIMEI);
+      devLog.log("[STRIPE] plan:", input.plan);
+      devLog.log("[STRIPE] paymentMethodId:", input.paymentMethodId);
+      devLog.log("[STRIPE] promotionCode:", input.promotionCode ?? "none");
+      devLog.log("[STRIPE] ─────────────────────────────────────────────");
+
+      // Pull all billing details that Stripe collected in the Payment Element
+      // (name on card, phone, address — everything the customer filled in)
+      const paymentMethod = await stripeInstance.paymentMethods.retrieve(input.paymentMethodId);
+      const bd = paymentMethod.billing_details;
+      devLog.log("[STRIPE] PaymentMethod billing_details | name:", bd.name, "| phone:", bd.phone, "| address:", JSON.stringify(bd.address));
+
+      // Update the customer: name from Full name field, address/phone from Payment Element via PaymentMethod
+      await stripeInstance.customers.update(input.customerId, {
+        email: input.customerEmail,
+        name: input.customerName,
+        phone: bd.phone ?? undefined,
+        address: bd.address
+          ? {
+              line1: bd.address.line1 ?? undefined,
+              line2: bd.address.line2 ?? undefined,
+              city: bd.address.city ?? undefined,
+              state: bd.address.state ?? undefined,
+              postal_code: bd.address.postal_code ?? undefined,
+              country: bd.address.country ?? undefined
+            }
+          : undefined,
+        metadata: { imei: input.deviceIMEI }
+      });
+      devLog.log("[STRIPE] Customer updated | id:", input.customerId, "| name:", input.customerName, "| email:", input.customerEmail, "| phone:", bd.phone, "| country:", bd.address?.country, "| postal_code:", bd.address?.postal_code);
+
+      // Resolve promotion code if provided
+      let promotionCodeId: string | undefined;
+      if (input.promotionCode?.trim()) {
+        const promoCodes = await stripeInstance.promotionCodes.list({
+          code: input.promotionCode.trim(),
+          active: true,
+          limit: 1
+        });
+        if (promoCodes.data.length === 0) {
+          throw new ActionError({ code: "BAD_REQUEST", message: "Invalid or expired coupon code" });
+        }
+        promotionCodeId = promoCodes.data[0].id;
+        devLog.log("[STRIPE] Promotion code resolved | id:", promotionCodeId);
+      }
+
+      const priceId = input.plan === "yearly" ? TECHLESS_YEARLY_PRICE_ID : TECHLESS_MONTHLY_PRICE_ID;
+
+      const subscriptionParams: Stripe.SubscriptionCreateParams = {
+        customer: input.customerId,
+        items: [{ price: priceId }],
+        default_payment_method: input.paymentMethodId,
+        payment_settings: {
+          save_default_payment_method: "on_subscription",
+          payment_method_types: ["card"]
+        },
+        expand: ["latest_invoice", "latest_invoice.payment_intent"],
+        metadata: { imei: input.deviceIMEI }
+      };
+
+      if (promotionCodeId) {
+        subscriptionParams.discounts = [{ promotion_code: promotionCodeId }];
+      }
+
+      devLog.log("[STRIPE] ── SUBSCRIPTION PARAMS ───────────────────────");
+      devLog.log("[STRIPE] customer:", subscriptionParams.customer);
+      devLog.log("[STRIPE] priceId:", priceId);
+      devLog.log("[STRIPE] default_payment_method:", subscriptionParams.default_payment_method);
+      devLog.log("[STRIPE] metadata.imei:", subscriptionParams.metadata?.imei);
+      devLog.log("[STRIPE] discounts:", JSON.stringify(subscriptionParams.discounts ?? []));
+      devLog.log("[STRIPE] ─────────────────────────────────────────────");
+      const subscription = await stripeInstance.subscriptions.create(subscriptionParams);
+      devLog.log("[STRIPE] Subscription created → id:", subscription.id, "| status:", subscription.status, "| customer:", subscription.customer);
+
+      const invoice = (typeof subscription.latest_invoice === "object" && subscription.latest_invoice !== null)
+        ? subscription.latest_invoice as Stripe.Invoice
+        : null;
+      const paymentIntent = (invoice?.payment_intent && typeof invoice.payment_intent === "object")
+        ? invoice.payment_intent as Stripe.PaymentIntent
+        : null;
+
+      devLog.log("[STRIPE] invoice.amount_due:", invoice?.amount_due, "| paymentIntent.status:", paymentIntent?.status ?? "none");
+
+      // $0 invoice: subscription is immediately active (100% off coupon). No payment to confirm.
+      if (!paymentIntent || invoice?.amount_due === 0) {
+        devLog.log("[STRIPE] $0 subscription activated | subscriptionId:", subscription.id);
+        return { requiresAction: false, subscriptionId: subscription.id, paymentIntentClientSecret: null };
+      }
+
+      // Payment already succeeded (Stripe auto-charged with the default_payment_method)
+      if (paymentIntent.status === "succeeded") {
+        devLog.log("[STRIPE] Payment already succeeded | subscriptionId:", subscription.id);
+        return { requiresAction: false, subscriptionId: subscription.id, paymentIntentClientSecret: null };
+      }
+
+      // 3DS or additional authentication required
+      if (paymentIntent.status === "requires_action" || paymentIntent.status === "requires_confirmation") {
+        devLog.log("[STRIPE] Payment requires client-side action | status:", paymentIntent.status, "| subscriptionId:", subscription.id);
+        return { requiresAction: true, subscriptionId: subscription.id, paymentIntentClientSecret: paymentIntent.client_secret };
+      }
+
+      // Payment failed (declined, insufficient funds, etc.)
+      devLog.log("[STRIPE] Payment failed | paymentIntent.status:", paymentIntent.status);
+      throw new ActionError({
+        code: "BAD_REQUEST",
+        message: "Payment was declined. Please check your card details and try again."
+      });
     }
   }),
 

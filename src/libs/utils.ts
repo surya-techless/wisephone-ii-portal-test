@@ -1201,9 +1201,10 @@ export function isValidIMEI(imei: string | number): boolean {
   return sum % 10 === 0;
 }
 
-export const STRIPE_PUBLIC_KEY = import.meta.env.PROD
-  ? "pk_live_51H2HO9ATGtdZ0VDDSWdTIkdOIDgT98W2wHukewQ8E2eMrUtkFGSUBiieGHM2HIxvqeYXP4bgHIT8E8pySI57En1T00q4Lov4Yy"
-  : "pk_test_51H2HO9ATGtdZ0VDDAmDRcW7ybhQo0QQeKyGg61wQIoA0JisO5MvCyuu213xEEFIs4tEU8hbgbl1YyY8oiGbEhAQh00RPI0ElVC";
+const PK_LIVE = "pk_live_51H2HO9ATGtdZ0VDDSWdTIkdOIDgT98W2wHukewQ8E2eMrUtkFGSUBiieGHM2HIxvqeYXP4bgHIT8E8pySI57En1T00q4Lov4Yy";
+const PK_TEST = "pk_test_51H2HO9ATGtdZ0VDDAmDRcW7ybhQo0QQeKyGg61wQIoA0JisO5MvCyuu213xEEFIs4tEU8hbgbl1YyY8oiGbEhAQh00RPI0ElVC";
+// PUBLIC_STRIPE_KEY in .env overrides the auto-detection (use pk_live_ when STRIPE_SECRET_KEY is sk_live_ locally)
+export const STRIPE_PUBLIC_KEY = (import.meta.env.PUBLIC_STRIPE_KEY as string | undefined) ?? (import.meta.env.PROD ? PK_LIVE : PK_TEST);
 
 /**
  * Development-only logging utility
