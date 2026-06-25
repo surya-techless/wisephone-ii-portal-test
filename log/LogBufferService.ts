@@ -38,12 +38,12 @@ export class LogBufferService {
 
     if (bufferSize >= bufferSizeNumKeys) {
       console.warn("⚠️ [LogBufferService] log buffer needs to be flushed");
-      await this.flush(bufferId);
+      await this.flush(imei, bufferId);
       console.log("✅ [LogBufferService] log buffer flush success");
     }
   }
 
-  private static async flush(bufferId: string): Promise<void> {
+  private static async flush(imei: string, bufferId: string): Promise<void> {
     // NOTE:
     // each log event item in cache will be an array of a file dump of on-device log events
     // also, this will potentially be a HUGE object in memory if `bufferSizeNumKeys` is too high
@@ -70,7 +70,7 @@ export class LogBufferService {
           (logEvent: LogEvent) => {
             newLogEventData.push(this.prepareLogEventData(logEvent, bufferId, batchId, submissionId))
             batchIdentifiers.add({
-              topic: `log/flush/${logEvent.pii.imei}/ack`,
+              topic: `log/flush/${imei}/ack`,
               batchId: batchId,
               bufferId: bufferId,
               submissionId: submissionId
@@ -104,7 +104,7 @@ export class LogBufferService {
       appVersion: log.device_context.app_version,
       osVersion: log.device_context.os_version,
       bootId: log.device_context.boot_id,
-      deviceName: log.knox_context.device_name ?? log.pii.imei,
+      deviceName: log.knox_context.device_name,
       domain: log.domain,
       eventCode: log.event_code,
       severity: log.severity,
