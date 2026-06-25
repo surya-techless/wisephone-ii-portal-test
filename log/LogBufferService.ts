@@ -68,7 +68,7 @@ export class LogBufferService {
         let batchId = batch.batch_id;
         batch.events.forEach(
           (logEvent: LogEvent) => {
-            newLogEventData.push(this.prepareLogEventData(logEvent, bufferId, batchId, submissionId))
+            newLogEventData.push(this.prepareLogEventData(logEvent, imei, bufferId, batchId, submissionId))
             batchIdentifiers.add({
               topic: `log/flush/${imei}/ack`,
               batchId: batchId,
@@ -92,14 +92,14 @@ export class LogBufferService {
     }
   }
 
-  private static prepareLogEventData(log: LogEvent, bufferId: string, batchId: string, submissionId: string) {
+  private static prepareLogEventData(log: LogEvent, imei: string, bufferId: string, batchId: string, submissionId: string) {
     const defaultRecordStatus: string = "SUCCESS";
 
     return {
       eventId: log.event_id,
       schemaVersion: log.schema_version,
       eventTimestamp: new Date(log.timestamp),
-      imei: log.pii.imei,
+      imei: imei,
       ipAddress: log.pii.ip_address ?? "x.x.x.x",
       appVersion: log.device_context.app_version,
       osVersion: log.device_context.os_version,
