@@ -64,6 +64,7 @@ const redisClient = createClient({
   url: process.env.CACHE_CONNECTION_STRING,
   socket: {
     connectTimeout: 5000,
+    tls: true
   },
 })
   .on("sharded-channel-moved", () =>
