@@ -141,5 +141,8 @@ export async function sendLogFlushAcks(identifiers: Set<BatchIdentifier>): Promi
           throw new WPIIPortalMQTTError(`there was an issue publishing log flush event ack to AWS IoT broker: ${err}`);
         }
       }
+      else {
+        throw new WPIIPortalMQTTError("[MQTT] ❌ there is no valid MQTT client to publish log flush event acks to AWS IoT broker");
+      }
     });
 }
