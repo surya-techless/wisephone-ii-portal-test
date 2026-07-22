@@ -2,9 +2,19 @@ import type { APIRoute } from "astro";
 import { captureException } from "@sentry/astro";
 import { SamsungKnoxService } from "@/libs/samsung-knox-service";
 import { devLog } from "@/libs/utils";
+import { HTTP, jsonResponse, errorResponse, preflightResponse } from "@/lib/server/api.response";
 
 type GetKnoxAction = "get-token" | "get-device-groups" | "get-device-info";
 type PostKnoxAction = "apply-feature" | "remove-feature" | "install-app" | "uninstall-app";
+
+export const OPTIONS: APIRoute = async () => {
+  try {
+    return preflightResponse();
+  } catch (error) {
+    console.error(error);
+    return errorResponse("Internal Server Error", HTTP.INTERNAL_SERVER_ERROR);
+  }
+};
 
 export const GET: APIRoute = async (props) => {
   const { request } = props;
@@ -15,16 +25,11 @@ export const GET: APIRoute = async (props) => {
   try {
     switch (action) {
       case "get-token":
-        return new Response(
-          JSON.stringify({
-            token: await SamsungKnoxService.getKnoxToken()
-          }),
-          { status: 200 }
-        );
+        return jsonResponse({ token: await SamsungKnoxService.getKnoxToken() });
 
       case "get-device-groups":
         if (!imei) {
-          throw new Error("IMEI parameter required");
+          return errorResponse("IMEI parameter required", HTTP.BAD_REQUEST);
         }
 
         // Fetch both groups and device info in parallel
@@ -33,38 +38,24 @@ export const GET: APIRoute = async (props) => {
           SamsungKnoxService.getDeviceFromImei(imei)
         ]);
 
-        // Return both groups and device info
-        return new Response(
-          JSON.stringify({
-            groups,
-            deviceInfo
-          }),
-          { status: 200 }
-        );
+        return jsonResponse({ groups, deviceInfo });
 
       case "get-device-info":
         if (!imei) {
-          throw new Error("IMEI parameter required");
+          return errorResponse("IMEI parameter required", HTTP.BAD_REQUEST);
         }
 
         const deviceInfoResult = await SamsungKnoxService.getDeviceFromImei(imei);
-        return new Response(JSON.stringify(deviceInfoResult), { status: 200 });
+        return jsonResponse(deviceInfoResult);
 
       default:
-        return new Response(
-          JSON.stringify({
-            error: "Invalid action parameter"
-          }),
-          { status: 400 }
-        );
+        return errorResponse("Invalid action parameter", HTTP.BAD_REQUEST);
     }
   } catch (error) {
     captureException(error);
-    return new Response(
-      JSON.stringify({
-        error: error instanceof Error ? error.message : "Unknown error"
-      }),
-      { status: 500 }
+    return errorResponse(
+      error instanceof Error ? error.message : "Unknown error",
+      HTTP.INTERNAL_SERVER_ERROR
     );
   }
 };
@@ -75,7 +66,7 @@ export const POST: APIRoute = async ({ request }) => {
   const imei = url.searchParams.get("imei");
 
   if (!imei) {
-    return new Response(JSON.stringify({ error: "IMEI is required" }), { status: 400 });
+    return errorResponse("IMEI is required", HTTP.BAD_REQUEST);
   }
 
   try {
@@ -83,7 +74,7 @@ export const POST: APIRoute = async ({ request }) => {
       case "apply-feature": {
         const knoxManageId = url.searchParams.get("knoxManageId");
         if (!knoxManageId) {
-          return new Response(JSON.stringify({ error: "Knox Manage ID is required" }), { status: 400 });
+          return errorResponse("Knox Manage ID is required", HTTP.BAD_REQUEST);
         }
         const response = await SamsungKnoxService.applyFeature(knoxManageId, imei, true);
         await SamsungKnoxService.sendNotification(
@@ -94,12 +85,12 @@ export const POST: APIRoute = async ({ request }) => {
             sendType: "Notification"
           }
         );
-        return new Response(JSON.stringify(response), { status: 200 });
+        return jsonResponse(response);
       }
       case "remove-feature": {
         const knoxManageId = url.searchParams.get("knoxManageId");
         if (!knoxManageId) {
-          return new Response(JSON.stringify({ error: "Knox Manage ID is required" }), { status: 400 });
+          return errorResponse("Knox Manage ID is required", HTTP.BAD_REQUEST);
         }
         const response = await SamsungKnoxService.removeFeature(knoxManageId, imei, true);
         await SamsungKnoxService.sendNotification(
@@ -110,62 +101,45 @@ export const POST: APIRoute = async ({ request }) => {
             sendType: "Notification"
           }
         );
-        return new Response(JSON.stringify(response), { status: 200 });
+        return jsonResponse(response);
       }
       case "install-app": {
         const appPackage = url.searchParams.get("appPackage");
 
         if (!appPackage) {
-          return new Response(JSON.stringify({ error: "App package is required" }), { status: 400 });
+          return errorResponse("App package is required", HTTP.BAD_REQUEST);
         }
 
         const response = await SamsungKnoxService.installAndroidApp(imei, {
           appPackage
         });
 
-        return new Response(JSON.stringify(response), { status: 200 });
+        return jsonResponse(response);
       }
       case "uninstall-app": {
         const appPackage = url.searchParams.get("appPackage");
 
         if (!appPackage) {
-          return new Response(JSON.stringify({ error: "App package is required" }), { status: 400 });
+          return errorResponse("App package is required", HTTP.BAD_REQUEST);
         }
 
         const response = await SamsungKnoxService.uninstallAndroidApp(imei, appPackage);
-        return new Response(JSON.stringify(response), { status: 200 });
+        return jsonResponse(response);
       }
       default: {
-        return new Response(
-          JSON.stringify({
-            error: "Invalid action parameter"
-          }),
-          { status: 400 }
-        );
+        return errorResponse("Invalid action parameter", HTTP.BAD_REQUEST);
       }
     }
   } catch (error) {
     captureException(error);
     devLog.error(error);
-    return new Response(
-      JSON.stringify({
-        error: error instanceof Error ? error.message : "Unknown error"
-      }),
-      { status: 500 }
+    return errorResponse(
+      error instanceof Error ? error.message : "Unknown error",
+      HTTP.INTERNAL_SERVER_ERROR
     );
   }
 };
 
 export const ALL: APIRoute = ({ request }) => {
-  return new Response(
-    JSON.stringify({
-      error: `Method ${request.method} not allowed`
-    }),
-    {
-      status: 405,
-      headers: {
-        Allow: "GET, POST"
-      }
-    }
-  );
+  return errorResponse(`Method ${request.method} not allowed`, HTTP.METHOD_NOT_ALLOWED);
 };

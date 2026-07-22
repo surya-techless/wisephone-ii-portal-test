@@ -20,6 +20,7 @@ export const HTTP = {
   UNAUTHORIZED: 401,
   FORBIDDEN: 403,
   NOT_FOUND: 404,
+  METHOD_NOT_ALLOWED: 405,
   INTERNAL_SERVER_ERROR: 500,
   NOT_IMPLEMENTED: 501,
   BAD_GATEWAY: 502,
@@ -55,6 +56,10 @@ export function successResponse(message: string, status: number = HTTP.OK) {
   return json({ message }, status, corsHeaders);
 }
 
+// accepts any json-serializable body and injects standard CORS + content headers
+export function jsonResponse(body: unknown, status: number = HTTP.OK) {
+  return json(body, status, corsHeaders);
+}
 
 export function errorResponse(errorMessage: string, status: number = HTTP.INTERNAL_SERVER_ERROR) {
   return json({ error: errorMessage }, status, corsHeaders);
