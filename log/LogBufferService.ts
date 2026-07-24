@@ -15,14 +15,16 @@ export type BatchIdentifier = {
   submissionId: string;
 };
 
-const LogFlushSeverityCodesForCommit = ["ERROR", "FATAL", "CRITICAL"];
+const LogFlushSeverityCodesForCommit = ["WARNING", "ERROR", "FATAL", "CRITICAL"];
 const bufferIdPrefix: string = "wisephone-portal-logFlushBuffer-imei-";
 
 // assume that each device encounters 1 error event every 10 minutes:
-// 20000 error events every 10 minutes
-// 2000 error events / minute
-// 33.3 error events / second
-// buffer threshold of 5000 = 1 bulk db insert every 2.5 minutes
+// 20000 error events in the span of 10 minutes
+// 2000 error events in the span of 1 minute
+// 33.3 error events in the span of 1 second
+
+// buffer cap is scoped to individual devices (not globally scoped)
+// buffer threshold of 100 = a single device might trigger 1 bulk db insert in the span of ~17 hours
 const bufferSizeNumKeys: number = Number(process.env.BUFFER_SIZE_NUM_MESSAGES);
 
 export class LogBufferService {
@@ -30,6 +32,12 @@ export class LogBufferService {
     let bufferId: string = bufferIdPrefix + imei;
     // we only care about persisting serious events since crashlytcis will contain ALL logs including debug and info logs
     let seriousLogEvents = payload.events.filter((e: LogFlushEvent) => LogFlushSeverityCodesForCommit.includes(e.severity));
+
+    if (seriousLogEvents.length === 0) {
+      console.log("✅ [LogBufferService] no serious log events to commit");
+      return;
+    }
+
     await cache.push(bufferId, JSON.stringify({
       events: seriousLogEvents,
       batch_id: payload.batch_id
