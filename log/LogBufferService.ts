@@ -1,0 +1,127 @@
+import { Cache, cache } from "cache/Cache";
+import { mysqldb } from '@/db';
+
+import { wiseOSLogEvent } from '@/db/schema';
+import { sendLogFlushAcks } from "@/libs/mqtt";
+import type { LogEvent } from "cache/dto/LogEvent";
+
+import type { LogFlushEvent, LogFLushPayload } from "./types/log-types";
+
+
+export type BatchIdentifier = {
+  topic: string,
+  batchId: string,
+  bufferId: string,
+  submissionId: string;
+};
+
+const LogFlushSeverityCodesForCommit = ["WARNING", "ERROR", "FATAL", "CRITICAL"];
+const bufferIdPrefix: string = "wisephone-portal-logFlushBuffer-imei-";
+
+// assume that each device encounters 1 error event every 10 minutes:
+// 20000 error events in the span of 10 minutes
+// 2000 error events in the span of 1 minute
+// 33.3 error events in the span of 1 second
+
+// buffer cap is scoped to individual devices (not globally scoped)
+// buffer threshold of 100 = a single device might trigger 1 bulk db insert in the span of ~17 hours
+const bufferSizeNumKeys: number = Number(process.env.BUFFER_SIZE_NUM_MESSAGES);
+
+export class LogBufferService {
+  public static async ingest(imei: string, payload: LogFLushPayload): Promise<void> {
+    let bufferId: string = bufferIdPrefix + imei;
+    // we only care about persisting serious events since crashlytcis will contain ALL logs including debug and info logs
+    let seriousLogEvents = payload.events.filter((e: LogFlushEvent) => LogFlushSeverityCodesForCommit.includes(e.severity));
+
+    if (seriousLogEvents.length === 0) {
+      console.log("✅ [LogBufferService] no serious log events to commit");
+      return;
+    }
+
+    await cache.push(bufferId, JSON.stringify({
+      events: seriousLogEvents,
+      batch_id: payload.batch_id
+    }));
+    const bufferSize = await cache.getBufferSize(bufferId);
+
+    if (bufferSize >= bufferSizeNumKeys) {
+      console.warn("⚠️ [LogBufferService] log buffer needs to be flushed");
+      await this.flush(imei, bufferId);
+      console.log("✅ [LogBufferService] log buffer flush success");
+    }
+  }
+
+  private static async flush(imei: string, bufferId: string): Promise<void> {
+    // NOTE:
+    // each log event item in cache will be an array of a file dump of on-device log events
+    // also, this will potentially be a HUGE object in memory if `bufferSizeNumKeys` is too high
+    const bufferedLogs = await cache.getAllBufferContents(bufferId);
+
+    // NOTE: even across many compute instance in our serverless env,
+    // av4 uuid should still offer sufficient entropy such that submission id's enver clash
+    const submissionId: string = crypto.randomUUID();
+
+    if (bufferedLogs.length === 0) {
+      console.warn("⚠️ [LogBufferService] log buffer empty");
+      return;
+    }
+
+    const batches = bufferedLogs.map((batch) => JSON.parse(batch));
+    const newLogEventData: any[] = [];
+    const batchIdentifiers: Set<BatchIdentifier> = new Set();  // no dups
+
+    batches.forEach(
+      (batch) => {
+
+        let batchId = batch.batch_id;
+        batch.events.forEach(
+          (logEvent: LogEvent) => {
+            newLogEventData.push(this.prepareLogEventData(logEvent, imei, bufferId, batchId, submissionId))
+            batchIdentifiers.add({
+              topic: `log/flush/${imei}/ack`,
+              batchId: batchId,
+              bufferId: bufferId,
+              submissionId: submissionId
+            });
+          });
+      });
+
+    try {
+      // batch log flush and db commit to keep write amplification to a minimum
+      await mysqldb.insert(wiseOSLogEvent).values(newLogEventData);
+      await cache.flush(bufferId);
+
+      // this is an async method but let's not block the thread before returning
+      // MQTT-based acknowledgements do not have to be sent synchronously
+      sendLogFlushAcks(batchIdentifiers);
+    } catch (e) {
+      console.error("❌ [LogBufferService] Log buffer flush failure:", e);
+      throw e;
+    }
+  }
+
+  private static prepareLogEventData(log: LogEvent, imei: string, bufferId: string, batchId: string, submissionId: string) {
+    const defaultRecordStatus: string = "SUCCESS";
+
+    return {
+      eventId: log.event_id,
+      schemaVersion: log.schema_version,
+      eventTimestamp: new Date(log.timestamp),
+      imei: imei,
+      ipAddress: log.pii.ip_address ?? "x.x.x.x",
+      appVersion: log.device_context.app_version,
+      osVersion: log.device_context.os_version,
+      bootId: log.device_context.boot_id,
+      deviceName: log.knox_context.device_name,
+      domain: log.domain,
+      eventCode: log.event_code,
+      severity: log.severity,
+      status: defaultRecordStatus,
+      submissionId: submissionId,
+      batchId: batchId,
+      bufferId: bufferId,
+      message: log.message,
+      metadata: log.metadata ?? {},
+    };
+  }
+}

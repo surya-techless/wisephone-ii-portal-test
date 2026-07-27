@@ -12,6 +12,8 @@
     "update-packages": "npx npm-check-updates -u",
     "start": "astro dev",
     "build": "astro check && astro build --remote",
+    "verifydb": "astro db verify --remote --json",
+    "migratemysql": "npx drizzle-kit migrate",
     "preview": "astro preview",
     "db:update": "astro db push --remote",
     "format": "prettier -w .",
@@ -44,7 +46,9 @@
     "astro-iconify": "^1.2.0",
     "astro-integration-lottie": "^0.3.1",
     "astro-seo": "^0.8.4",
+    "aws-iot-device-sdk-v2": "1.26.0",
     "better-sqlite3": "^11.3.0",
+    "drizzle-orm": "0.45.2",
     "groq-sdk": "^0.7.0",
     "htmx.org": "2.0.1",
     "isbot": "^5.1.17",
@@ -52,6 +56,8 @@
     "js-confetti": "^0.12.0",
     "lottie-web": "^5.12.2",
     "marked": "^14.1.2",
+    "mysql2": "3.22.5",
+    "redis": "5.12.1",
     "stripe": "^17.7.0",
     "trix": "^2.1.6",
     "uqr": "^0.1.2"
@@ -64,11 +70,13 @@
     "@types/better-sqlite3": "^7.6.11",
     "concurrently": "^9.2.1",
     "daisyui": "^4.12.10",
+    "drizzle-kit": "0.31.10",
     "esbuild": "^0.25.0",
     "prettier": "^3.6.2",
     "prettier-plugin-astro": "^0.14.1",
     "prettier-plugin-tailwindcss": "^0.7.1",
     "tailwindcss": "^3.4.10",
+    "tsx": "4.22.4",
     "typescript": "^5.6.2"
   },
   "private": true,
@@ -76,7 +84,7 @@
   "author": "Cameron Pak",
   "homepage": "https://portal.wisephone.com",
   "engines": {
-    "node": ">=20.3.0",
-    "npm": ">=10.0.0"
+    "node": "=22.22.3",
+    "npm": ">=10.9.8"
   }
 }
