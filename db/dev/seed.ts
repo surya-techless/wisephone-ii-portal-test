@@ -5,7 +5,7 @@ import { db, Wisephone, BypassTechlessSubscription, UserPermission, App } from "
 const CAM_CLERK_ID = "user_2sLc5BX4F7qRUklqQ2UTUJXSipf";
 
 function loadAppsFromJson() {
-  const { rows } = JSON.parse(readFileSync(join(process.cwd(), "apps.json"), "utf-8"));
+  const { rows } = JSON.parse(readFileSync(join(process.cwd(), "db/dev/apps.json"), "utf-8"));
   const seen = new Set<string>();
   const apps = [];
 
