@@ -1,9 +1,47 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { db, Wisephone, BypassTechlessSubscription, UserPermission, App } from "astro:db";
 
 const CAM_CLERK_ID = "user_2sLc5BX4F7qRUklqQ2UTUJXSipf";
+
+function loadAppsFromJson() {
+  const { rows } = JSON.parse(readFileSync(join(process.cwd(), "apps.json"), "utf-8"));
+  const seen = new Set<string>();
+  const apps = [];
+
+  for (const row of rows) {
+    const cells = row.cells ?? {};
+    const playStoreUrl = cells["Play Store URL"];
+    if (!playStoreUrl || playStoreUrl === "n/a") continue;
+
+    let packageName = "";
+    try {
+      packageName = new URL(playStoreUrl).searchParams.get("id") ?? "";
+    } catch {
+      continue;
+    }
+    if (!packageName || seen.has(packageName)) continue;
+    seen.add(packageName);
+
+    const toolDrawer = cells["Tool Drawer"] ?? "";
+    apps.push({
+      packageName,
+      name: cells["Tool Name"]?.trim() || "Unknown App",
+      playStoreUrl,
+      iconUrl: cells["Play Store Icon URL"] || undefined,
+      category: cells["Play Store Category"] || undefined,
+      source: toolDrawer === "Yes" ? 1 : toolDrawer === "faith.tools" ? 2 : 0,
+      inCatalog: toolDrawer === "Yes" || toolDrawer === "faith.tools" ? 1 : 0,
+      type: toolDrawer || "unset",
+      createdAt: new Date()
+    });
+  }
+
+  return apps;
+}
+
 // https://astro.build/db/seed
 export default async function seed() {
-  // Devices to seed
   const devices = [
     {
       imei: 350256486849403,
@@ -19,14 +57,10 @@ export default async function seed() {
     }
   ];
 
-  // Insert all Wisephones (ignore if already exists)
-  // Note: DeviceScreenTime will be initialized automatically by createWisephone action
-  // when devices are added via the portal UI
   for (const device of devices) {
     try {
       await db.insert(Wisephone).values(device);
     } catch (error: any) {
-      // Ignore if device already exists
       if (error?.code !== "SQLITE_CONSTRAINT_PRIMARYKEY" && error?.code !== "SQLITE_CONSTRAINT") {
         throw error;
       }
@@ -40,15 +74,7 @@ export default async function seed() {
     }
   ]);
 
-  await db.insert(App).values([
-    {
-      packageName: "com.techless.wiseos",
-      name: "WiseOS",
-      source: 1, // Tool Drawer
-      inCatalog: 1,
-      createdAt: new Date()
-    }
-  ]);
+  await db.insert(App).values(loadAppsFromJson());
 
   await db.insert(UserPermission).values([
     {

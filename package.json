@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "astro dev --remote",
     "dev:remote": "astro dev --remote",
-    "dev:host": "astro dev --remote --host",
+    "dev:host": "astro db push --remote && astro db execute db/seed.ts --remote && astro dev --remote --host",
     "dev:https": "HTTPS=true astro dev --remote",
     "dev:tunnel": "concurrently \"astro dev --remote\" \"ngrok http 4321 --log stdout\"",
     "tunnel": "ngrok http 4321",
