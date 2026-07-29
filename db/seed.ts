@@ -44,8 +44,9 @@ export default async function seed() {
     {
       packageName: "com.techless.wiseos",
       name: "WiseOS",
-      createdAt: new Date(),
-      type: "Tool Drawer"
+      source: 1, // Tool Drawer
+      inCatalog: 1,
+      createdAt: new Date()
     }
   ]);
 

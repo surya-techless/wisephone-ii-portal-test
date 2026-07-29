@@ -16,10 +16,17 @@ const BypassTechlessSubscription = defineTable({
   }
 });
 
+// Catalog of apps available in Tool Management (replaces apps.json). packageName is the Android application id (from Play Store URL).
 const App = defineTable({
   columns: {
     packageName: column.text({ primaryKey: true }),
     name: column.text(),
+    playStoreUrl: column.text({ optional: true }), // Full Play Store listing URL, when known.
+    iconUrl: column.text({ optional: true }), // Play Store / CDN icon URL shown in Tool Management.
+    category: column.text({ optional: true }), // Play Store category label (e.g. "Productivity").
+    source: column.number({ default: 0 }), // 0 = not set, 1 = Tool Drawer, 2 = faith.tools
+    inCatalog: column.number({ default: 1 }), // 1 = show in Tool Management search/list; 0 = hidden. Filter search on inCatalog = 1.
+    htiAppId: column.text({ optional: true }), // Optional HTI app id when upserted from an HTI approval webhook.
     createdAt: column.date({ default: new Date() }),
     updatedAt: column.date({ optional: true }),
     type: column.text()
