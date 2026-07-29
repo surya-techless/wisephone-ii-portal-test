@@ -19,6 +19,16 @@ export type CatalogApp = {
   source: AppSourceValue;
 };
 
+export type InsertCatalogAppInput = {
+  packageName: string;
+  name: string;
+  playStoreUrl?: string | null;
+  iconUrl?: string | null;
+  category?: string | null;
+  htiAppId?: string | null;
+  source?: AppSourceValue;
+};
+
 /** Catalog apps shown in Tool Management (inCatalog = 1). */
 export async function getCatalogApps(): Promise<CatalogApp[]> {
   try {
@@ -48,4 +58,24 @@ export async function getCatalogApps(): Promise<CatalogApp[]> {
     devLog.error("Failed to load catalog apps from DB:", error);
     return [];
   }
+}
+
+/** Insert an approved app into the Tool Management catalog. */
+export async function insertCatalogApp(input: InsertCatalogAppInput): Promise<void> {
+  if (!input.packageName) {
+    throw new Error("packageName is required");
+  }
+
+  await db.insert(App).values({
+    packageName: input.packageName,
+    name: input.name || input.packageName,
+    playStoreUrl: input.playStoreUrl || undefined,
+    iconUrl: input.iconUrl || undefined,
+    category: input.category || undefined,
+    source: input.source ?? AppSource.TOOL_DRAWER,
+    inCatalog: 1,
+    htiAppId: input.htiAppId || undefined,
+    type: "Yes",
+    createdAt: new Date()
+  });
 }
