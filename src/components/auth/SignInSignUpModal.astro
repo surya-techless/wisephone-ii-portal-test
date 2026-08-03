@@ -24,6 +24,107 @@ interface Props {
 
 const { redirectUrl = "/dashboard", publishableKey, termsUrl = "https://wisephone.com/policies/terms-of-service", privacyUrl = "https://wisephone.com/policies/privacy-policy" } = Astro.props;
 const isProd = import.meta.env.PROD;
+
+// Mirrors the Clerk dashboard's allowed phone-number countries.
+// Keep in sync with the Clerk dashboard config if that list changes.
+interface PhoneCountry {
+  name: string;
+  code: string;
+}
+const PHONE_COUNTRIES: PhoneCountry[] = [
+  { name: "Albania", code: "+355" },
+  { name: "Angola", code: "+244" },
+  { name: "Antigua & Barbuda", code: "+1" },
+  { name: "Argentina", code: "+54" },
+  { name: "Australia", code: "+61" },
+  { name: "Austria", code: "+43" },
+  { name: "Bahamas", code: "+1" },
+  { name: "Bahrain", code: "+973" },
+  { name: "Bosnia & Herzegovina", code: "+387" },
+  { name: "Botswana", code: "+267" },
+  { name: "Brazil", code: "+55" },
+  { name: "Brunei", code: "+673" },
+  { name: "Canada", code: "+1" },
+  { name: "Chile", code: "+56" },
+  { name: "China", code: "+86" },
+  { name: "Colombia", code: "+57" },
+  { name: "Costa Rica", code: "+506" },
+  { name: "Croatia", code: "+385" },
+  { name: "Cuba", code: "+53" },
+  { name: "Cyprus", code: "+357" },
+  { name: "Czechia", code: "+420" },
+  { name: "Denmark", code: "+45" },
+  { name: "Dominican Republic", code: "+1" },
+  { name: "El Salvador", code: "+503" },
+  { name: "Estonia", code: "+372" },
+  { name: "Eswatini", code: "+268" },
+  { name: "Faroe Islands", code: "+298" },
+  { name: "Finland", code: "+358" },
+  { name: "France", code: "+33" },
+  { name: "Germany", code: "+49" },
+  { name: "Greece", code: "+30" },
+  { name: "Greenland", code: "+299" },
+  { name: "Guam", code: "+1" },
+  { name: "Guernsey", code: "+44" },
+  { name: "Honduras", code: "+504" },
+  { name: "Hong Kong", code: "+852" },
+  { name: "Hungary", code: "+36" },
+  { name: "Iceland", code: "+354" },
+  { name: "India", code: "+91" },
+  { name: "Ireland", code: "+353" },
+  { name: "Isle of Man", code: "+44" },
+  { name: "Italy", code: "+39" },
+  { name: "Japan", code: "+81" },
+  { name: "Jersey", code: "+44" },
+  { name: "Laos", code: "+856" },
+  { name: "Latvia", code: "+371" },
+  { name: "Liberia", code: "+231" },
+  { name: "Liechtenstein", code: "+423" },
+  { name: "Lithuania", code: "+370" },
+  { name: "Luxembourg", code: "+352" },
+  { name: "Macao", code: "+853" },
+  { name: "Malaysia", code: "+60" },
+  { name: "Maldives", code: "+960" },
+  { name: "Malta", code: "+356" },
+  { name: "Micronesia", code: "+691" },
+  { name: "Moldova", code: "+373" },
+  { name: "Montenegro", code: "+382" },
+  { name: "Namibia", code: "+264" },
+  { name: "Netherlands", code: "+31" },
+  { name: "Nicaragua", code: "+505" },
+  { name: "Norfolk Island", code: "+672" },
+  { name: "North Macedonia", code: "+389" },
+  { name: "Norway", code: "+47" },
+  { name: "Palau", code: "+680" },
+  { name: "Paraguay", code: "+595" },
+  { name: "Peru", code: "+51" },
+  { name: "Poland", code: "+48" },
+  { name: "Portugal", code: "+351" },
+  { name: "Puerto Rico", code: "+1" },
+  { name: "Qatar", code: "+974" },
+  { name: "Romania", code: "+40" },
+  { name: "Saudi Arabia", code: "+966" },
+  { name: "Seychelles", code: "+248" },
+  { name: "Singapore", code: "+65" },
+  { name: "Slovakia", code: "+421" },
+  { name: "Solomon Islands", code: "+677" },
+  { name: "South Africa", code: "+27" },
+  { name: "South Korea", code: "+82" },
+  { name: "Spain", code: "+34" },
+  { name: "Sweden", code: "+46" },
+  { name: "Switzerland", code: "+41" },
+  { name: "Taiwan", code: "+886" },
+  { name: "Thailand", code: "+66" },
+  { name: "Türkiye", code: "+90" },
+  { name: "Turks & Caicos Islands", code: "+1" },
+  { name: "United Kingdom", code: "+44" },
+  { name: "Uruguay", code: "+598" },
+  { name: "U.S. Virgin Islands", code: "+1" },
+  { name: "Venezuela", code: "+58" },
+  // Listed last so it matches (and is shown selected for) the default `phoneCountryCode` ("+1")
+  // when the modal opens — the select shows the last option matching the bound value.
+  { name: "United States", code: "+1" }
+];
 ---
 
 <dialog
@@ -77,11 +178,10 @@ const isProd = import.meta.env.PROD;
       <div class="form-control" x-show="signInMethod === 'phone'" x-cloak>
         <label class="label py-1" for="auth-phone-signin"><span class="label-text">Phone number</span></label>
         <div class="flex gap-2">
-          <select class="select select-bordered select-sm w-24 shrink-0 h-10" x-model="phoneCountryCode" aria-label="Country code">
-            <option value="+1">US +1</option>
-            <option value="+44">UK +44</option>
-            <option value="+91">IN +91</option>
-            <option value="+61">AU +61</option>
+          <select class="select select-bordered select-sm w-36 sm:w-44 shrink-0 h-10 truncate" x-model="phoneCountryCode" aria-label="Country code">
+            {PHONE_COUNTRIES.map((c) => (
+              <option value={c.code}>{c.name} {c.code}</option>
+            ))}
           </select>
           <input
             id="auth-phone-signin"
@@ -182,11 +282,10 @@ const isProd = import.meta.env.PROD;
       <div class="form-control">
         <label class="label py-1" for="auth-phone-signup"><span class="label-text">Phone number</span></label>
         <div class="flex gap-2">
-          <select class="select select-bordered select-sm w-24 shrink-0 h-10" x-model="phoneCountryCode" aria-label="Country code">
-            <option value="+1">US +1</option>
-            <option value="+44">UK +44</option>
-            <option value="+91">IN +91</option>
-            <option value="+61">AU +61</option>
+          <select class="select select-bordered select-sm w-36 sm:w-44 shrink-0 h-10 truncate" x-model="phoneCountryCode" aria-label="Country code">
+            {PHONE_COUNTRIES.map((c) => (
+              <option value={c.code}>{c.name} {c.code}</option>
+            ))}
           </select>
           <input
             id="auth-phone-signup"
