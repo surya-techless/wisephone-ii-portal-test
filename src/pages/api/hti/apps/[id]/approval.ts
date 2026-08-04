@@ -1,7 +1,7 @@
 import type { APIRoute } from "astro";
 
 import { errorResponse, preflightResponse, successResponse, WPIIPortalAPIError, HTTP } from "@/lib/server/api.response";
-import { insertCatalogApp } from "@/libs/app-catalog";
+import { getCatalogAppByHtiId, insertCatalogApp } from "@/libs/app-catalog";
 
 export const POST: APIRoute = async ({ request, params }) => {
   try {
@@ -11,9 +11,12 @@ export const POST: APIRoute = async ({ request, params }) => {
       throw new WPIIPortalAPIError("invalid url", HTTP.NOT_FOUND);
     }
 
+    if (await getCatalogAppByHtiId(appId)) {
+      throw new WPIIPortalAPIError("App already exists in catalog", HTTP.BAD_REQUEST);
+    }
+
     const body = await request.json();
     const packageName = body.packageName ?? body.package_name;
-    console.log("✅ [hti/apps/1/approval]: ", body);
 
     if (!packageName) {
       throw new WPIIPortalAPIError("packageName is required", HTTP.BAD_REQUEST);
@@ -28,7 +31,7 @@ export const POST: APIRoute = async ({ request, params }) => {
       htiAppId: appId
     });
 
-    return successResponse("Ok", HTTP.OK);
+    return successResponse("Created", HTTP.CREATED);
   } catch (error) {
     console.error(error);
 

@@ -60,6 +60,11 @@ export async function getCatalogApps(): Promise<CatalogApp[]> {
   }
 }
 
+/** Look up a catalog app by HTI app id. */
+export async function getCatalogAppByHtiId(htiAppId: string) {
+  return db.select().from(App).where(eq(App.htiAppId, htiAppId)).get();
+}
+
 /** Insert an approved app into the Tool Management catalog. */
 export async function insertCatalogApp(input: InsertCatalogAppInput): Promise<void> {
   if (!input.packageName) {
