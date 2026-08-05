@@ -64,6 +64,7 @@ export const POST: APIRoute = async ({ request }) => {
   const url = new URL(request.url);
   const action: PostKnoxAction = url.searchParams.get("action") as PostKnoxAction;
   const imei = url.searchParams.get("imei");
+  console.log("✅ samsung knox json POST", url.searchParams);
 
   if (!imei) {
     return errorResponse("IMEI is required", HTTP.BAD_REQUEST);
@@ -104,6 +105,7 @@ export const POST: APIRoute = async ({ request }) => {
         return jsonResponse(response);
       }
       case "install-app": {
+        console.log("✅ install-app", url.searchParams);
         const appPackage = url.searchParams.get("appPackage");
 
         if (!appPackage) {
@@ -131,6 +133,7 @@ export const POST: APIRoute = async ({ request }) => {
       }
     }
   } catch (error) {
+    console.error("❌ samsung knox json POST error", error);
     captureException(error);
     devLog.error(error);
     return errorResponse(
