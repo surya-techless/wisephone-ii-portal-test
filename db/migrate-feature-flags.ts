@@ -55,6 +55,18 @@ export default async function migrate() {
       }
     }
 
+    console.log("📊 Adding BLOCK_GOOGLE_MESSAGES_GIFS column (if not exists)...");
+    try {
+      await db.run(sql`ALTER TABLE DeviceFeatureFlags ADD COLUMN BLOCK_GOOGLE_MESSAGES_GIFS INTEGER NOT NULL DEFAULT 0`);
+      console.log("✅ BLOCK_GOOGLE_MESSAGES_GIFS column added");
+    } catch (alterError: any) {
+      if (alterError?.message?.includes("duplicate column name")) {
+        console.log("ℹ️  BLOCK_GOOGLE_MESSAGES_GIFS column already exists, skipping");
+      } else {
+        throw alterError;
+      }
+    }
+
     console.log("========================================");
     console.log("🎉 Migration completed successfully!");
     console.log("========================================");

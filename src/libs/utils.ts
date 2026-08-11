@@ -85,8 +85,10 @@ export const KNOX_USER_GROUPS = {
   
   CSPIRE_ADD_ON_BLOCK_TOOL_DRAWER:"a15c3b9f2d84454fa37fce957f490485",
   CSPIRE_WPII_Unpaid_v2:"fa681b06021142e3bc5595a4e5c9983f",
-  CSPIRE_WPII_Subscribed:"10a69871e5d145078520b352120b2b72"
+  CSPIRE_WPII_Subscribed:"10a69871e5d145078520b352120b2b72",
   // "Add-on- WPII - Block-Tool Drawer" Knox group — applying this group blocks the Tool Drawer on the phone
+
+  ADD_ON_BLOCK_GOOGLE_MESSAGES_GIFS: "8c04ed5c946c43d997742cb4849b7cb8"
 
 };
 
@@ -199,6 +201,15 @@ export const FEATURES: Record<string, Feature> = {
     description: "Show screen time and data usage on the Device Info tab for this device. Metrics may take up to a day to load.",
     enableMessage: "I acknowledge turning on this feature will show screen time on the Device Info tab.",
     disableMessage: "I acknowledge turning off this feature will hide screen time on the Device Info tab."
+  },
+  BLOCK_GOOGLE_MESSAGES_GIFS: {
+    knoxManageId: KNOX_USER_GROUPS.ADD_ON_BLOCK_GOOGLE_MESSAGES_GIFS,
+    lucideIcon: "globe-lock",
+    isEnabled: true,
+    name: "Block Google Messages GIFs",
+    description: "When enabled, the device cannot access Google Messages GIF content.",
+    enableMessage: "I acknowledge turning on this feature will block Google Messages GIFs on this device.",
+    disableMessage: "I acknowledge turning off this feature will allow Google Messages GIFs on this device."
   }
 };
 

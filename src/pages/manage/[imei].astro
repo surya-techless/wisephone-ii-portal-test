@@ -394,6 +394,7 @@ try {
             ALLOW_FACTORY_RESET: flagsRow.ALLOW_FACTORY_RESET,
             WISEOS_PROTECT: flagsRow.WISEOS_PROTECT,
             SHOW_SCREEN_TIME: flagsRow.SHOW_SCREEN_TIME,
+            BLOCK_GOOGLE_MESSAGES_GIFS: flagsRow.BLOCK_GOOGLE_MESSAGES_GIFS,
             updatedAt:
               flagsRow.updatedAt instanceof Date
                 ? flagsRow.updatedAt.toISOString()
@@ -416,6 +417,7 @@ try {
         ALLOW_FACTORY_RESET: 1,
         WISEOS_PROTECT: 0,
         SHOW_SCREEN_TIME: 0,
+        BLOCK_GOOGLE_MESSAGES_GIFS: 0,
         updatedAt: new Date()
       } as const;
 
@@ -448,6 +450,7 @@ try {
               ALLOW_FACTORY_RESET: flagsRow.ALLOW_FACTORY_RESET,
               WISEOS_PROTECT: flagsRow.WISEOS_PROTECT,
               SHOW_SCREEN_TIME: flagsRow.SHOW_SCREEN_TIME,
+              BLOCK_GOOGLE_MESSAGES_GIFS: flagsRow.BLOCK_GOOGLE_MESSAGES_GIFS,
               updatedAt:
                 flagsRow.updatedAt instanceof Date
                   ? flagsRow.updatedAt.toISOString()

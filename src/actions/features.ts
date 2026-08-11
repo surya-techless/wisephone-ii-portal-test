@@ -10,7 +10,8 @@ const featureFlagSchema = z.object({
   NO_HOTSPOT: z.number().min(0).max(1),
   ALLOW_FACTORY_RESET: z.number().min(0).max(1),
   WISEOS_PROTECT: z.number().min(0).max(1),
-  SHOW_SCREEN_TIME: z.number().min(0).max(1)
+  SHOW_SCREEN_TIME: z.number().min(0).max(1),
+  BLOCK_GOOGLE_MESSAGES_GIFS: z.number().min(0).max(1)
 });
 
 export const features = {
