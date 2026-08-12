@@ -23,11 +23,10 @@ import TechlessSubscriptionButton from "@/components/TechlessSubscriptionButton.
 import DashboardSidebar from "@/components/DashboardSidebar.astro";
 import ScreenTimeStats from "@/components/ScreenTimeStats.astro";
 import { FEATURES, getPackageNameFromPlayStoreUrl, isValidIMEI, type Feature, devLog } from "@/libs/utils";
+import { getCatalogApps, AppSource as CatalogAppSource } from "@/libs/app-catalog";
 import { isAdmin } from "@/lib/auth/permissions";
 import type { AppsList } from "@/types/apps";
 import { DEFAULT_SYSTEM_APPS, getSystemAppPackageNames } from "@/utils/system-apps";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { isFeatureEnabled } from "@/config/feature-flags";
 
 // Initialize variables
@@ -45,17 +44,8 @@ let screenTimeData: any[] = [];
 let dataUsageData: { cycleStartDate?: Date; usageDetail?: any; lastSyncedAt?: Date } | null = null;
 let dbShowScreenTime: boolean = false;
 
-// Load apps.json file
-let appsJsonData: any = { rows: [] };
-try {
-  const appsJsonPath = join(process.cwd(), "apps.json");
-  const appsJsonContent = readFileSync(appsJsonPath, "utf-8");
-  appsJsonData = JSON.parse(appsJsonContent);
-  devLog.log(`✅ Loaded ${appsJsonData.rows?.length || 0} apps from apps.json`);
-} catch (error) {
-  devLog.error("❌ Failed to load apps.json:", error);
-  // Continue with empty apps list
-}
+const catalogApps = await getCatalogApps();
+devLog.log(`✅ Loaded ${catalogApps.length} catalog apps from DB`);
 
 // Check if a device was just deleted successfully - must happen before any device lookup
 const deleteActionResult = Astro.getActionResult(actions.wisephones.deleteWisephone);
@@ -1369,8 +1359,9 @@ try {
             </div>
           </div>
 
-          <script is:inline define:vars={{ appsJsonData }}>
-            window.APPS_JSON_DATA = appsJsonData;
+          <script is:inline define:vars={{ catalogApps, CatalogAppSource }}>
+            window.CATALOG_APPS = catalogApps;
+            window.CATALOG_APP_SOURCE = CatalogAppSource;
             window.DEV_SKIP_KNOX_SUBSCRIPTION_PUSH = false;
           </script>
           <script>
@@ -1455,9 +1446,7 @@ try {
                 installedOpen: false,
                 // @ts-ignore
                 isPhoneSetUp: this.$persist(false),
-                // TODO :  Not a todo, but note to the future dev : all apps are embedded inside apps.json file,
-                // TODO :since ottogrid support is not available and Healthy Tech Index is not yet integrated
-                // TODO : apps in apps.json  from line 4 to 2537 are faith tools apps and the rest are from ottogrid (approved apps)
+                // Catalog apps are loaded server-side via getCatalogApps() into window.CATALOG_APPS
                 get totalAppsCount() {
                   // Use cached value if available, otherwise calculate from current state
                   if (this.cachedTotalApps > 0) {
@@ -2052,71 +2041,57 @@ try {
                   await fetch(url, { method: "POST" });
                 },
 
-                // Load available apps from apps.json - both Tool Drawer and Faith Tools
-                // This should be called immediately when Tool Management tab is clicked
+                // Load available apps from DB catalog (window.CATALOG_APPS) - Tool Drawer + Faith Tools
+                // Called when Tool Management tab is clicked
                 loadAvailableApps() {
                   if (this.isAvailableAppsLoaded) {
                     return;
                   }
 
                   try {
-                    devLog.log("[DEBUG] Loading available apps from apps.json...");
+                    devLog.log("[DEBUG] Loading available apps from catalog...");
                     const updatedAppsList: Record<string, Omit<AppEntry, "packageName">> = {};
+                    const catalog = ((window as any).CATALOG_APPS || []) as Array<{
+                      packageName: string;
+                      name: string;
+                      iconUrl: string | null;
+                      category: string | null;
+                      source: number;
+                    }>;
+                    const sourceEnum = (window as any).CATALOG_APP_SOURCE || { FAITH_TOOLS: 2 };
 
-                    // Load apps from apps.json - filter for apps where "Tool Drawer" === "Yes" OR "faith.tools"
-                    const appsJsonData = (window as any).APPS_JSON_DATA || { rows: [] };
-                    const appsFromJson = (appsJsonData.rows || []).filter((row: any) => {
-                      const toolDrawer = row.cells && row.cells["Tool Drawer"];
-                      return toolDrawer === "Yes" || toolDrawer === "faith.tools";
-                    });
-
-                    appsFromJson.forEach((row: any) => {
+                    catalog.forEach((app) => {
                       try {
-                        const cells = row.cells || {};
-                        const playStoreUrl = cells["Play Store URL"];
-                        const toolName = cells["Tool Name"]?.trim() || "Unknown App";
-                        const iconUrl = cells["Play Store Icon URL"] || "";
+                        const packageName = app.packageName;
+                        if (!packageName || updatedAppsList[packageName]) return;
 
-                        if (!playStoreUrl || playStoreUrl === "n/a") return;
-
-                        const packageName = getPackageNameFromPlayStoreUrl(playStoreUrl);
-                        if (!packageName) return;
-
-                        // Skip if already added (deduplication)
-                        if (updatedAppsList[packageName]) return;
-
-                        // Check if app is installed by comparing with installedApps
                         const isInstalled = (this.installedApps || []).some(
                           (installedApp: { packageName: string }) =>
                             installedApp && installedApp.packageName === packageName
                         );
 
-                        // Determine source based on Tool Drawer value
-                        const toolDrawerValue = cells["Tool Drawer"];
-                        const source = toolDrawerValue === "faith.tools" ? "faith.tools" : "Tool Drawer";
-
-                        const category = cells["Play Store Category"] || "";
+                        const source =
+                          app.source === sourceEnum.FAITH_TOOLS ? "faith.tools" : "Tool Drawer";
 
                         updatedAppsList[packageName] = {
                           source: source as "faith.tools" | "Tool Drawer",
                           installed: isInstalled,
-                          name: toolName,
-                          iconUrl: iconUrl || undefined,
-                          category: category || undefined
+                          name: app.name?.trim() || "Unknown App",
+                          iconUrl: app.iconUrl || undefined,
+                          category: app.category || undefined
                         };
                       } catch (appError) {
-                        devLog.error("Error processing app from apps.json:", appError);
+                        devLog.error("Error processing catalog app:", appError);
                       }
                     });
 
-                    // Sort apps by name
                     this.appsList = Object.fromEntries(
                       Object.entries(updatedAppsList).sort(([, a], [, b]) => a.name.localeCompare(b.name))
                     );
 
                     this.isAvailableAppsLoaded = true;
                     devLog.log(
-                      `[DEBUG] Loaded ${Object.keys(this.appsList).length} available apps from apps.json (Tool Drawer + Faith Tools)`
+                      `[DEBUG] Loaded ${Object.keys(this.appsList).length} available apps from catalog`
                     );
                   } catch (error) {
                     devLog.error("Error loading available apps:", error);

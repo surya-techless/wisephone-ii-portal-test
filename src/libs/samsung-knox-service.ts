@@ -489,6 +489,7 @@ export class SamsungKnoxService {
     }
   ): Promise<Record<string, any>> {
     const deviceId = await this.getDeviceIdFromImei(imei);
+    console.log("✅ installAndroidApp", deviceId);
 
     if (!deviceId) {
       throw new Error("Device not found");
@@ -507,10 +508,15 @@ export class SamsungKnoxService {
       ...(appInfo.knoxId && { knoxId: appInfo.knoxId })
     });
 
+    let t = await this.getKnoxToken();
+    console.log("✅ installAndroidApp token", t);
+
+    console.log("✅ installAndroidApp params", params);
+
     const response = await fetch(apiUrl, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${await this.getKnoxToken()}`,
+        Authorization: `Bearer ${t}`,
         "cache-control": "no-cache",
         "content-type": "application/x-www-form-urlencoded"
       },
@@ -519,6 +525,7 @@ export class SamsungKnoxService {
 
     if (!response.ok) {
       const data = await response.json();
+      console.error("❌ samsung knox installAndroidApp error", data);
       devLog.error(data);
       throw new Error("Failed to initiate app installation on device");
     }
@@ -526,6 +533,7 @@ export class SamsungKnoxService {
     const data = await response.json();
 
     if (!data.resultValue) {
+      console.error("❌ samsung knox installAndroidApp error", data);
       throw new Error("Failed to initiate app installation on device");
     }
 
