@@ -32,7 +32,7 @@ export const DEFAULT_SYSTEM_APPS: SystemApp[] = [
     name: "Messages",
     packageName: "com.samsung.android.messaging",
     alternativePackageName: "com.google.android.apps.messaging",
-    useAlternativeFor: ["A16"] // Samsung A16 uses Google Messages
+    useAlternativeFor: ["A16", "A17"] // Samsung A16/A17 uses Google Messages
   },
   {
     name: "Phone",
