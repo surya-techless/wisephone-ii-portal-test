@@ -1,11 +1,7 @@
 import Stripe from "stripe";
 import { STRIPE_SECRET_KEY, GIGS_API_KEY, SUBSCRIPTION_ENFORCEMENT_MODE } from "astro:env/server";
 import { type SubscriptionList, type DeviceList, type Subscription } from "./types";
-import {
-  normalizeImei,
-  stripeSubscriptionMatchesImei,
-  gigsSubscriptionMatchesDevice
-} from "./subscription-matching";
+import { normalizeImei, stripeSubscriptionMatchesImei, gigsSubscriptionMatchesDevice } from "./subscription-matching";
 import { devLog } from "./utils";
 
 export const stripe = new Stripe(import.meta.env.PROD ? STRIPE_SECRET_KEY : STRIPE_SECRET_KEY, {
@@ -161,7 +157,9 @@ async function validateIsSubscribedLegacy({
     const gigsResult = await validateSubscriptionLegacy("gigs", { imei, phoneNumber });
     devLog.log("PAY DEBUG: [L2.7] Gigs subscription check result:", gigsResult);
     devLog.log("PAY DEBUG: [L2.8] Final result:", gigsResult);
-    devLog.log(`[Device Details] IMEI: ${imei} | isSubscribed: ${gigsResult} | provider: ${gigsResult ? "GIGS" : "NONE (not subscribed)"}`);
+    devLog.log(
+      `[Device Details] IMEI: ${imei} | isSubscribed: ${gigsResult} | provider: ${gigsResult ? "GIGS" : "NONE (not subscribed)"}`
+    );
 
     return gigsResult;
   } catch (err: any) {
@@ -272,7 +270,8 @@ export async function validateIsSubscribed({
 
   if (legacyResult !== strictResult) {
     console.info(
-      `[SUB-VALIDATION-SHADOW] imei=${normalizeImei(imei)} legacy=${legacyResult} strict=${strictResult} phoneProvided=${Boolean(phoneNumber)}`
+      `[SUB-VALIDATION-SHADOW] imei=${normalizeImei(imei)} legacy=${legacyResult} strict=${strictResult} ` +
+        `phoneProvided=${Boolean(phoneNumber)}`
     );
   }
 

@@ -82,11 +82,17 @@ describe("gigsSubscriptionMatchesDevice", () => {
 
   it("returns false for missing or null sim without throwing", () => {
     assert.equal(gigsSubscriptionMatchesDevice({ status: "active" } as Subscription, device), false);
-    assert.equal(gigsSubscriptionMatchesDevice({ status: "active", sim: null } as unknown as Subscription, device), false);
+    assert.equal(
+      gigsSubscriptionMatchesDevice({ status: "active", sim: null } as unknown as Subscription, device),
+      false
+    );
   });
 
   it("returns false for empty or missing device.sims without throwing", () => {
-    assert.equal(gigsSubscriptionMatchesDevice({ ...baseSub, status: "active" }, { sims: [] } as unknown as Device), false);
+    assert.equal(
+      gigsSubscriptionMatchesDevice({ ...baseSub, status: "active" }, { sims: [] } as unknown as Device),
+      false
+    );
     assert.equal(gigsSubscriptionMatchesDevice({ ...baseSub, status: "active" }, {} as Device), false);
   });
 });
