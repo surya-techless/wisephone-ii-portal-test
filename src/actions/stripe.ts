@@ -169,12 +169,11 @@ export const stripe = {
       }
 
       // Flow: User completes checkout → subscription is created → validateSubscription action runs
-      // → sets IMEI on customer metadata → Later, validateIsSubscribed calls validateSubscription
-      // → searches customers by IMEI → finds customer → checks their subscriptions
+      // → stamps IMEI on subscription metadata (source of truth for per-device validation)
+      // → also sets IMEI on customer metadata as a search index / diagnostic aid.
       //
-      // Add IMEI to customer metadata. This is how we can identify the customer is subscribed.
-      // The validateIsSubscribed function searches customers by IMEI metadata, then checks
-      // if those customers have active subscriptions.
+      // Per-device subscription validity is determined by subscription metadata.imei (strict path)
+      // or customer metadata search (legacy path). Customer metadata alone does not prove subscription.
       devLog.log("PAY DEBUG: [A2.11] Updating customer metadata with IMEI");
       await stripeInstance.customers.update(session.customer as string, {
         metadata: {

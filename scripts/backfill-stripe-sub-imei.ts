@@ -79,6 +79,7 @@ function getCustomerId(subscription: Stripe.Subscription): string {
 type ResolveResult = {
   resolved: { imei: string; source: "session" | "customer" } | null;
   customerEmail?: string;
+  reason?: "ambiguous-customer";
 };
 
 async function resolveImei(subscription: Stripe.Subscription): Promise<ResolveResult> {
@@ -119,6 +120,16 @@ async function resolveImei(subscription: Stripe.Subscription): Promise<ResolveRe
     return { resolved: null, customerEmail };
   }
 
+  const [activeSubs, trialingSubs] = await Promise.all([
+    stripe.subscriptions.list({ customer: customerId, status: "active" }),
+    stripe.subscriptions.list({ customer: customerId, status: "trialing" })
+  ]);
+  const eligibleSubs = [...activeSubs.data, ...trialingSubs.data];
+
+  if (eligibleSubs.length !== 1 || eligibleSubs[0].id !== subscription.id) {
+    return { resolved: null, customerEmail, reason: "ambiguous-customer" };
+  }
+
   return { resolved: { imei: customerImei, source: "customer" }, customerEmail };
 }
 
@@ -130,8 +141,8 @@ async function processSubscription(
 
   const rawExisting = subscription.metadata?.imei;
   if (typeof rawExisting === "string" && rawExisting.length > 0) {
-    const normalizedExisting = normalizeImei(rawExisting);
-    if (normalizedExisting) {
+    const isCanonical = /^\d{14,16}$/.test(rawExisting);
+    if (isCanonical) {
       report.counts.alreadyStamped++;
       return;
     }
@@ -142,13 +153,13 @@ async function processSubscription(
       customerId: getCustomerId(subscription),
       status: subscription.status,
       created: new Date(subscription.created * 1000).toISOString(),
-      reason: "existing-non-imei-value",
+      reason: "existing-non-canonical-value",
       existingImeiValue: rawExisting
     });
     return;
   }
 
-  const { resolved, customerEmail } = await resolveImei(subscription);
+  const { resolved, customerEmail, reason } = await resolveImei(subscription);
 
   if (resolved) {
     if (isLiveRun) {
@@ -172,6 +183,7 @@ async function processSubscription(
     customerId: getCustomerId(subscription),
     status: subscription.status,
     created: new Date(subscription.created * 1000).toISOString(),
+    ...(reason ? { reason } : {}),
     ...(customerEmail ? { customerEmail } : {})
   });
 }

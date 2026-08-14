@@ -60,9 +60,10 @@ export default defineConfig({
       KNOX_CLIENT_SECRET: envField.string({ context: "server", access: "secret" }),
       OTTOGRID_API_KEY: envField.string({ context: "server", access: "secret" }),
       DEVICE_SYNC_API_KEY: envField.string({ context: "server", access: "secret" }),
-      SUBSCRIPTION_ENFORCEMENT_MODE: envField.string({
+      SUBSCRIPTION_ENFORCEMENT_MODE: envField.enum({
         context: "server",
         access: "public",
+        values: ["legacy", "shadow", "enforce"],
         optional: true,
         default: "shadow"
       })
