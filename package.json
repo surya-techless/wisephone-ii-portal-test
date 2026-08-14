@@ -19,7 +19,8 @@
     "format": "prettier -w .",
     "test:e2e": "playwright test",
     "test:gui": "playwright test --ui",
-    "test:unit": "tsx --test tests/unit/*.test.ts"
+    "test:unit": "tsx --test tests/unit/*.test.ts",
+    "backfill:stripe-imei": "tsx scripts/backfill-stripe-sub-imei.ts"
   },
   "dependencies": {
     "@alpinejs/collapse": "^3.14.1",
