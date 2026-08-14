@@ -1,6 +1,11 @@
 import Stripe from "stripe";
-import { STRIPE_SECRET_KEY, GIGS_API_KEY } from "astro:env/server";
+import { STRIPE_SECRET_KEY, GIGS_API_KEY, SUBSCRIPTION_ENFORCEMENT_MODE } from "astro:env/server";
 import { type SubscriptionList, type DeviceList, type Subscription } from "./types";
+import {
+  normalizeImei,
+  stripeSubscriptionMatchesImei,
+  gigsSubscriptionMatchesDevice
+} from "./subscription-matching";
 import { devLog } from "./utils";
 
 export const stripe = new Stripe(import.meta.env.PROD ? STRIPE_SECRET_KEY : STRIPE_SECRET_KEY, {
@@ -15,7 +20,7 @@ const API_CONFIG = {
   }
 };
 
-export async function validateSubscription(
+export async function validateSubscriptionLegacy(
   provider: "stripe" | "gigs",
   params: { imei?: string; phoneNumber?: string }
 ): Promise<boolean> {
@@ -128,7 +133,7 @@ export async function validateSubscription(
   return false;
 }
 
-export async function validateIsSubscribed({
+async function validateIsSubscribedLegacy({
   imei,
   phoneNumber
 }: {
@@ -142,7 +147,7 @@ export async function validateIsSubscribed({
   try {
     if (imei) {
       devLog.log("PAY DEBUG: [L2.3] Checking Stripe subscription first by IMEI");
-      const stripeResult = await validateSubscription("stripe", { imei });
+      const stripeResult = await validateSubscriptionLegacy("stripe", { imei });
       devLog.log("PAY DEBUG: [L2.4] Stripe subscription check result:", stripeResult);
 
       if (stripeResult) {
@@ -153,7 +158,7 @@ export async function validateIsSubscribed({
     }
 
     devLog.log("PAY DEBUG: [L2.6] Stripe check returned false, checking Gigs subscription");
-    const gigsResult = await validateSubscription("gigs", { imei, phoneNumber });
+    const gigsResult = await validateSubscriptionLegacy("gigs", { imei, phoneNumber });
     devLog.log("PAY DEBUG: [L2.7] Gigs subscription check result:", gigsResult);
     devLog.log("PAY DEBUG: [L2.8] Final result:", gigsResult);
     devLog.log(`[Device Details] IMEI: ${imei} | isSubscribed: ${gigsResult} | provider: ${gigsResult ? "GIGS" : "NONE (not subscribed)"}`);
@@ -165,4 +170,111 @@ export async function validateIsSubscribed({
     // This prevents unsubscribed devices from getting subscribed features due to API errors
     return false;
   }
+}
+
+async function validateIsSubscribedStrict({ imei }: { imei: string }): Promise<boolean> {
+  try {
+    devLog.log("PAY DEBUG: [L3] validateIsSubscribedStrict function called");
+    devLog.log("PAY DEBUG: [L3.1] imei:", imei);
+
+    const normalized = normalizeImei(imei);
+    if (!normalized) {
+      devLog.log("PAY DEBUG: [L3.2] Empty normalized IMEI, returning false");
+      return false;
+    }
+
+    devLog.log("PAY DEBUG: [L3.3] Searching Stripe subscriptions by IMEI metadata");
+    devLog.log("PAY DEBUG: [L3.4] Search query:", `metadata['imei']:'${normalized}'`);
+
+    const subs = await stripe.subscriptions.search({
+      query: `metadata['imei']:'${normalized}'`
+    });
+
+    const stripeHit = subs.data.some(
+      (sub) =>
+        (sub.status === "active" || sub.status === "trialing") &&
+        stripeSubscriptionMatchesImei(sub.metadata, normalized)
+    );
+
+    if (stripeHit) {
+      devLog.log("PAY DEBUG: [L3.5] Stripe subscription match found, returning true");
+      return true;
+    }
+
+    devLog.log("PAY DEBUG: [L3.6] No Stripe match, checking Gigs subscription by device");
+    const devicesApiUrl = new URL(`${API_CONFIG.gigs.baseUrl}/devices/search`);
+    const deviceResponse = await fetch(devicesApiUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${API_CONFIG.gigs.apiKey}`,
+        Accept: "application/json"
+      },
+      body: JSON.stringify({ imei })
+    });
+
+    const devices = (await deviceResponse.json()) as DeviceList;
+    const device = devices.items?.[0];
+
+    if (!device || !device.user?.id) {
+      devLog.log("PAY DEBUG: [L3.7] No device or user found, returning false");
+      return false;
+    }
+
+    const apiUrl = new URL(`${API_CONFIG.gigs.baseUrl}/subscriptions`);
+    apiUrl.searchParams.set("user", device.user.id);
+
+    const subscriptionsResponse = await fetch(apiUrl, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${API_CONFIG.gigs.apiKey}`,
+        Accept: "application/json"
+      }
+    });
+
+    const subscriptions = (await subscriptionsResponse.json()) as { items: Subscription[] };
+    const gigsHit = subscriptions.items?.some((sub) => gigsSubscriptionMatchesDevice(sub, device)) ?? false;
+
+    devLog.log("PAY DEBUG: [L3.8] Gigs subscription check result:", gigsHit);
+    return gigsHit;
+  } catch (err: any) {
+    devLog.error("PAY DEBUG: [L3.9] ERROR validating subscription (strict):", err);
+    return false;
+  }
+}
+
+export async function validateIsSubscribed({
+  imei,
+  phoneNumber
+}: {
+  imei: string;
+  phoneNumber: string;
+}): Promise<boolean> {
+  const mode = SUBSCRIPTION_ENFORCEMENT_MODE ?? "shadow";
+
+  if (mode === "legacy") {
+    return validateIsSubscribedLegacy({ imei, phoneNumber });
+  }
+
+  if (mode === "enforce") {
+    return validateIsSubscribedStrict({ imei });
+  }
+
+  const legacyResult = await validateIsSubscribedLegacy({ imei, phoneNumber });
+
+  let strictResult = false;
+  try {
+    strictResult = await validateIsSubscribedStrict({ imei });
+  } catch (err: any) {
+    devLog.error("PAY DEBUG: [L2.10] ERROR in strict path (shadow mode):", err);
+  }
+
+  if (legacyResult !== strictResult) {
+    console.info(
+      `[SUB-VALIDATION-SHADOW] imei=${normalizeImei(imei)} legacy=${legacyResult} strict=${strictResult} phoneProvided=${Boolean(phoneNumber)}`
+    );
+  }
+
+  return legacyResult;
 }

@@ -18,7 +18,8 @@
     "db:update": "astro db push --remote",
     "format": "prettier -w .",
     "test:e2e": "playwright test",
-    "test:gui": "playwright test --ui"
+    "test:gui": "playwright test --ui",
+    "test:unit": "tsx --test tests/unit/*.test.ts"
   },
   "dependencies": {
     "@alpinejs/collapse": "^3.14.1",

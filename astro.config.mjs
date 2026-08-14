@@ -59,7 +59,13 @@ export default defineConfig({
       KNOX_CLIENT_ID: envField.string({ context: "server", access: "secret" }),
       KNOX_CLIENT_SECRET: envField.string({ context: "server", access: "secret" }),
       OTTOGRID_API_KEY: envField.string({ context: "server", access: "secret" }),
-      DEVICE_SYNC_API_KEY: envField.string({ context: "server", access: "secret" })
+      DEVICE_SYNC_API_KEY: envField.string({ context: "server", access: "secret" }),
+      SUBSCRIPTION_ENFORCEMENT_MODE: envField.string({
+        context: "server",
+        access: "public",
+        optional: true,
+        default: "shadow"
+      })
     }
   }
 });
