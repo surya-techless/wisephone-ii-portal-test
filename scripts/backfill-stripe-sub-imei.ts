@@ -40,6 +40,8 @@ type UnattributedEntry = {
   status: string;
   created: string;
   customerEmail?: string;
+  reason?: string;
+  existingImeiValue?: string;
 };
 
 type Report = {
@@ -126,9 +128,23 @@ async function processSubscription(
 ): Promise<void> {
   report.counts.scanned++;
 
-  const existing = normalizeImei(subscription.metadata?.imei);
-  if (existing) {
-    report.counts.alreadyStamped++;
+  const rawExisting = subscription.metadata?.imei;
+  if (typeof rawExisting === "string" && rawExisting.length > 0) {
+    const normalizedExisting = normalizeImei(rawExisting);
+    if (normalizedExisting) {
+      report.counts.alreadyStamped++;
+      return;
+    }
+
+    report.counts.unattributed++;
+    report.unattributed.push({
+      subscriptionId: subscription.id,
+      customerId: getCustomerId(subscription),
+      status: subscription.status,
+      created: new Date(subscription.created * 1000).toISOString(),
+      reason: "existing-non-imei-value",
+      existingImeiValue: rawExisting
+    });
     return;
   }
 
