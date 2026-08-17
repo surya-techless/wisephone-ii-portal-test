@@ -88,7 +88,12 @@ export const KNOX_USER_GROUPS = {
   CSPIRE_WPII_Subscribed:"10a69871e5d145078520b352120b2b72",
   // "Add-on- WPII - Block-Tool Drawer" Knox group — applying this group blocks the Tool Drawer on the phone
 
-  ADD_ON_BLOCK_GOOGLE_MESSAGES_GIFS: "8c04ed5c946c43d997742cb4849b7cb8"
+  ADD_ON_BLOCK_GOOGLE_MESSAGES_GIFS: "8c04ed5c946c43d997742cb4849b7cb8",
+
+  // Retail/inventory group — devices not yet sold/set up. wiseOS shows a
+  // setup-only launcher while a device is in this group; removed once the
+  // device is confirmed subscribed (see assignSubscriptionGroupByDeviceModel).
+  SHELF_STOCK: "fdc85e95e3574f729be74d9c2bce72b4"
 
 };
 

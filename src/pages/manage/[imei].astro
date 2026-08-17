@@ -1107,7 +1107,7 @@ try {
                   <h4 class="text-sm font-semibold text-gray-900 mb-2">Device Removal</h4>
                   <p class="text-sm text-gray-600 mb-2">
                     Remove this device from this list of managed devices. Perform this action if you want to manage this
-                    device on a different account.
+                    device on a different account.4
                   </p>
                   <p class="text-sm text-gray-600 mb-3">
                     If you need to re-add this device in the future, select "Add Device" on the Devices page.
@@ -1729,6 +1729,16 @@ try {
                     devLog.log("[DEV] Skipping Knox subscription group push (DEV_SKIP_KNOX_SUBSCRIPTION_PUSH=true). Feature flags still push via MQTT.");
                     return;
                   }
+
+                  // Device is confirmed subscribed — if it came from Shelf-Stock inventory,
+                  // remove it from that group so wiseOS's setup-only gate re-syncs correctly
+                  // going forward (e.g. after a factory reset/reinstall).
+                  if (this.features.includes(KNOX_USER_GROUPS.SHELF_STOCK)) {
+                    devLog.log("[SHELF-STOCK] Device is subscribed — removing from Shelf-Stock group");
+                    await this.removeFeatureFromDevice(KNOX_USER_GROUPS.SHELF_STOCK);
+                    this.features = this.features.filter((g: string) => g !== KNOX_USER_GROUPS.SHELF_STOCK);
+                  }
+
                   // Bail out early if the correct subscription group is already present —
                   // prevents duplicate Knox calls and double-push on concurrent invocations
                   const alreadyHasSubscribedGroup =
