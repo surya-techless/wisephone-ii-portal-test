@@ -211,8 +211,9 @@ export const FEATURES: Record<string, Feature> = {
     knoxManageId: KNOX_USER_GROUPS.ADD_ON_BLOCK_GOOGLE_MESSAGES_GIFS,
     lucideIcon: "globe-lock",
     isEnabled: true,
-    name: "Block Google Messages GIFs",
-    description: "When enabled, the device cannot access Google Messages GIF content.",
+    name: "Block GIFs in Google Messages",
+    description: "Controls whether GIFs are accessible via the keyboard in the default Google Messages app.",
+    note: "NOTE: This change may take up to 15 minutes to take effect.",
     enableMessage: "I acknowledge turning on this feature will block Google Messages GIFs on this device.",
     disableMessage: "I acknowledge turning off this feature will allow Google Messages GIFs on this device."
   }

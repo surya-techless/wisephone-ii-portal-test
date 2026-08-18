@@ -19,7 +19,7 @@ import TypeformDeviceRegistration from "@/components/TypeformDeviceRegistration.
 import CspireSubscriptionModal from "@/components/CspireSubscriptionModal.astro";
 import StripeCheckout from "@/components/StripeCheckout.astro";
 
-const testStripe = true; // Toggle: true = custom modal, false = legacy embedded dialog
+const testStripe = false; // Toggle: true = custom modal, false = legacy embedded dialog
 
 if (!Astro.locals.auth().userId) {
   return Astro.redirect("/");
