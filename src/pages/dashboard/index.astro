@@ -430,8 +430,7 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
   }
 
   { !derivedHasNoWisephone &&
-    <Fragment>
-      <div class="w-full mx-auto ml-0">
+    <div x-show="activeLink === 'devices'" class="w-full mx-auto ml-0">
         <div class="device-dashboard-inner-container mx-4 mt-4 mb-4 md:m-4">
           <div class="flex justify-between items-start gap-2 pt-2 md:pt-0">
             <div class="flex-1 min-w-0">
@@ -496,8 +495,17 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
             })}
           </div>
         </div>
+    </div>
+  }
+
+{/* TODO */}
+  { !derivedHasNoWisephone &&
+    <div x-show="activeLink === 'request-app'" x-cloak class="w-full mx-auto ml-0">
+      <div class="device-dashboard-inner-container mx-4 mt-4 mb-4 md:m-4">
+        <h1 class="text-xl md:text-2xl font-semibold text-gray-800">Request an App</h1>
+        <p class="mt-1 text-sm md:text-base text-gray-600">App request content goes here.</p>
       </div>
-    </Fragment>
+    </div>
   }
 
   <!-- Modal for Add Device Form -->
@@ -1144,18 +1152,6 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
     </Fragment>
   }
 
-  {/* TODO */}
-  { !derivedHasNoWisephone && false &&
-    <Fragment>
-      <div class="p-4 md:p-8">
-        <section class="flex flex-col items-center justify-center w-full p-6 md:p-8 bg-transparent border-2 rounded-2xl border-slate-200">
-          <h1 class="text-2xl md:text-3xl font-bold text-center mt-4">Request an App</h1>
-          <p class="m-0 text-center text-sm md:text-base mt-2">Request an app to be added to your Wisephone.</p>
-        </section>
-      </div>
-    </Fragment>
-  }
-
 </main>
 
 </div>
@@ -1502,6 +1498,7 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
     }));
 
     Alpine.data("dashboard", (initialData?: { userEmail?: string; newDevice?: { imei: string; phoneNumber: string; isCspire?: boolean } | null; testStripe?: boolean }) => ({
+      activeLink: 'devices',
       showForm: false,
       isLoading: false,
       mobileMenuOpen: false,
