@@ -498,108 +498,12 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
     </div>
   }
 
+{/* TODO */}
   { !derivedHasNoWisephone &&
     <div x-show="activeLink === 'request-app'" x-cloak class="w-full mx-auto ml-0">
-      <div class="device-dashboard-inner-container mx-4 mt-4 mb-8 md:m-4 md:mb-8 w-full lg:w-[60%] min-w-0">
-        <h1 class="text-xl md:text-2xl font-semibold text-gray-800">Want an App on Your Wisephone?</h1>
-        <h2 class="mt-2 text-base md:text-lg font-semibold text-gray-800">Meet the Healthy Tech Index</h2>
-
-        <div class="mt-4 space-y-4 text-sm md:text-base text-gray-600 leading-relaxed">
-          <p>
-            Wisephone is partnering with the Healthy Tech Index, an independent organization that evaluates technology based on its standards for healthier digital habits.
-          </p>
-          <p>
-            Healthy Tech Index uses a consistent scoring framework to evaluate apps across multiple categories, including apps that will never be available on Wisephone. Each evaluated app receives a score along with information explaining the evaluation.
-          </p>
-        </div>
-
-        <h2 class="mt-8 text-lg md:text-xl font-semibold text-gray-800">How can an app become available in the Tool Drawer?</h2>
-
-        <ol class="mt-5 space-y-5">
-          <li class="flex items-start gap-4">
-            <span class="w-8 h-8 rounded-full bg-[#4b918e] text-white text-sm font-semibold flex items-center justify-center shrink-0">1</span>
-            <div class="min-w-0 flex-1 shrink">
-              <h3 class="font-semibold text-gray-900 text-sm md:text-base">Search for the app</h3>
-              <p class="mt-1 text-sm md:text-base text-gray-600 leading-relaxed text-wrap">
-                Visit
-                <a href="https://healthytechindex.com" target="_blank" rel="noopener noreferrer" class="text-blue-600 underline hover:text-blue-800">Healthy Tech Index</a>
-                to see if the app has already been evaluated.
-              </p>
-            </div>
-          </li>
-          <li class="flex items-start gap-4">
-            <span class="w-8 h-8 rounded-full bg-[#4b918e] text-white text-sm font-semibold flex items-center justify-center shrink-0">2</span>
-            <div class="min-w-0 flex-1 shrink">
-              <h3 class="font-semibold text-gray-900 text-sm md:text-base">Request an app</h3>
-              <p class="mt-1 text-sm md:text-base text-gray-600 leading-relaxed text-wrap">
-                Can't find it? Submit the app directly to
-                <a href="https://healthytechindex.com" target="_blank" rel="noopener noreferrer" class="text-blue-600 underline hover:text-blue-800">Healthy Tech Index</a>
-                for review. You don't need to submit a separate request to Wisephone.
-              </p>
-            </div>
-          </li>
-          <li class="flex items-start gap-4">
-            <span class="w-8 h-8 rounded-full bg-[#4b918e] text-white text-sm font-semibold flex items-center justify-center shrink-0">3</span>
-            <div class="min-w-0 flex-1 shrink">
-              <h3 class="font-semibold text-gray-900 text-sm md:text-base">Look for the Healthy badge</h3>
-              <p class="mt-1 text-sm md:text-base text-gray-600 leading-relaxed text-wrap">
-                Apps that meet Healthy Tech Index's standards receive a Healthy badge.
-              </p>
-            </div>
-          </li>
-          <li class="flex items-start gap-4">
-            <span class="w-8 h-8 rounded-full bg-[#4b918e] text-white text-sm font-semibold flex items-center justify-center shrink-0">4</span>
-            <div class="min-w-0 flex-1 shrink">
-              <h3 class="font-semibold text-gray-900 text-sm md:text-base">Healthy apps are added to the Tool Drawer</h3>
-              <p class="mt-1 text-sm md:text-base text-gray-600 leading-relaxed text-wrap">
-                Apps with a Healthy badge will be considered for the Wisephone Tool Drawer, but Wisephone makes the final decision based on compatibility, security, technical requirements, and other product considerations.
-              </p>
-            </div>
-          </li>
-        </ol>
-
-        <div class="mt-6 space-y-4 text-sm md:text-base text-gray-600 leading-relaxed">
-          <p>
-            Healthy apps typically automatically appear in the Tool Drawer within 48 hours. Having the Healthy badge does not guarantee availability, and Wisephone may add or remove third-party apps from the Tool Drawer at any time.
-          </p>
-          <p class="font-medium text-gray-800">
-            We will never approve apps that are games, social media, solo media.
-          </p>
-        </div>
-
-        <div class="mt-8 border border-gray-300 rounded-lg p-4 md:p-6 bg-white">
-          <div class="flex items-center gap-3 mb-4">
-            <img src="/assets/portal-icons/app-request.svg" alt="" class="w-6 h-6" />
-            <h3 class="font-semibold text-gray-900 text-sm md:text-base">Already requested an app?</h3>
-          </div>
-          <p class="text-sm md:text-base text-gray-600 leading-relaxed">
-            We've shared previous app requests with Healthy Tech Index for review, so you don't need to resubmit the same request.
-          </p>
-
-          <a
-            href="https://healthytechindex.com"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="mt-6 inline-flex items-center justify-center gap-1 px-4 py-2 bg-[#C07F53] text-white rounded-md text-sm font-medium hover:bg-[#A06F43] transition-colors"
-          >
-            Explore the Healthy Tech Index
-            <Icon name="lucide:arrow-right" class="w-4 h-4" />
-          </a>
-
-          <p class="mt-6 text-sm text-gray-500 leading-relaxed">
-            Healthy Tech Index is currently in beta. To ensure your feedback reaches the appropriate team, please submit all Healthy Tech Index-related feedback directly through Healthy Tech Index.
-          </p>
-
-          <a
-            href="https://healthytechindex.com/feedback"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="mt-4 inline-flex items-center justify-center gap-1 px-4 py-2 border border-gray-400 rounded-md text-sm font-semibold text-gray-800 hover:bg-gray-100 transition-colors"
-          >
-            Share Feedback
-            <Icon name="lucide:arrow-right" class="w-4 h-4" />
-          </a>
-        </div>
+      <div class="device-dashboard-inner-container mx-4 mt-4 mb-4 md:m-4">
+        <h1 class="text-xl md:text-2xl font-semibold text-gray-800">Request an App</h1>
+        <p class="mt-1 text-sm md:text-base text-gray-600">App request content goes here.</p>
       </div>
     </div>
   }
