@@ -4,7 +4,9 @@ import WisephoneLogo from "@/components/WisephoneLogo.astro";
 import IsAdmin from "@/components/server-islands/IsAdmin.astro";
 import { SignOutButton, UserButton } from "@clerk/astro/components";
 
-interface Props { activeLink?: "devices" | "request-app" | "admin" | "account" | "support"; }
+interface Props {
+  activeLink?: "devices" | "request-app" | "admin" | "account" | "support";
+}
 
 const { activeLink = "devices" } = Astro.props;
 ---
@@ -113,26 +115,27 @@ const { activeLink = "devices" } = Astro.props;
       <nav class="md:mt-6 px-2 space-y-1">
         <!-- Devices -->
         <a
-          href="#"
-          @click.prevent="mobileMenuOpen = false; activeLink = 'devices'"
-          class="flex items-center px-4 py-3 text-sm rounded-lg cursor-pointer"
-          :class="activeLink === 'devices' ? 'text-gray-800' : 'text-gray-600 hover:bg-gray-50'"
-          :style="activeLink === 'devices' ? 'background-color: #DBD5CD;' : ''"
+          href="/dashboard"
+          @click="$root.mobileMenuOpen = false; mobileMenuOpen = false"
+          class={`flex items-center px-4 py-3 text-sm rounded-lg ${activeLink === "devices" ? "text-gray-800" : "text-gray-600 hover:bg-gray-50"}`}
+          style={activeLink === "devices" ? "background-color: #DBD5CD;" : ""}
         >
           <img src="/assets/portal-icons/devices.svg" alt="" class="w-5 h-5" />
           <span class="ml-4">Devices</span>
         </a>
 
-        <a
-          href="#"
-          @click.prevent="mobileMenuOpen = false; activeLink = 'request-app'"
-          class="flex items-center px-4 py-3 text-sm rounded-lg cursor-pointer"
-          :class="activeLink === 'request-app' ? 'text-gray-800' : 'text-gray-600 hover:bg-gray-50'"
-          :style="activeLink === 'request-app' ? 'background-color: #DBD5CD;' : ''"
+        <!-- Request an app - Hidden -->
+        <!-- <a
+          href="https://getwisephone.com/request-app"
+          target="_blank"
+          rel="noopener noreferrer"
+          @click="mobileMenuOpen = false"
+          class={`flex items-center px-4 py-3 text-sm rounded-lg ${activeLink === "request-app" ? "text-gray-800" : "text-gray-600 hover:bg-gray-50"}`}
+          style={activeLink === "request-app" ? "background-color: #DBD5CD;" : ""}
         >
           <img src="/assets/portal-icons/app-request.svg" alt="" class="w-5 h-5" />
           <span class="ml-4">Request an App</span>
-        </a>
+        </a> -->
 
         <!-- Desktop: Show only bottom section -->
         <!-- Mobile: Show all options in one list -->
