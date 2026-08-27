@@ -1,7 +1,7 @@
 import type { APIRoute } from "astro";
 
 import { errorResponse, preflightResponse, successResponse, WPIIPortalAPIError, HTTP } from "@/lib/server/api.response";
-import { getCatalogAppByHtiId, insertCatalogApp } from "@/libs/app-catalog";
+import { getCatalogAppByHtiId, upsertCatalogApp } from "@/libs/app-catalog";
 
 export const POST: APIRoute = async ({ request, params }) => {
   try {
@@ -22,7 +22,7 @@ export const POST: APIRoute = async ({ request, params }) => {
       throw new WPIIPortalAPIError("packageName is required", HTTP.BAD_REQUEST);
     }
 
-    await insertCatalogApp({
+    await upsertCatalogApp({
       packageName,
       name: body.name ?? packageName,
       playStoreUrl: body.playStoreUrl ?? body.play_store_url,

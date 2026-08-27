@@ -65,13 +65,13 @@ export async function getCatalogAppByHtiId(htiAppId: string) {
   return db.select().from(App).where(eq(App.htiAppId, htiAppId)).get();
 }
 
-/** Insert an approved app into the Tool Management catalog. */
-export async function insertCatalogApp(input: InsertCatalogAppInput): Promise<void> {
+/** Upsert an approved app into the Tool Management catalog (by packageName). */
+export async function upsertCatalogApp(input: InsertCatalogAppInput): Promise<void> {
   if (!input.packageName) {
     throw new Error("packageName is required");
   }
 
-  await db.insert(App).values({
+  const values = {
     packageName: input.packageName,
     name: input.name || input.packageName,
     playStoreUrl: input.playStoreUrl || undefined,
@@ -81,6 +81,25 @@ export async function insertCatalogApp(input: InsertCatalogAppInput): Promise<vo
     inCatalog: 1,
     htiAppId: input.htiAppId || undefined,
     type: "Yes",
-    createdAt: new Date()
-  });
+    createdAt: new Date(),
+    updatedAt: new Date()
+  };
+
+  await db
+    .insert(App)
+    .values(values)
+    .onConflictDoUpdate({
+      target: App.packageName,
+      set: {
+        name: values.name,
+        playStoreUrl: values.playStoreUrl,
+        iconUrl: values.iconUrl,
+        category: values.category,
+        source: values.source,
+        inCatalog: values.inCatalog,
+        htiAppId: values.htiAppId,
+        type: values.type,
+        updatedAt: values.updatedAt
+      }
+    });
 }
