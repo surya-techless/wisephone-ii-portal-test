@@ -39,6 +39,8 @@ export const stripe = {
       plan: z.enum(["monthly", "yearly"]).default("monthly")
     }),
     handler: async (input, context) => {
+      const normalizedImei = input.deviceIMEI.replace(/\D/g, "");
+
       devLog.log("PAY DEBUG: [A1] createSubscriptionPage action called");
       devLog.log("PAY DEBUG: [A1.1] customerEmail:", input.customerEmail);
       devLog.log("PAY DEBUG: [A1.2] deviceIMEI:", input.deviceIMEI);
@@ -107,8 +109,13 @@ export const stripe = {
         return_url: returnUrl.toString(),
         automatic_tax: { enabled: true },
         allow_promotion_codes: true,
+        subscription_data: {
+          metadata: {
+            imei: normalizedImei
+          }
+        },
         metadata: {
-          imei: input.deviceIMEI
+          imei: normalizedImei
         }
       });
 
@@ -341,25 +348,51 @@ export const stripe = {
       devLog.log("PAY DEBUG: [A2.6] Session subscription ID:", session.subscription);
       devLog.log("PAY DEBUG: [A2.7] Session customer ID:", session.customer);
 
+      const sessionImei = (session.metadata?.imei ?? "").replace(/\D/g, "");
+      const requestedImei = input.imei.replace(/\D/g, "");
+      devLog.log("PAY DEBUG: [A2.7.1] Session IMEI:", sessionImei);
+      devLog.log("PAY DEBUG: [A2.7.2] Requested IMEI:", requestedImei);
+
+      if (!sessionImei || sessionImei !== requestedImei) {
+        devLog.error("PAY DEBUG: [A2.7.3] Session IMEI mismatch or missing");
+        throw new ActionError({
+          code: "FORBIDDEN",
+          message: "This checkout session does not belong to this device."
+        });
+      }
+
       devLog.log("PAY DEBUG: [A2.8] Retrieving subscription");
       const subscription = await stripeInstance.subscriptions.retrieve(session.subscription as string);
       devLog.log("PAY DEBUG: [A2.9] Subscription retrieved - ID:", subscription.id);
       devLog.log("PAY DEBUG: [A2.10] Subscription status:", subscription.status);
 
+      const subscriptionImei = (subscription.metadata?.imei ?? "").replace(/\D/g, "");
+      if (!subscriptionImei) {
+        devLog.log("PAY DEBUG: [A2.10.1] Stamping IMEI on subscription metadata");
+        await stripeInstance.subscriptions.update(subscription.id, {
+          metadata: { ...subscription.metadata, imei: requestedImei }
+        });
+        devLog.log("PAY DEBUG: [A2.10.2] Subscription metadata updated with IMEI:", requestedImei);
+      } else if (subscriptionImei !== requestedImei) {
+        devLog.error(
+          "PAY DEBUG: [A2.10.3] Subscription has different IMEI, not overwriting:",
+          subscriptionImei
+        );
+      }
+
       // Flow: User completes checkout → subscription is created → validateSubscription action runs
-      // → sets IMEI on customer metadata → Later, validateIsSubscribed calls validateSubscription
-      // → searches customers by IMEI → finds customer → checks their subscriptions
+      // → stamps IMEI on subscription metadata (source of truth for per-device validation)
+      // → also sets IMEI on customer metadata as a search index / diagnostic aid.
       //
-      // Add IMEI to customer metadata. This is how we can identify the customer is subscribed.
-      // The validateIsSubscribed function searches customers by IMEI metadata, then checks
-      // if those customers have active subscriptions.
+      // Per-device subscription validity is determined by subscription metadata.imei (strict path)
+      // or customer metadata search (legacy path). Customer metadata alone does not prove subscription.
       devLog.log("PAY DEBUG: [A2.11] Updating customer metadata with IMEI");
       await stripeInstance.customers.update(session.customer as string, {
         metadata: {
-          imei: input.imei
+          imei: requestedImei
         }
       });
-      devLog.log("PAY DEBUG: [A2.12] Customer metadata updated with IMEI:", input.imei);
+      devLog.log("PAY DEBUG: [A2.12] Customer metadata updated with IMEI:", requestedImei);
 
       const isSubscribed = subscription.status === "active" || subscription.status === "trialing";
       devLog.log("PAY DEBUG: [A2.13] Subscription check result - isSubscribed:", isSubscribed);

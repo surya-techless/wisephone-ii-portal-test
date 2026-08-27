@@ -55,3 +55,6 @@ deduplicated_ottogridApps_updated.json
 
 # Test files (development)
 tests/byoc-activation-flow.spec.ts
+
+# Backfill script output
+scripts/output/
