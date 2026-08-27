@@ -375,6 +375,14 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
   * {
     font-family: 'TT Norms Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   }
+
+  .request-app-page :is(h1, h2, h3, p, li, a, span) {
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    flex-shrink: 1;
+  }
 </style>
 
 <div class="dashboard-container flex h-screen w-full min-w-[360px] bg-[#f7f6f2] relative" x-data={`dashboard(${JSON.stringify({ userEmail: user?.emailAddresses?.[0]?.emailAddress || user?.primaryEmailAddress?.emailAddress || "", newDevice: actionResult?.data && !actionResult.error && !actionResult.data.isSubscribed && actionResult.data.wisephone?.[0] ? { imei: actionResult.data.wisephone[0].imei.toString().padEnd(15, "0"), phoneNumber: actionResult.data.wisephone[0].phoneNumber || "", isCspire: Boolean(actionResult.data.isCspire) } : null, testStripe })})`} @activate-modal.window="$event.detail?.isCspire ? openCspireModal($event.detail) : openActivateModal($event.detail?.imei || $event.detail)">
@@ -407,740 +415,848 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
   <!-- Sidebar -->
   <DashboardSidebar activeLink="devices" />
 
-<main class="device-dashboard-main-container relative flex-1 overflow-auto md:rounded-xl md:mt-4 md:mb-4 md:mr-4 bg-[#ffffff] w-full pt-16 md:pt-0">
-  {derivedHasNoWisephone ? (<Fragment>
-    <div class="p-4 md:p-8">
-    <section
-              class="flex flex-col items-center justify-center w-full p-6 md:p-8 bg-transparent border-2 rounded-2xl border-slate-200"
-              x-show="!showForm"
-            >
-              <img
-                src={phoneImg.src}
-                alt="A hand-drawn hand holding a Wisephone II"
-                class="h-[100px] md:h-[125px] aspect-square"
-                decoding="async"
-                loading="lazy"
-              />
-              <h1 class="text-2xl md:text-3xl font-bold text-center mt-4">Connect to your Wisephone.</h1>
-              <p class="m-0 text-center text-sm md:text-base mt-2">Connect your Wisephone II to manage your device's experience.</p>
-              <button class="mt-6 md:mt-8 btn btn-primary w-fit px-6" @click="showForm = true">
-                Get Started
-              </button>
-            </section>
-    </div>
-  </Fragment>):(
-  <Fragment>
-    <div class="w-full mx-auto ml-0">
-      <div class="device-dashboard-inner-container mx-4 mt-4 mb-4 md:m-4">
-        <div class="flex justify-between items-start gap-2 pt-2 md:pt-0">
-          <div class="flex-1 min-w-0">
-            <h1 class="text-xl md:text-2xl font-semibold text-gray-800">Device Dashboard</h1>
-            <p class="mt-1 text-sm md:text-base text-gray-600 md:hidden">Select a phone to manage</p>
-            <p class="mt-1 text-base text-gray-600 hidden md:block">View all of the Wisephones associated with this account here. Click "Manage Device" to <br>configure settings for a specific Wisephone.</p>
+<main class="device-dashboard-main-container relative flex-1 min-w-0 overflow-auto md:rounded-xl md:mt-4 md:mb-4 md:mr-4 bg-[#ffffff] w-full pt-16 md:pt-0">
+
+  <!-- no registered devices, so prompt user to add -->
+  { derivedHasNoWisephone &&
+      <Fragment>
+        <div class="p-4 md:p-8">
+          <section class="flex flex-col items-center justify-center w-full p-6 md:p-8 bg-transparent border-2 rounded-2xl border-slate-200" x-show="!showForm">
+            <img
+              src={phoneImg.src}
+              alt="A hand-drawn hand holding a Wisephone II"
+              class="h-[100px] md:h-[125px] aspect-square"
+              decoding="async"
+              loading="lazy"
+            />
+            <h1 class="text-2xl md:text-3xl font-bold text-center mt-4">Connect to your Wisephone.</h1>
+            <p class="m-0 text-center text-sm md:text-base mt-2">Connect your Wisephone II to manage your device's experience.</p>
+            <button class="mt-6 md:mt-8 btn btn-primary w-fit px-6" @click="showForm = true"> Get Started </button>
+          </section>
+        </div>
+      </Fragment>
+  }
+
+  { !derivedHasNoWisephone &&
+    <div x-show="activeLink === 'devices'" class="w-full mx-auto ml-0">
+        <div class="device-dashboard-inner-container mx-4 mt-4 mb-4 md:m-4">
+          <div class="flex justify-between items-start gap-2 pt-2 md:pt-0">
+            <div class="flex-1 min-w-0">
+              <h1 class="text-xl md:text-2xl font-semibold text-gray-800">Device Dashboard</h1>
+              <p class="mt-1 text-sm md:text-base text-gray-600 md:hidden">Select a phone to manage</p>
+              <p class="mt-1 text-base text-gray-600 hidden md:block">View all of the Wisephones associated with this account here. Click "Manage Device" to <br>configure settings for a specific Wisephone.</p>
+            </div>
+            <button @click="showForm = true" class="flex items-center justify-center flex-shrink-0 p-1 md:px-3 md:py-1 border border-gray-400 rounded-md text-sm font-semibold hover:bg-gray-100 whitespace-nowrap">
+              <img src="/assets/portal-icons/add-phone.svg" alt="Add device" class="w-7 h-7 md:mr-2" />
+              <span class="hidden md:inline">Add device</span>
+            </button>
           </div>
-          <button @click="showForm = true" class="flex items-center justify-center flex-shrink-0 p-1 md:px-3 md:py-1 border border-gray-400 rounded-md text-sm font-semibold hover:bg-gray-100 whitespace-nowrap">
-            <img src="/assets/portal-icons/add-phone.svg" alt="Add device" class="w-7 h-7 md:mr-2" />
-            <span class="hidden md:inline">Add device</span>
-          </button>
+
+          <!-- Device Cards Grid -->
+          <div class="mt-6 flex flex-wrap gap-6">
+            {wisephonesWithSubscription.map((wisephone) => {
+              const initials = (wisephone.nickname || 'Device')
+                .split(' ')
+                .map(word => word[0])
+                .join('')
+                .toUpperCase()
+                .slice(0, 2);
+              const imeiString = wisephone.imei.toString().padEnd(15, "0");
+              const deviceData = {
+                imei: imeiString,
+                isSubscribed: Boolean(wisephone.isSubscribed),
+                phoneNumber: wisephone.phoneNumber || '',
+                isCspire: Boolean(wisephone.isCspire)
+              };
+              devLog.log(`Device card data for ${imeiString}:`, deviceData, `isSubscribed type: ${typeof wisephone.isSubscribed}, value: ${wisephone.isSubscribed}`);
+
+              return (
+                <div class="border border-gray-300 rounded-md bg-white p-3 w-full md:w-[400px] flex items-start gap-4" x-data={`deviceCard(${JSON.stringify(deviceData)})`}>
+                  <div class="w-10 h-10 bg-[#4b918e] rounded-full flex items-center justify-center text-white text-sm font-semibold flex-shrink-0">
+                    {initials}
+                  </div>
+                  <div class="flex-1 min-w-0 flex flex-col gap-0.5">
+                    <p class="font-semibold text-base text-gray-900 truncate">{wisephone.nickname || 'Device'}</p>
+                    <p class="text-gray-500 text-sm">{wisephone.phoneNumber || '(111) 111-1111'}</p>
+                    <p class="text-gray-500 text-sm whitespace-nowrap">IMEI: {imeiString}</p>
+                  </div>
+                  <template x-if="isSubscribed">
+                    <a
+                      href={`/manage/${imeiString}`}
+                      @click="$root.isLoading = true"
+                      class="border border-gray-300 bg-white text-gray-900 text-sm px-2.5 py-1 rounded-md hover:bg-gray-50 whitespace-nowrap flex-shrink-0"
+                    >
+                      Manage Device
+                    </a>
+                  </template>
+                  <template x-if="!isSubscribed">
+                    <button
+                      type="button"
+                      @click="openActivateModal()"
+                      class="border border-gray-300 bg-white text-gray-900 text-sm px-2.5 py-1 rounded-md hover:bg-gray-50 whitespace-nowrap flex-shrink-0"
+                    >
+                      Activate Plan
+                    </button>
+                  </template>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+    </div>
+  }
+
+  { !derivedHasNoWisephone &&
+    <div x-show="activeLink === 'request-app'" x-cloak class="request-app-page w-full min-w-0 overflow-x-hidden">
+      <div class="device-dashboard-inner-container mx-4 mt-4 mb-4 md:m-4 pt-2 md:pt-0 min-w-0 lg:max-w-[60%]">
+        <h1 class="text-xl md:text-2xl font-semibold text-gray-800">Meet the Healthy Tech Index</h1>
+
+        <div class="mt-3 md:mt-4 space-y-3 md:space-y-4 text-sm md:text-base text-gray-600 leading-relaxed">
+          <p>
+            Wisephone partners with the Healthy Tech Index, an independent organization that evaluates applications using consistent standards for healthier digital habits.
+          </p>
+          <p>
+            The Healthy Tech Index evaluates apps across multiple categories, including apps that may never be available on Wisephone. Each evaluated app receives a score along with information explaining the evaluation.
+          </p>
         </div>
 
-        <!-- Device Cards Grid -->
-        <div class="mt-6 flex flex-wrap gap-6">
-          {wisephonesWithSubscription.map((wisephone) => {
-            const initials = (wisephone.nickname || 'Device')
-              .split(' ')
-              .map(word => word[0])
-              .join('')
-              .toUpperCase()
-              .slice(0, 2);
-            const imeiString = wisephone.imei.toString().padEnd(15, "0");
-            const deviceData = {
-              imei: imeiString,
-              isSubscribed: Boolean(wisephone.isSubscribed),
-              phoneNumber: wisephone.phoneNumber || '',
-              isCspire: Boolean(wisephone.isCspire)
-            };
-            devLog.log(`Device card data for ${imeiString}:`, deviceData, `isSubscribed type: ${typeof wisephone.isSubscribed}, value: ${wisephone.isSubscribed}`);
+        <h2 class="mt-6 md:mt-8 text-base md:text-xl font-semibold text-gray-800">How can an app become available in the Tool Drawer?</h2>
 
-            return (
-              <div class="border border-gray-300 rounded-md bg-white p-3 w-full md:w-[400px] flex items-start gap-4" x-data={`deviceCard(${JSON.stringify(deviceData)})`}>
-                <div class="w-10 h-10 bg-[#4b918e] rounded-full flex items-center justify-center text-white text-sm font-semibold flex-shrink-0">
-                  {initials}
-                </div>
-                <div class="flex-1 min-w-0 flex flex-col gap-0.5">
-                  <p class="font-semibold text-base text-gray-900 truncate">{wisephone.nickname || 'Device'}</p>
-                  <p class="text-gray-500 text-sm">{wisephone.phoneNumber || '(111) 111-1111'}</p>
-                  <p class="text-gray-500 text-sm whitespace-nowrap">IMEI: {imeiString}</p>
-                </div>
-                <template x-if="isSubscribed">
-                  <a
-                    href={`/manage/${imeiString}`}
-                    @click="$root.isLoading = true"
-                    class="border border-gray-300 bg-white text-gray-900 text-sm px-2.5 py-1 rounded-md hover:bg-gray-50 whitespace-nowrap flex-shrink-0"
-                  >
-                    Manage Device
-                  </a>
-                </template>
-                <template x-if="!isSubscribed">
-                  <button
-                    type="button"
-                    @click="openActivateModal()"
-                    class="border border-gray-300 bg-white text-gray-900 text-sm px-2.5 py-1 rounded-md hover:bg-gray-50 whitespace-nowrap flex-shrink-0"
-                  >
-                    Activate Plan
-                  </button>
-                </template>
-              </div>
-            );
-          })}
+        <ol class="mt-4 md:mt-5 space-y-4 md:space-y-5">
+          <li class="grid grid-cols-[auto_minmax(0,1fr)] gap-3 md:gap-4">
+            <span class="w-7 h-7 md:w-8 md:h-8 rounded-full bg-[#4b918e] text-white text-sm font-semibold flex items-center justify-center">1</span>
+            <div>
+              <h3 class="font-semibold text-gray-900 text-sm md:text-base">Search for the app</h3>
+              <p class="mt-1 text-sm md:text-base text-gray-600 leading-relaxed">
+                Visit
+                <a href="https://healthytechindex.com" target="_blank" rel="noopener noreferrer" class="text-blue-600 underline hover:text-blue-800">Healthy Tech Index</a>
+                to see whether the app has already been evaluated.
+              </p>
+            </div>
+          </li>
+          <li class="grid grid-cols-[auto_minmax(0,1fr)] gap-3 md:gap-4">
+            <span class="w-7 h-7 md:w-8 md:h-8 rounded-full bg-[#4b918e] text-white text-sm font-semibold flex items-center justify-center">2</span>
+            <div>
+              <h3 class="font-semibold text-gray-900 text-sm md:text-base">Request an app</h3>
+              <p class="mt-1 text-sm md:text-base text-gray-600 leading-relaxed">
+                Not scored yet? Select "+ Add" next to the app in
+                <a href="https://healthytechindex.com" target="_blank" rel="noopener noreferrer" class="text-blue-600 underline hover:text-blue-800">Healthy Tech Index</a>
+                search to request review.<br><br>
+                <b>Note:</b> You don't need to submit a separate request to Wisephone.
+              </p>
+            </div>
+          </li>
+          <li class="grid grid-cols-[auto_minmax(0,1fr)] gap-3 md:gap-4">
+            <span class="w-7 h-7 md:w-8 md:h-8 rounded-full bg-[#4b918e] text-white text-sm font-semibold flex items-center justify-center">3</span>
+            <div>
+              <h3 class="font-semibold text-gray-900 text-sm md:text-base">Look for the <b>W-Approved</b> badge</h3>
+              <p class="mt-1 text-sm md:text-base text-gray-600 leading-relaxed">
+                Apps that are approved for Wisephone use should have a <b>W-Approved</b> badge.
+              </p>
+            </div>
+          </li>
+          <li class="grid grid-cols-[auto_minmax(0,1fr)] gap-3 md:gap-4">
+            <span class="w-7 h-7 md:w-8 md:h-8 rounded-full bg-[#4b918e] text-white text-sm font-semibold flex items-center justify-center">4</span>
+            <div>
+              <h3 class="font-semibold text-gray-900 text-sm md:text-base">W-Approved apps are considered for the Tool Drawer</h3>
+              <p class="mt-1 text-sm md:text-base text-gray-600 leading-relaxed">
+                Apps with a <b>W-Approved</b> badge will be considered for the Wisephone Tool Drawer, but Wisephone makes the final decision based on extra criteria.
+              </p>
+            </div>
+          </li>
+        </ol>
+
+        <div class="mt-5 md:mt-6 space-y-3 md:space-y-4 text-sm md:text-base text-gray-600 leading-relaxed">
+          <p>
+            W-Approved apps typically appear in the Tool Drawer within 48 hours. Having the badge does not guarantee availability, and Wisephone may add or remove third-party apps from the Tool Drawer at any time.
+          </p>
+          <p class="font-medium text-gray-800">
+            <b>
+              Wisephone is <i>generally</i> free from internet browsers, social media, games, shopping, video streaming, explicit content, and solo media.
+            </b>
+          </p>
+        </div>
+
+        <div class="mt-6 md:mt-8 border border-gray-300 rounded-lg p-4 md:p-6 bg-white">
+          <div class="grid grid-cols-[auto_minmax(0,1fr)] gap-3 mb-3 md:mb-4">
+            <img src="/assets/portal-icons/app-request.svg" alt="" class="w-6 h-6" />
+            <h3 class="font-semibold text-gray-900 text-sm md:text-base">Already requested an app?</h3>
+          </div>
+          <p class="text-sm md:text-base text-gray-600 leading-relaxed">
+            We have submitted all previous app requests to Healthy Tech Index for review. If a score is not visible, please follow step 2 above.
+          </p>
+
+          <a
+            href="https://healthytechindex.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="mt-5 md:mt-6 flex w-full max-w-full md:inline-flex md:w-auto items-center justify-center gap-1 px-4 py-2.5 md:py-2 bg-[#C07F53] text-white rounded-md text-sm font-medium hover:bg-[#A06F43] transition-colors"
+          >
+            <span class="text-center">Explore the Healthy Tech Index</span>
+            <Icon name="lucide:arrow-right" class="w-4 h-4" />
+          </a>
+
+          <p class="mt-5 md:mt-6 text-sm text-gray-500 leading-relaxed">
+            Healthy Tech Index is currently in beta. To ensure your feedback reaches the appropriate team, please submit Healthy Tech Index-related feedback directly through Healthy Tech Index.
+          </p>
+
+          <a
+            href="https://healthytechindex.com/feedback"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="mt-4 flex w-full max-w-full md:inline-flex md:w-auto items-center justify-center gap-1 px-4 py-2.5 md:py-2 border border-gray-400 rounded-md text-sm font-semibold text-gray-800 hover:bg-gray-100 transition-colors"
+          >
+            Share Feedback
+            <Icon name="lucide:arrow-right" class="w-4 h-4" />
+          </a>
         </div>
       </div>
-      </div>
-
-  </Fragment>
-)}
+    </div>
+  }
 
   <!-- Modal for Add Device Form -->
-  <Fragment>
-    <div
-    x-show="showForm"
-    x-cloak
-    x-transition.opacity
-    class="fixed inset-0 bg-black bg-opacity-50 flex items-start md:items-center justify-center z-50 overflow-y-auto p-0 md:p-4"
-    @click.self="showForm = false; resetForm()"
-  >
-    <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-0 md:mx-4 mt-[5vh] md:my-auto max-h-[75vh] md:max-h-[90vh] overflow-y-auto flex flex-col">
-      <!-- Custom Typeform Component (when feature flag is enabled AND on mobile) -->
-      {enableTypeform && (
-        <div x-show="isMobile" x-cloak class="flex flex-col">
-          <div class="bg-white border-b border-gray-200 p-3 md:p-4 flex justify-between items-center flex-shrink-0">
-            <h2 class="text-lg md:text-xl font-semibold text-gray-800">Add a Wisephone</h2>
-            <button @click="showForm = false; resetForm()" class="text-gray-400 hover:text-gray-600">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
+  { !derivedHasNoWisephone &&
+    <Fragment>
+      <div
+        x-show="showForm"
+        x-cloak
+        x-transition.opacity
+        class="fixed inset-0 bg-black bg-opacity-50 flex items-start md:items-center justify-center z-50 overflow-y-auto p-0 md:p-4"
+        @click.self="showForm = false; resetForm()"
+      >
+        <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-0 md:mx-4 mt-[5vh] md:my-auto max-h-[75vh] md:max-h-[90vh] overflow-y-auto flex flex-col">
+          <!-- Custom Typeform Component (when feature flag is enabled AND on mobile) -->
+          {enableTypeform && (
+            <div x-show="isMobile" x-cloak class="flex flex-col">
+              <div class="bg-white border-b border-gray-200 p-3 md:p-4 flex justify-between items-center flex-shrink-0">
+                <h2 class="text-lg md:text-xl font-semibold text-gray-800">Add a Wisephone</h2>
+                <button @click="showForm = false; resetForm()" class="text-gray-400 hover:text-gray-600">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="24"
+                    height="24"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path d="M18 6 6 18"></path>
+                    <path d="m6 6 12 12"></path>
+                  </svg>
+                </button>
+              </div>
+              <div 
+                x-show="isMobile" 
+                x-cloak 
+                class="px-4 md:px-6 md:pb-10 flex flex-col items-start"
               >
-                <path d="M18 6 6 18"></path>
-                <path d="m6 6 12 12"></path>
-              </svg>
-            </button>
-          </div>
-          <div 
-            x-show="isMobile" 
-            x-cloak 
-            class="px-4 md:px-6 md:pb-10 flex flex-col items-start"
-          >
-          <form
-            method="POST"
-            action={actions.wisephones.createWisephone}
-            id="device-registration-form"
-            style="display: none;"
-          >
-            <input type="hidden" name="imei" />
-            <input type="hidden" name="imei2" />
-            <input type="hidden" name="phoneNumber" />
-            <input type="hidden" name="nickname" />
-            <input type="hidden" name="userId" value={user?.id} />
-          </form>
-          <TypeformDeviceRegistration />
-        </div>
-        </div>
-      )}
-      
-      <!-- Old Form (when feature flag is disabled OR on desktop) -->
-      {enableTypeform ? (
-        <div 
-          x-show="!isMobile" 
-          x-cloak 
-          class="flex flex-col h-full"
-        >
-          <div class="sticky top-0 bg-white border-b border-gray-200 p-3 md:p-4 flex justify-between items-center flex-shrink-0">
-            <h2 class="text-lg md:text-xl font-semibold text-gray-800">Add a Wisephone</h2>
-            <button @click="showForm = false; resetForm()" class="text-gray-400 hover:text-gray-600">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
+              <form
+                method="POST"
+                action={actions.wisephones.createWisephone}
+                id="device-registration-form"
+                style="display: none;"
               >
-                <path d="M18 6 6 18"></path>
-                <path d="m6 6 12 12"></path>
-              </svg>
-            </button>
-          </div>
-          <div class="p-6">
-          <p class="text-sm text-gray-600 mb-6">
-          Complete this form to add a Wisephone II to your portal account
-          {`${user?.emailAddresses?.[0]?.emailAddress || user?.primaryEmailAddress?.emailAddress ? `(${user?.emailAddresses?.[0]?.emailAddress || user?.primaryEmailAddress?.emailAddress})` : ""}`}. You'll
-          be able to manage the device's features and apps through the portal, and you can add multiple devices to the
-          same portal account.
-        </p>
-
-        <form
-          method="POST"
-          action={actions.wisephones.createWisephone}
-          class="space-y-4"
-          @submit.prevent="$el.checkValidity() && isFormValid() ? $el.submit() : null"
-        >
-          <div>
-            <label for="imei" class="block text-sm font-medium text-gray-700 mb-1">
-              Wisephone IMEI (slot 1)
-              <span class="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              id="imei"
-              name="imei"
-              x-model.trim="imei1"
-              x-mask="999999999999999"
-              placeholder="350XXXXXXXXXXXX"
-              class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              :class="{ 'border-red-500': !isImeiValid && hasBlurredImei }"
-              pattern="[0-9]{15}"
-              minlength="15"
-              maxlength="15"
-              title="Please enter exactly 15 digits"
-              @blur="validateImei(); hasBlurredImei = true;"
-              required
-            />
-            <div x-show="hasBlurredImei && (imei1.length > 0 && (imei1.length !== 15 || !isImeiValid))">
-              <p class="text-sm text-red-500 mt-1" x-show="imei1.length > 0 && imei1.length !== 15">
-                IMEI must be exactly 15 digits
-              </p>
-              <p class="text-sm text-red-500 mt-1" x-show="imei1.length === 15 && !isImeiValid">
-                Invalid IMEI. Please check the number and try again.
-              </p>
+                <input type="hidden" name="imei" />
+                <input type="hidden" name="imei2" />
+                <input type="hidden" name="phoneNumber" />
+                <input type="hidden" name="nickname" />
+                <input type="hidden" name="userId" value={user?.id} />
+              </form>
+              <TypeformDeviceRegistration />
             </div>
-            <p class="text-xs text-gray-500 mt-2">
-              On the WiseOS home screen, tap <strong>"Settings"</strong> → tap
-              <strong>"Open System Settings"</strong> → scroll to and tap <strong>"About phone"</strong> → hold down on
-              <strong>"IMEI (slot 1)"</strong> to copy the number.
+            </div>
+          )}
+          
+          <!-- Old Form (when feature flag is disabled OR on desktop) -->
+          {enableTypeform ? (
+            <div 
+              x-show="!isMobile" 
+              x-cloak 
+              class="flex flex-col h-full"
+            >
+              <div class="sticky top-0 bg-white border-b border-gray-200 p-3 md:p-4 flex justify-between items-center flex-shrink-0">
+                <h2 class="text-lg md:text-xl font-semibold text-gray-800">Add a Wisephone</h2>
+                <button @click="showForm = false; resetForm()" class="text-gray-400 hover:text-gray-600">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="24"
+                    height="24"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path d="M18 6 6 18"></path>
+                    <path d="m6 6 12 12"></path>
+                  </svg>
+                </button>
+              </div>
+              <div class="p-6">
+              <p class="text-sm text-gray-600 mb-6">
+              Complete this form to add a Wisephone II to your portal account
+              {`${user?.emailAddresses?.[0]?.emailAddress || user?.primaryEmailAddress?.emailAddress ? `(${user?.emailAddresses?.[0]?.emailAddress || user?.primaryEmailAddress?.emailAddress})` : ""}`}. You'll
+              be able to manage the device's features and apps through the portal, and you can add multiple devices to the
+              same portal account.
             </p>
-          </div>
 
-          <div>
-            <label for="imei2" class="block text-sm font-medium text-gray-700 mb-1">
-              Enter the IMEI one more time
-              <span class="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              id="imei2"
-              name="imei2"
-              x-model.trim="imei2"
-              x-mask="999999999999999"
-              placeholder="350XXXXXXXXXXXX"
-              class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              :class="{ 'border-red-500': !isImeiValid && hasBlurredImeiVerification }"
-              pattern="[0-9]{15}"
-              minlength="15"
-              maxlength="15"
-              title="Please enter exactly 15 digits"
-              @blur="validateImei(); hasBlurredImeiVerification = true;"
-              required
-            />
-            <div x-show="hasBlurredImei && (imei2.length > 0 && ((imei2.length !== 15) || (imei2.length === 15 && imei1 !== imei2)))">
-              <p class="text-sm text-red-500 mt-1" x-show="imei2.length > 0 && imei2.length !== 15">
-                IMEI must be exactly 15 digits
-              </p>
-              <p class="text-sm text-red-500 mt-1" x-show="imei2.length === 15 && imei1.length === 15 && imei1 !== imei2">
-                IMEIs don't match
-              </p>
+            <form
+              method="POST"
+              action={actions.wisephones.createWisephone}
+              class="space-y-4"
+              @submit.prevent="$el.checkValidity() && isFormValid() ? $el.submit() : null"
+            >
+              <div>
+                <label for="imei" class="block text-sm font-medium text-gray-700 mb-1">
+                  Wisephone IMEI (slot 1)
+                  <span class="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  id="imei"
+                  name="imei"
+                  x-model.trim="imei1"
+                  x-mask="999999999999999"
+                  placeholder="350XXXXXXXXXXXX"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  :class="{ 'border-red-500': !isImeiValid && hasBlurredImei }"
+                  pattern="[0-9]{15}"
+                  minlength="15"
+                  maxlength="15"
+                  title="Please enter exactly 15 digits"
+                  @blur="validateImei(); hasBlurredImei = true;"
+                  required
+                />
+                <div x-show="hasBlurredImei && (imei1.length > 0 && (imei1.length !== 15 || !isImeiValid))">
+                  <p class="text-sm text-red-500 mt-1" x-show="imei1.length > 0 && imei1.length !== 15">
+                    IMEI must be exactly 15 digits
+                  </p>
+                  <p class="text-sm text-red-500 mt-1" x-show="imei1.length === 15 && !isImeiValid">
+                    Invalid IMEI. Please check the number and try again.
+                  </p>
+                </div>
+                <p class="text-xs text-gray-500 mt-2">
+                  On the WiseOS home screen, tap <strong>"Settings"</strong> → tap
+                  <strong>"Open System Settings"</strong> → scroll to and tap <strong>"About phone"</strong> → hold down on
+                  <strong>"IMEI (slot 1)"</strong> to copy the number.
+                </p>
+              </div>
+
+              <div>
+                <label for="imei2" class="block text-sm font-medium text-gray-700 mb-1">
+                  Enter the IMEI one more time
+                  <span class="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  id="imei2"
+                  name="imei2"
+                  x-model.trim="imei2"
+                  x-mask="999999999999999"
+                  placeholder="350XXXXXXXXXXXX"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  :class="{ 'border-red-500': !isImeiValid && hasBlurredImeiVerification }"
+                  pattern="[0-9]{15}"
+                  minlength="15"
+                  maxlength="15"
+                  title="Please enter exactly 15 digits"
+                  @blur="validateImei(); hasBlurredImeiVerification = true;"
+                  required
+                />
+                <div x-show="hasBlurredImei && (imei2.length > 0 && ((imei2.length !== 15) || (imei2.length === 15 && imei1 !== imei2)))">
+                  <p class="text-sm text-red-500 mt-1" x-show="imei2.length > 0 && imei2.length !== 15">
+                    IMEI must be exactly 15 digits
+                  </p>
+                  <p class="text-sm text-red-500 mt-1" x-show="imei2.length === 15 && imei1.length === 15 && imei1 !== imei2">
+                    IMEIs don't match
+                  </p>
+                </div>
+              </div>
+
+              <div>
+                <label for="phoneNumber" class="block text-sm font-medium text-gray-700 mb-1">
+                  Wisephone Phone Number
+                  <span class="text-red-500">*</span>
+                </label>
+                <input
+                  type="tel"
+                  id="phoneNumber"
+                  x-model.trim="phoneNumber"
+                  name="phoneNumber"
+                  x-mask="999-999-9999"
+                  placeholder="XXX-XXX-XXXX"
+                  pattern="[0-9]{3}-[0-9]{3}-[0-9]{4}"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  :class="{ 'border-red-500': phoneNumber.length > 0 && phoneNumber.replace(/-/g, '').length !== 10 }"
+                  required
+                />
+              </div>
+
+              <div>
+                <label for="nickname" class="block text-sm font-medium text-gray-700 mb-1">
+                  Give this Wisephone a name or owner
+                  <span class="text-red-500">*</span>
+                </label>
+                <input
+                  id="nickname"
+                  x-model.trim="nickname"
+                  type="text"
+                  name="nickname"
+                  placeholder="John Doe"
+                  maxlength="64"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  :class="{ 'border-red-500': (nickname.length > 0 && nickname.trim().length === 0) || nickname.length > 64 }"
+                  required
+                />
+                <div x-show="nickname.length > 64">
+                  <p class="text-sm text-red-500 mt-1">
+                    Name must not exceed 64 characters
+                  </p>
+                </div>
+              </div>
+
+              <input type="hidden" name="userId" value={user?.id} />
+
+              <div class="flex justify-end gap-3 pt-4">
+                <button type="button" @click="showForm = false; resetForm()" class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">
+                  Cancel
+                </button>
+                <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed" :disabled="!isFormValid()">
+                  Add Device
+                </button>
+              </div>
+            </form>
+              </div>
             </div>
-          </div>
-
-          <div>
-            <label for="phoneNumber" class="block text-sm font-medium text-gray-700 mb-1">
-              Wisephone Phone Number
-              <span class="text-red-500">*</span>
-            </label>
-            <input
-              type="tel"
-              id="phoneNumber"
-              x-model.trim="phoneNumber"
-              name="phoneNumber"
-              x-mask="999-999-9999"
-              placeholder="XXX-XXX-XXXX"
-              pattern="[0-9]{3}-[0-9]{3}-[0-9]{4}"
-              class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              :class="{ 'border-red-500': phoneNumber.length > 0 && phoneNumber.replace(/-/g, '').length !== 10 }"
-              required
-            />
-          </div>
-
-          <div>
-            <label for="nickname" class="block text-sm font-medium text-gray-700 mb-1">
-              Give this Wisephone a name or owner
-              <span class="text-red-500">*</span>
-            </label>
-            <input
-              id="nickname"
-              x-model.trim="nickname"
-              type="text"
-              name="nickname"
-              placeholder="John Doe"
-              maxlength="64"
-              class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              :class="{ 'border-red-500': (nickname.length > 0 && nickname.trim().length === 0) || nickname.length > 64 }"
-              required
-            />
-            <div x-show="nickname.length > 64">
-              <p class="text-sm text-red-500 mt-1">
-                Name must not exceed 64 characters
-              </p>
-            </div>
-          </div>
-
-          <input type="hidden" name="userId" value={user?.id} />
-
-          <div class="flex justify-end gap-3 pt-4">
-            <button type="button" @click="showForm = false; resetForm()" class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">
-              Cancel
-            </button>
-            <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed" :disabled="!isFormValid()">
-              Add Device
-            </button>
-          </div>
-        </form>
-          </div>
-        </div>
-      ) : (
-        <div 
-          class="flex flex-col h-full"
-        >
-          <div class="sticky top-0 bg-white border-b border-gray-200 p-3 md:p-4 flex justify-between items-center flex-shrink-0">
-            <h2 class="text-lg md:text-xl font-semibold text-gray-800">Add a Wisephone</h2>
-            <button @click="showForm = false; resetForm()" class="text-gray-400 hover:text-gray-600">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <path d="M18 6 6 18"></path>
-                <path d="m6 6 12 12"></path>
-              </svg>
-            </button>
-          </div>
-          <div class="p-6">
-        <p class="text-sm text-gray-600 mb-6">
-          Complete this form to add a Wisephone II to your portal account
-          {`${user?.emailAddresses?.[0]?.emailAddress || user?.primaryEmailAddress?.emailAddress ? `(${user?.emailAddresses?.[0]?.emailAddress || user?.primaryEmailAddress?.emailAddress})` : ""}`}. You'll
-          be able to manage the device's features and apps through the portal, and you can add multiple devices to the
-          same portal account.
-        </p>
-
-        <form
-          method="POST"
-          action={actions.wisephones.createWisephone}
-          class="space-y-4"
-          @submit.prevent="$el.checkValidity() && isFormValid() ? $el.submit() : null"
-        >
-          <div>
-            <label for="imei" class="block text-sm font-medium text-gray-700 mb-1">
-              Wisephone IMEI (slot 1)
-              <span class="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              id="imei"
-              name="imei"
-              x-model.trim="imei1"
-              x-mask="999999999999999"
-              placeholder="350XXXXXXXXXXXX"
-              class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              :class="{ 'border-red-500': !isImeiValid && hasBlurredImei }"
-              pattern="[0-9]{15}"
-              minlength="15"
-              maxlength="15"
-              title="Please enter exactly 15 digits"
-              @blur="validateImei(); hasBlurredImei = true;"
-              required
-            />
-            <div x-show="hasBlurredImei && (imei1.length > 0 && (imei1.length !== 15 || !isImeiValid))">
-              <p class="text-sm text-red-500 mt-1" x-show="imei1.length > 0 && imei1.length !== 15">
-                IMEI must be exactly 15 digits
-              </p>
-              <p class="text-sm text-red-500 mt-1" x-show="imei1.length === 15 && !isImeiValid">
-                Invalid IMEI. Please check the number and try again.
-              </p>
-            </div>
-            <p class="text-xs text-gray-500 mt-2">
-              On the WiseOS home screen, tap <strong>"Settings"</strong> → tap
-              <strong>"Open System Settings"</strong> → scroll to and tap <strong>"About phone"</strong> → hold down on
-              <strong>"IMEI (slot 1)"</strong> to copy the number.
+          ) : (
+            <div 
+              class="flex flex-col h-full"
+            >
+              <div class="sticky top-0 bg-white border-b border-gray-200 p-3 md:p-4 flex justify-between items-center flex-shrink-0">
+                <h2 class="text-lg md:text-xl font-semibold text-gray-800">Add a Wisephone</h2>
+                <button @click="showForm = false; resetForm()" class="text-gray-400 hover:text-gray-600">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="24"
+                    height="24"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path d="M18 6 6 18"></path>
+                    <path d="m6 6 12 12"></path>
+                  </svg>
+                </button>
+              </div>
+              <div class="p-6">
+            <p class="text-sm text-gray-600 mb-6">
+              Complete this form to add a Wisephone II to your portal account
+              {`${user?.emailAddresses?.[0]?.emailAddress || user?.primaryEmailAddress?.emailAddress ? `(${user?.emailAddresses?.[0]?.emailAddress || user?.primaryEmailAddress?.emailAddress})` : ""}`}. You'll
+              be able to manage the device's features and apps through the portal, and you can add multiple devices to the
+              same portal account.
             </p>
-          </div>
 
-          <div>
-            <label for="imei2" class="block text-sm font-medium text-gray-700 mb-1">
-              Enter the IMEI one more time
-              <span class="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              id="imei2"
-              name="imei2"
-              x-model.trim="imei2"
-              x-mask="999999999999999"
-              placeholder="350XXXXXXXXXXXX"
-              class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              :class="{ 'border-red-500': !isImeiValid && hasBlurredImeiVerification }"
-              pattern="[0-9]{15}"
-              minlength="15"
-              maxlength="15"
-              title="Please enter exactly 15 digits"
-              @blur="validateImei(); hasBlurredImeiVerification = true;"
-              required
-            />
-            <div x-show="hasBlurredImei && (imei2.length > 0 && ((imei2.length !== 15) || (imei2.length === 15 && imei1 !== imei2)))">
-              <p class="text-sm text-red-500 mt-1" x-show="imei2.length > 0 && imei2.length !== 15">
-                IMEI must be exactly 15 digits
-              </p>
-              <p class="text-sm text-red-500 mt-1" x-show="imei2.length === 15 && imei1.length === 15 && imei1 !== imei2">
-                IMEIs don't match
-              </p>
+            <form
+              method="POST"
+              action={actions.wisephones.createWisephone}
+              class="space-y-4"
+              @submit.prevent="$el.checkValidity() && isFormValid() ? $el.submit() : null"
+            >
+              <div>
+                <label for="imei" class="block text-sm font-medium text-gray-700 mb-1">
+                  Wisephone IMEI (slot 1)
+                  <span class="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  id="imei"
+                  name="imei"
+                  x-model.trim="imei1"
+                  x-mask="999999999999999"
+                  placeholder="350XXXXXXXXXXXX"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  :class="{ 'border-red-500': !isImeiValid && hasBlurredImei }"
+                  pattern="[0-9]{15}"
+                  minlength="15"
+                  maxlength="15"
+                  title="Please enter exactly 15 digits"
+                  @blur="validateImei(); hasBlurredImei = true;"
+                  required
+                />
+                <div x-show="hasBlurredImei && (imei1.length > 0 && (imei1.length !== 15 || !isImeiValid))">
+                  <p class="text-sm text-red-500 mt-1" x-show="imei1.length > 0 && imei1.length !== 15">
+                    IMEI must be exactly 15 digits
+                  </p>
+                  <p class="text-sm text-red-500 mt-1" x-show="imei1.length === 15 && !isImeiValid">
+                    Invalid IMEI. Please check the number and try again.
+                  </p>
+                </div>
+                <p class="text-xs text-gray-500 mt-2">
+                  On the WiseOS home screen, tap <strong>"Settings"</strong> → tap
+                  <strong>"Open System Settings"</strong> → scroll to and tap <strong>"About phone"</strong> → hold down on
+                  <strong>"IMEI (slot 1)"</strong> to copy the number.
+                </p>
+              </div>
+
+              <div>
+                <label for="imei2" class="block text-sm font-medium text-gray-700 mb-1">
+                  Enter the IMEI one more time
+                  <span class="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  id="imei2"
+                  name="imei2"
+                  x-model.trim="imei2"
+                  x-mask="999999999999999"
+                  placeholder="350XXXXXXXXXXXX"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  :class="{ 'border-red-500': !isImeiValid && hasBlurredImeiVerification }"
+                  pattern="[0-9]{15}"
+                  minlength="15"
+                  maxlength="15"
+                  title="Please enter exactly 15 digits"
+                  @blur="validateImei(); hasBlurredImeiVerification = true;"
+                  required
+                />
+                <div x-show="hasBlurredImei && (imei2.length > 0 && ((imei2.length !== 15) || (imei2.length === 15 && imei1 !== imei2)))">
+                  <p class="text-sm text-red-500 mt-1" x-show="imei2.length > 0 && imei2.length !== 15">
+                    IMEI must be exactly 15 digits
+                  </p>
+                  <p class="text-sm text-red-500 mt-1" x-show="imei2.length === 15 && imei1.length === 15 && imei1 !== imei2">
+                    IMEIs don't match
+                  </p>
+                </div>
+              </div>
+
+              <div>
+                <label for="phoneNumber" class="block text-sm font-medium text-gray-700 mb-1">
+                  Wisephone Phone Number
+                  <span class="text-red-500">*</span>
+                </label>
+                <input
+                  type="tel"
+                  id="phoneNumber"
+                  x-model.trim="phoneNumber"
+                  name="phoneNumber"
+                  x-mask="999-999-9999"
+                  placeholder="XXX-XXX-XXXX"
+                  pattern="[0-9]{3}-[0-9]{3}-[0-9]{4}"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  :class="{ 'border-red-500': phoneNumber.length > 0 && phoneNumber.replace(/-/g, '').length !== 10 }"
+                  required
+                />
+              </div>
+
+              <div>
+                <label for="nickname" class="block text-sm font-medium text-gray-700 mb-1">
+                  Give this Wisephone a name or owner
+                  <span class="text-red-500">*</span>
+                </label>
+                <input
+                  id="nickname"
+                  x-model.trim="nickname"
+                  type="text"
+                  name="nickname"
+                  placeholder="John Doe"
+                  maxlength="64"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  :class="{ 'border-red-500': (nickname.length > 0 && nickname.trim().length === 0) || nickname.length > 64 }"
+                  required
+                />
+                <div x-show="nickname.length > 64">
+                  <p class="text-sm text-red-500 mt-1">
+                    Name must not exceed 64 characters
+                  </p>
+                </div>
+              </div>
+
+              <input type="hidden" name="userId" value={user?.id} />
+
+              <div class="flex justify-end gap-3 pt-4">
+                <button type="button" @click="showForm = false; resetForm()" class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">
+                  Cancel
+                </button>
+                <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed" :disabled="!isFormValid()">
+                  Add Device
+                </button>
+              </div>
+            </form>
+              </div>
             </div>
-          </div>
-
-          <div>
-            <label for="phoneNumber" class="block text-sm font-medium text-gray-700 mb-1">
-              Wisephone Phone Number
-              <span class="text-red-500">*</span>
-            </label>
-            <input
-              type="tel"
-              id="phoneNumber"
-              x-model.trim="phoneNumber"
-              name="phoneNumber"
-              x-mask="999-999-9999"
-              placeholder="XXX-XXX-XXXX"
-              pattern="[0-9]{3}-[0-9]{3}-[0-9]{4}"
-              class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              :class="{ 'border-red-500': phoneNumber.length > 0 && phoneNumber.replace(/-/g, '').length !== 10 }"
-              required
-            />
-          </div>
-
-          <div>
-            <label for="nickname" class="block text-sm font-medium text-gray-700 mb-1">
-              Give this Wisephone a name or owner
-              <span class="text-red-500">*</span>
-            </label>
-            <input
-              id="nickname"
-              x-model.trim="nickname"
-              type="text"
-              name="nickname"
-              placeholder="John Doe"
-              maxlength="64"
-              class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              :class="{ 'border-red-500': (nickname.length > 0 && nickname.trim().length === 0) || nickname.length > 64 }"
-              required
-            />
-            <div x-show="nickname.length > 64">
-              <p class="text-sm text-red-500 mt-1">
-                Name must not exceed 64 characters
-              </p>
-            </div>
-          </div>
-
-          <input type="hidden" name="userId" value={user?.id} />
-
-          <div class="flex justify-end gap-3 pt-4">
-            <button type="button" @click="showForm = false; resetForm()" class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">
-              Cancel
-            </button>
-            <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed" :disabled="!isFormValid()">
-              Add Device
-            </button>
-          </div>
-        </form>
-          </div>
+          )}
         </div>
-      )}
-      </div>
-    </div>
-
-  <!-- Activate Plan Modal -->
-  <div
-    x-show="showActivateModal"
-    x-cloak
-    x-transition.opacity
-    class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
-    @click.self="closeActivateModal()"
-  >
-    <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-      <div class="sticky top-0 bg-white border-b border-gray-200 p-4 md:p-6 flex justify-between items-center">
-        <h2 class="text-xl md:text-2xl font-semibold text-gray-800">Activate Plan</h2>
-        <button @click="closeActivateModal()" class="text-gray-400 hover:text-gray-600">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <path d="M18 6 6 18"></path>
-            <path d="m6 6 12 12"></path>
-          </svg>
-        </button>
       </div>
 
-      <div class="p-4 md:p-6">
-        <p class="text-sm md:text-base text-gray-600 mb-6">
-          Your Wisephone needs an active subscription. Choose your WiseOS plan:
-        </p>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-          <!-- WiseOS with Data -->
-          <div class="border border-gray-300 rounded-lg p-4 md:p-6 flex flex-col h-full">
-            <h3 class="text-base md:text-lg font-semibold text-gray-900 mb-1">
-              WiseOS with Data
-            </h3>
-            <p class="text-xs md:text-sm text-gray-500 mb-2">(All-in-One Subscription)</p>
-            <p class="text-sm md:text-base text-gray-700 mb-3 leading-snug">
-              Get everything in one place: WiseOS, talk, text, and data bundled together for a seamless, hassle-free experience.
-              <a
-                class="text-blue-600 underline text-xs md:text-sm"
-                href="https://wisephone.com/pages/plans"
-                target="_blank"
-                rel="noopener noreferrer"
+      <!-- Activate Plan Modal -->
+      <div
+        x-show="showActivateModal"
+        x-cloak
+        x-transition.opacity
+        class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+        @click.self="closeActivateModal()"
+      >
+        <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+          <div class="sticky top-0 bg-white border-b border-gray-200 p-4 md:p-6 flex justify-between items-center">
+            <h2 class="text-xl md:text-2xl font-semibold text-gray-800">Activate Plan</h2>
+            <button @click="closeActivateModal()" class="text-gray-400 hover:text-gray-600">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
               >
-                Learn more
-              </a>
+                <path d="M18 6 6 18"></path>
+                <path d="m6 6 12 12"></path>
+              </svg>
+            </button>
+          </div>
+
+          <div class="p-4 md:p-6">
+            <p class="text-sm md:text-base text-gray-600 mb-6">
+              Your Wisephone needs an active subscription. Choose your WiseOS plan:
             </p>
-            <div class="text-xs md:text-sm text-gray-600 mb-4">
-              <p class="font-semibold mb-1">Includes:</p>
-              <ul class="list-disc list-inside space-y-1">
-                <li>WiseOS Subscription</li>
-                <li>Carrier Service (Data, Talk, and Text)</li>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+              <!-- WiseOS with Data -->
+              <div class="border border-gray-300 rounded-lg p-4 md:p-6 flex flex-col h-full">
+                <h3 class="text-base md:text-lg font-semibold text-gray-900 mb-1">
+                  WiseOS with Data
+                </h3>
+                <p class="text-xs md:text-sm text-gray-500 mb-2">(All-in-One Subscription)</p>
+                <p class="text-sm md:text-base text-gray-700 mb-3 leading-snug">
+                  Get everything in one place: WiseOS, talk, text, and data bundled together for a seamless, hassle-free experience.
+                  <a
+                    class="text-blue-600 underline text-xs md:text-sm"
+                    href="https://wisephone.com/pages/plans"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Learn more
+                  </a>
+                </p>
+                <div class="text-xs md:text-sm text-gray-600 mb-4">
+                  <p class="font-semibold mb-1">Includes:</p>
+                  <ul class="list-disc list-inside space-y-1">
+                    <li>WiseOS Subscription</li>
+                    <li>Carrier Service (Data, Talk, and Text)</li>
+                  </ul>
+                </div>
+                <a
+                  href="https://plans.techless.com/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  @click="closeActivateModal()"
+                  class="flex items-center justify-center gap-1 w-full px-4 py-2 bg-[#C07F53] text-white rounded-md text-sm font-medium hover:bg-[#A06F43] transition-colors cursor-pointer mt-auto"
+                >
+                  Activate All‑In‑One Plan
+                  <Icon name="lucide:external-link" class="w-4 h-4" />
+                </a>
+              </div>
+
+              <!-- Bring Your Own Carrier -->
+              <div class="border border-gray-300 rounded-lg p-4 md:p-6 flex flex-col h-full">
+                <h3 class="text-base md:text-lg font-semibold text-gray-900 mb-1">
+                  Bring Your Own Carrier
+                </h3>
+                <p class="text-xs md:text-sm text-gray-500 mb-2">(WiseOS Subscription - no data included)</p>
+                <p class="text-sm md:text-base text-gray-700 mb-3 leading-snug">
+                  Perfect if you already have a carrier you love. Enjoy all the features of WiseOS while keeping your existing mobile plan.
+                  <a
+                    class="text-blue-600 underline text-xs md:text-sm"
+                    href="https://wisephone.com/pages/plans"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Learn more
+                  </a>
+                </p>
+                <div class="text-xs md:text-sm text-gray-600 mb-4">
+                  <p class="font-semibold mb-1">Includes:</p>
+                  <ul class="list-disc list-inside space-y-1">
+                    <li>WiseOS Subscription</li>
+                    <li>No carrier service included — bring your own plan</li>
+                  </ul>
+                </div>
+                <button
+                  @click="openByocModal()"
+                  class="flex items-center justify-center gap-1 w-full px-4 py-2 bg-[#C07F53] text-white rounded-md text-sm font-medium hover:bg-[#A06F43] transition-colors cursor-pointer mt-auto"
+                >
+                  Activate BYOC Plan
+                </button>
+              </div>
+            </div>
+
+            <p class="text-xs md:text-sm text-gray-500 italic mt-2 mb-4">
+              *Both subscription options are managed through third party portals.
+            </p>
+
+            <!-- Remove Device Button -->
+            <div class="p-4 md:p-6">
+              <form
+                method="POST"
+                action={actions.wisephones.deleteWisephone}
+                @submit.prevent="handleRemoveDevice($event)"
+              >
+                <input type="hidden" name="imei" x-bind:value="activeDeviceImei ? parseInt(activeDeviceImei.replace(/[^0-9]/g, '')) : ''" />
+                <button
+                  type="submit"
+                  class="w-full px-4 py-2 text-sm font-medium text-red-600 bg-white border border-red-300 rounded-md hover:bg-red-50 transition-colors"
+                >
+                  Remove Device
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- BYOC Plans Modal -->
+      <div
+        x-show="showByocModal"
+        x-cloak
+        x-transition.opacity
+        class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+        @click.self="closeByocModal()"
+      >
+        <div class="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+          <!-- Header -->
+          <div class="sticky top-0 bg-white border-b border-gray-200 p-4 md:p-6 flex justify-between items-center">
+            <div class="flex items-center gap-2">
+              <button @click="closeByocModal()" class="text-gray-400 hover:text-gray-600 mr-1">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="m15 18-6-6 6-6"></path>
+                </svg>
+              </button>
+              <h2 class="text-xl font-semibold text-gray-800">Bring Your Own Carrier</h2>
+            </div>
+            <button @click="closeActivateModal()" class="text-gray-400 hover:text-gray-600">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M18 6 6 18"></path>
+                <path d="m6 6 12 12"></path>
+              </svg>
+            </button>
+          </div>
+
+          <div class="p-4 md:p-6">
+            <!-- Billing cycle toggle -->
+            <div class="flex items-center rounded-full bg-gray-200 p-1 mb-6 h-11">
+              <button
+                @click="byocBillingCycle = 'yearly'"
+                class="flex-1 min-w-0 h-full px-3 rounded-full text-sm font-medium transition-all duration-200 focus:outline-none leading-tight text-center"
+                :class="byocBillingCycle === 'yearly' ? 'bg-[#C07F53] text-white shadow-sm' : 'text-gray-500'"
+              >
+                Annually (One Month Free)
+              </button>
+              <button
+                @click="byocBillingCycle = 'monthly'"
+                class="flex-1 min-w-0 h-full rounded-full text-sm font-medium transition-all duration-200 focus:outline-none"
+                :class="byocBillingCycle === 'monthly' ? 'bg-[#C07F53] text-white shadow-sm' : 'text-gray-500'"
+              >
+                Monthly
+              </button>
+            </div>
+
+            <!-- Plan card -->
+            <div class="border border-gray-200 rounded-xl p-5 mb-5">
+              <h3 class="text-base font-semibold text-gray-900 mb-1">WiseOS Subscription</h3>
+              <p class="text-xs text-gray-500 mb-4">No carrier service included — bring your own plan</p>
+              <ul class="space-y-2 mb-5">
+                <li class="flex items-start gap-2 text-sm text-gray-700">
+                  <svg class="w-4 h-4 text-[#C07F53] mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                  WiseOS Subscription
+                </li>
+                <li class="flex items-start gap-2 text-sm text-gray-700">
+                  <svg class="w-4 h-4 text-[#C07F53] mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                  Full feature access
+                </li>
+                <li class="flex items-start gap-2 text-sm text-gray-700">
+                  <svg class="w-4 h-4 text-[#C07F53] mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                  Works with any carrier
+                </li>
               </ul>
+              <div x-show="byocBillingCycle === 'monthly'">
+                <p class="text-3xl font-bold text-gray-900">$14.99<span class="text-base font-normal text-gray-500">/mo</span></p>
+                <p class="text-xs text-gray-500 mt-1">Billed monthly</p>
+              </div>
+              <div x-show="byocBillingCycle === 'yearly'" x-cloak>
+                <p class="text-3xl font-bold text-gray-900">$13.74<span class="text-base font-normal text-gray-500">/mo</span></p>
+                <p class="text-xs text-gray-500 mt-1">Billed annually · One Month Free</p>
+              </div>
             </div>
-            <a
-              href="https://plans.techless.com/"
-              target="_blank"
-              rel="noopener noreferrer"
-              @click="closeActivateModal()"
-              class="flex items-center justify-center gap-1 w-full px-4 py-2 bg-[#C07F53] text-white rounded-md text-sm font-medium hover:bg-[#A06F43] transition-colors cursor-pointer mt-auto"
-            >
-              Activate All‑In‑One Plan
-              <Icon name="lucide:external-link" class="w-4 h-4" />
-            </a>
-          </div>
 
-          <!-- Bring Your Own Carrier -->
-          <div class="border border-gray-300 rounded-lg p-4 md:p-6 flex flex-col h-full">
-            <h3 class="text-base md:text-lg font-semibold text-gray-900 mb-1">
-              Bring Your Own Carrier
-            </h3>
-            <p class="text-xs md:text-sm text-gray-500 mb-2">(WiseOS Subscription - no data included)</p>
-            <p class="text-sm md:text-base text-gray-700 mb-3 leading-snug">
-              Perfect if you already have a carrier you love. Enjoy all the features of WiseOS while keeping your existing mobile plan.
-              <a
-                class="text-blue-600 underline text-xs md:text-sm"
-                href="https://wisephone.com/pages/plans"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Learn more
-              </a>
-            </p>
-            <div class="text-xs md:text-sm text-gray-600 mb-4">
-              <p class="font-semibold mb-1">Includes:</p>
-              <ul class="list-disc list-inside space-y-1">
-                <li>WiseOS Subscription</li>
-                <li>No carrier service included — bring your own plan</li>
-              </ul>
+            <!-- Activate button -->
+            <button
+              @click="handleStripeCheckout(byocBillingCycle)"
+              :disabled="!isStripeLoaded || !activeDeviceImei"
+              class="w-full px-4 py-3 bg-[#C07F53] text-white rounded-md text-sm font-medium hover:bg-[#A06F43] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <span x-text="byocBillingCycle === 'yearly' ? 'Activate BYOC Plan (Annually)' : 'Activate BYOC Plan (Monthly)'"></span>
+            </button>
+
+            <p class="text-xs text-gray-400 text-center mt-3">Secure checkout powered by Stripe</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- CSpire Subscription Modal -->
+      <CspireSubscriptionModal />
+
+      {
+        testStripe ? (
+          <!-- Custom Stripe Checkout Modal -->
+          <div
+            x-show="showStripeModal"
+            x-cloak
+            x-transition.opacity
+            class="fixed inset-0 z-50 bg-black bg-opacity-60 flex items-center justify-center p-4"
+            @click.self="closeStripeModal()"
+          >
+            <div class="bg-[#f7f6f2] rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto relative">
+              <div class="flex items-center justify-between px-5 pt-5 pb-3">
+                <h2 class="text-base font-semibold text-gray-800">Test Stripe Modal</h2>
+                <button
+                  @click="closeStripeModal()"
+                  class="text-gray-400 hover:text-gray-600 transition-colors p-1"
+                  aria-label="Close"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M18 6 6 18"></path>
+                    <path d="m6 6 12 12"></path>
+                  </svg>
+                </button>
+              </div>
+              <div class="px-5 pb-6">
+                <StripeCheckout customerEmail={user?.emailAddresses?.[0]?.emailAddress || user?.primaryEmailAddress?.emailAddress || ""} />
+              </div>
             </div>
-            <button
-              @click="openByocModal()"
-              class="flex items-center justify-center gap-1 w-full px-4 py-2 bg-[#C07F53] text-white rounded-md text-sm font-medium hover:bg-[#A06F43] transition-colors cursor-pointer mt-auto"
-            >
-              Activate BYOC Plan
-            </button>
           </div>
-        </div>
-
-        <p class="text-xs md:text-sm text-gray-500 italic mt-2 mb-4">
-          *Both subscription options are managed through third party portals.
-        </p>
-
-        <!-- Remove Device Button -->
-        <div class="p-4 md:p-6">
-          <form
-            method="POST"
-            action={actions.wisephones.deleteWisephone}
-            @submit.prevent="handleRemoveDevice($event)"
-          >
-            <input type="hidden" name="imei" x-bind:value="activeDeviceImei ? parseInt(activeDeviceImei.replace(/[^0-9]/g, '')) : ''" />
-            <button
-              type="submit"
-              class="w-full px-4 py-2 text-sm font-medium text-red-600 bg-white border border-red-300 rounded-md hover:bg-red-50 transition-colors"
-            >
-              Remove Device
-            </button>
-          </form>
-        </div>
+        ) : (
+          <!-- Legacy Stripe Embedded Checkout Dialog -->
+          <dialog x-ref="stripeDialog" class="modal">
+            <div style="background-color: rgb(247, 246, 242)" class="modal-box max-w-2xl">
+              <div id="stripe-subscription-element"></div>
+            </div>
+            <form method="dialog" class="modal-backdrop">
+              <button>close</button>
+            </form>
+          </dialog>
+        )
+      }
       </div>
-    </div>
-  </div>
-
-  <!-- BYOC Plans Modal -->
-  <div
-    x-show="showByocModal"
-    x-cloak
-    x-transition.opacity
-    class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
-    @click.self="closeByocModal()"
-  >
-    <div class="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
-      <!-- Header -->
-      <div class="sticky top-0 bg-white border-b border-gray-200 p-4 md:p-6 flex justify-between items-center">
-        <div class="flex items-center gap-2">
-          <button @click="closeByocModal()" class="text-gray-400 hover:text-gray-600 mr-1">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="m15 18-6-6 6-6"></path>
-            </svg>
-          </button>
-          <h2 class="text-xl font-semibold text-gray-800">Bring Your Own Carrier</h2>
-        </div>
-        <button @click="closeActivateModal()" class="text-gray-400 hover:text-gray-600">
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M18 6 6 18"></path>
-            <path d="m6 6 12 12"></path>
-          </svg>
-        </button>
-      </div>
-
-      <div class="p-4 md:p-6">
-        <!-- Billing cycle toggle -->
-        <div class="flex items-center rounded-full bg-gray-200 p-1 mb-6 h-11">
-          <button
-            @click="byocBillingCycle = 'yearly'"
-            class="flex-1 min-w-0 h-full px-3 rounded-full text-sm font-medium transition-all duration-200 focus:outline-none leading-tight text-center"
-            :class="byocBillingCycle === 'yearly' ? 'bg-[#C07F53] text-white shadow-sm' : 'text-gray-500'"
-          >
-            Annually (One Month Free)
-          </button>
-          <button
-            @click="byocBillingCycle = 'monthly'"
-            class="flex-1 min-w-0 h-full rounded-full text-sm font-medium transition-all duration-200 focus:outline-none"
-            :class="byocBillingCycle === 'monthly' ? 'bg-[#C07F53] text-white shadow-sm' : 'text-gray-500'"
-          >
-            Monthly
-          </button>
-        </div>
-
-        <!-- Plan card -->
-        <div class="border border-gray-200 rounded-xl p-5 mb-5">
-          <h3 class="text-base font-semibold text-gray-900 mb-1">WiseOS Subscription</h3>
-          <p class="text-xs text-gray-500 mb-4">No carrier service included — bring your own plan</p>
-          <ul class="space-y-2 mb-5">
-            <li class="flex items-start gap-2 text-sm text-gray-700">
-              <svg class="w-4 h-4 text-[#C07F53] mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>
-              WiseOS Subscription
-            </li>
-            <li class="flex items-start gap-2 text-sm text-gray-700">
-              <svg class="w-4 h-4 text-[#C07F53] mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>
-              Full feature access
-            </li>
-            <li class="flex items-start gap-2 text-sm text-gray-700">
-              <svg class="w-4 h-4 text-[#C07F53] mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>
-              Works with any carrier
-            </li>
-          </ul>
-          <div x-show="byocBillingCycle === 'monthly'">
-            <p class="text-3xl font-bold text-gray-900">$14.99<span class="text-base font-normal text-gray-500">/mo</span></p>
-            <p class="text-xs text-gray-500 mt-1">Billed monthly</p>
-          </div>
-          <div x-show="byocBillingCycle === 'yearly'" x-cloak>
-            <p class="text-3xl font-bold text-gray-900">$13.74<span class="text-base font-normal text-gray-500">/mo</span></p>
-            <p class="text-xs text-gray-500 mt-1">Billed annually · One Month Free</p>
-          </div>
-        </div>
-
-        <!-- Activate button -->
-        <button
-          @click="handleStripeCheckout(byocBillingCycle)"
-          :disabled="!isStripeLoaded || !activeDeviceImei"
-          class="w-full px-4 py-3 bg-[#C07F53] text-white rounded-md text-sm font-medium hover:bg-[#A06F43] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <span x-text="byocBillingCycle === 'yearly' ? 'Activate BYOC Plan (Annually)' : 'Activate BYOC Plan (Monthly)'"></span>
-        </button>
-
-        <p class="text-xs text-gray-400 text-center mt-3">Secure checkout powered by Stripe</p>
-      </div>
-    </div>
-  </div>
-
-  <!-- CSpire Subscription Modal -->
-  <CspireSubscriptionModal />
-
-  {testStripe ? (
-    <!-- Custom Stripe Checkout Modal -->
-    <div
-      x-show="showStripeModal"
-      x-cloak
-      x-transition.opacity
-      class="fixed inset-0 z-50 bg-black bg-opacity-60 flex items-center justify-center p-4"
-      @click.self="closeStripeModal()"
-    >
-      <div class="bg-[#f7f6f2] rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto relative">
-        <div class="flex items-center justify-between px-5 pt-5 pb-3">
-          <h2 class="text-base font-semibold text-gray-800">Test Stripe Modal</h2>
-          <button
-            @click="closeStripeModal()"
-            class="text-gray-400 hover:text-gray-600 transition-colors p-1"
-            aria-label="Close"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M18 6 6 18"></path>
-              <path d="m6 6 12 12"></path>
-            </svg>
-          </button>
-        </div>
-        <div class="px-5 pb-6">
-          <StripeCheckout customerEmail={user?.emailAddresses?.[0]?.emailAddress || user?.primaryEmailAddress?.emailAddress || ""} />
-        </div>
-      </div>
-    </div>
-  ) : (
-    <!-- Legacy Stripe Embedded Checkout Dialog -->
-    <dialog x-ref="stripeDialog" class="modal">
-      <div style="background-color: rgb(247, 246, 242)" class="modal-box max-w-2xl">
-        <div id="stripe-subscription-element"></div>
-      </div>
-      <form method="dialog" class="modal-backdrop">
-        <button>close</button>
-      </form>
-    </dialog>
-  )}
-
-  </div>
-
-  </Fragment>
+    </Fragment>
+  }
 
 </main>
 
@@ -1488,6 +1604,7 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
     }));
 
     Alpine.data("dashboard", (initialData?: { userEmail?: string; newDevice?: { imei: string; phoneNumber: string; isCspire?: boolean } | null; testStripe?: boolean }) => ({
+      activeLink: 'devices',
       showForm: false,
       isLoading: false,
       mobileMenuOpen: false,
