@@ -12,15 +12,20 @@ export const POST: APIRoute = async ({ request, params }) => {
 
   const body = await request.json();
   const packageName = body.packageName ?? body.package_name;
+  const name = body.name;
 
   if (packageName.length === 0 || packageName === undefined || packageName === null) {
     throw new WPIIPortalAPIError("packageName is required", HTTP.BAD_REQUEST);
   }
 
+  if (name.length === 0 || name === undefined || name === null) {
+    throw new WPIIPortalAPIError("name is required", HTTP.BAD_REQUEST);
+  }
+
   try {
     await upsertCatalogApp({
-      packageName,
-      name: packageName,
+      packageName: packageName,
+      name: name,
       playStoreUrl: body.playStoreUrl ?? body.play_store_url,
       iconUrl: body.iconUrl ?? body.icon_url,
       category: body.category,
