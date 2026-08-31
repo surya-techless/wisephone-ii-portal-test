@@ -375,14 +375,6 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
   * {
     font-family: 'TT Norms Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   }
-
-  .request-app-page :is(h1, h2, h3, p, li, a, span) {
-    min-width: 0;
-    max-width: 100%;
-    overflow-wrap: anywhere;
-    word-break: break-word;
-    flex-shrink: 1;
-  }
 </style>
 
 <div class="dashboard-container flex h-screen w-full min-w-[360px] bg-[#f7f6f2] relative" x-data={`dashboard(${JSON.stringify({ userEmail: user?.emailAddresses?.[0]?.emailAddress || user?.primaryEmailAddress?.emailAddress || "", newDevice: actionResult?.data && !actionResult.error && !actionResult.data.isSubscribed && actionResult.data.wisephone?.[0] ? { imei: actionResult.data.wisephone[0].imei.toString().padEnd(15, "0"), phoneNumber: actionResult.data.wisephone[0].phoneNumber || "", isCspire: Boolean(actionResult.data.isCspire) } : null, testStripe })})`} @activate-modal.window="$event.detail?.isCspire ? openCspireModal($event.detail) : openActivateModal($event.detail?.imei || $event.detail)">
@@ -420,7 +412,7 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
   <!-- no registered devices, so prompt user to add -->
   { derivedHasNoWisephone &&
       <Fragment>
-        <div class="p-4 md:p-8">
+        <div class="p-4 md:p-8" x-show="activeLink === 'devices'">
           <section class="flex flex-col items-center justify-center w-full p-6 md:p-8 bg-transparent border-2 rounded-2xl border-slate-200" x-show="!showForm">
             <img
               src={phoneImg.src}
@@ -506,124 +498,14 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
     </div>
   }
 
-  { !derivedHasNoWisephone &&
-    <div x-show="activeLink === 'request-app'" x-cloak class="request-app-page w-full min-w-0 overflow-x-hidden">
-      <div class="device-dashboard-inner-container mx-4 mt-4 mb-4 md:m-4 pt-2 md:pt-0 min-w-0 lg:max-w-[60%]">
-        <h1 class="text-xl md:text-2xl font-semibold text-gray-800">Meet the Healthy Tech Index</h1>
-
-        <div class="mt-3 md:mt-4 space-y-3 md:space-y-4 text-sm md:text-base text-gray-600 leading-relaxed">
-          <p>
-            Wisephone partners with the Healthy Tech Index, an independent organization that evaluates applications using consistent standards for healthier digital habits.
-          </p>
-          <p>
-            The Healthy Tech Index evaluates apps across multiple categories, including apps that may never be available on Wisephone. Each evaluated app receives a score along with information explaining the evaluation.
-          </p>
-        </div>
-
-        <h2 class="mt-6 md:mt-8 text-base md:text-xl font-semibold text-gray-800">How can an app become available in the Tool Drawer?</h2>
-
-        <ol class="mt-4 md:mt-5 space-y-4 md:space-y-5">
-          <li class="grid grid-cols-[auto_minmax(0,1fr)] gap-3 md:gap-4">
-            <span class="w-7 h-7 md:w-8 md:h-8 rounded-full bg-[#4b918e] text-white text-sm font-semibold flex items-center justify-center">1</span>
-            <div>
-              <h3 class="font-semibold text-gray-900 text-sm md:text-base">Search for the app</h3>
-              <p class="mt-1 text-sm md:text-base text-gray-600 leading-relaxed">
-                Visit
-                <a href="https://healthytechindex.com" target="_blank" rel="noopener noreferrer" class="text-blue-600 underline hover:text-blue-800">Healthy Tech Index</a>
-                to see whether the app has already been evaluated.
-              </p>
-            </div>
-          </li>
-          <li class="grid grid-cols-[auto_minmax(0,1fr)] gap-3 md:gap-4">
-            <span class="w-7 h-7 md:w-8 md:h-8 rounded-full bg-[#4b918e] text-white text-sm font-semibold flex items-center justify-center">2</span>
-            <div>
-              <h3 class="font-semibold text-gray-900 text-sm md:text-base">Request an app</h3>
-              <p class="mt-1 text-sm md:text-base text-gray-600 leading-relaxed">
-                Not scored yet? Select "+ Add" next to the app in
-                <a href="https://healthytechindex.com" target="_blank" rel="noopener noreferrer" class="text-blue-600 underline hover:text-blue-800">Healthy Tech Index</a>
-                search to request review.<br><br>
-                <b>Note:</b> You don't need to submit a separate request to Wisephone.
-              </p>
-            </div>
-          </li>
-          <li class="grid grid-cols-[auto_minmax(0,1fr)] gap-3 md:gap-4">
-            <span class="w-7 h-7 md:w-8 md:h-8 rounded-full bg-[#4b918e] text-white text-sm font-semibold flex items-center justify-center">3</span>
-            <div>
-              <h3 class="font-semibold text-gray-900 text-sm md:text-base">Look for the <b>W-Approved</b> badge</h3>
-              <p class="mt-1 text-sm md:text-base text-gray-600 leading-relaxed">
-                Apps that are approved for Wisephone use should have a <b>W-Approved</b> badge.
-              </p>
-            </div>
-          </li>
-          <li class="grid grid-cols-[auto_minmax(0,1fr)] gap-3 md:gap-4">
-            <span class="w-7 h-7 md:w-8 md:h-8 rounded-full bg-[#4b918e] text-white text-sm font-semibold flex items-center justify-center">4</span>
-            <div>
-              <h3 class="font-semibold text-gray-900 text-sm md:text-base">W-Approved apps are considered for the Tool Drawer</h3>
-              <p class="mt-1 text-sm md:text-base text-gray-600 leading-relaxed">
-                Apps with a <b>W-Approved</b> badge will be considered for the Wisephone Tool Drawer, but Wisephone makes the final decision based on extra criteria.
-              </p>
-            </div>
-          </li>
-        </ol>
-
-        <div class="mt-5 md:mt-6 space-y-3 md:space-y-4 text-sm md:text-base text-gray-600 leading-relaxed">
-          <p>
-            W-Approved apps typically appear in the Tool Drawer within 48 hours. Having the badge does not guarantee availability, and Wisephone may add or remove third-party apps from the Tool Drawer at any time.
-          </p>
-          <p class="font-medium text-gray-800">
-            <b>
-              Wisephone is <i>generally</i> free from internet browsers, social media, games, shopping, video streaming, explicit content, and solo media.
-            </b>
-          </p>
-        </div>
-
-        <div class="mt-6 md:mt-8 border border-gray-300 rounded-lg p-4 md:p-6 bg-white">
-          <div class="grid grid-cols-[auto_minmax(0,1fr)] gap-3 mb-3 md:mb-4">
-            <img src="/assets/portal-icons/app-request.svg" alt="" class="w-6 h-6" />
-            <h3 class="font-semibold text-gray-900 text-sm md:text-base">Already requested an app?</h3>
-          </div>
-          <p class="text-sm md:text-base text-gray-600 leading-relaxed">
-            We have submitted all previous app requests to Healthy Tech Index for review. If a score is not visible, please follow step 2 above.
-          </p>
-
-          <a
-            href="https://healthytechindex.com"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="mt-5 md:mt-6 flex w-full max-w-full md:inline-flex md:w-auto items-center justify-center gap-1 px-4 py-2.5 md:py-2 bg-[#C07F53] text-white rounded-md text-sm font-medium hover:bg-[#A06F43] transition-colors"
-          >
-            <span class="text-center">Explore the Healthy Tech Index</span>
-            <Icon name="lucide:arrow-right" class="w-4 h-4" />
-          </a>
-
-          <p class="mt-5 md:mt-6 text-sm text-gray-500 leading-relaxed">
-            Healthy Tech Index is currently in beta. To ensure your feedback reaches the appropriate team, please submit Healthy Tech Index-related feedback directly through Healthy Tech Index.
-          </p>
-
-          <a
-            href="https://healthytechindex.com/feedback"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="mt-4 flex w-full max-w-full md:inline-flex md:w-auto items-center justify-center gap-1 px-4 py-2.5 md:py-2 border border-gray-400 rounded-md text-sm font-semibold text-gray-800 hover:bg-gray-100 transition-colors"
-          >
-            Share Feedback
-            <Icon name="lucide:arrow-right" class="w-4 h-4" />
-          </a>
-        </div>
-      </div>
-    </div>
-  }
-
   <!-- Modal for Add Device Form -->
-  { !derivedHasNoWisephone &&
-    <Fragment>
-      <div
-        x-show="showForm"
-        x-cloak
-        x-transition.opacity
-        class="fixed inset-0 bg-black bg-opacity-50 flex items-start md:items-center justify-center z-50 overflow-y-auto p-0 md:p-4"
-        @click.self="showForm = false; resetForm()"
-      >
+  <div
+    x-show="showForm"
+    x-cloak
+    x-transition.opacity
+    class="fixed inset-0 bg-black bg-opacity-50 flex items-start md:items-center justify-center z-50 overflow-y-auto p-0 md:p-4"
+    @click.self="showForm = false; resetForm()"
+  >
         <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-0 md:mx-4 mt-[5vh] md:my-auto max-h-[75vh] md:max-h-[90vh] overflow-y-auto flex flex-col">
           <!-- Custom Typeform Component (when feature flag is enabled AND on mobile) -->
           {enableTypeform && (
@@ -994,6 +876,8 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
         </div>
       </div>
 
+  { !derivedHasNoWisephone &&
+    <Fragment>
       <!-- Activate Plan Modal -->
       <div
         x-show="showActivateModal"
