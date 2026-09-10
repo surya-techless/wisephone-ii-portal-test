@@ -3,7 +3,7 @@ import { z } from "astro:schema";
 import { db, Wisephone, BypassTechlessSubscription, DeviceFeatureFlags, eq, sql } from "astro:db";
 import { SamsungKnoxService } from "@/libs/samsung-knox-service";
 import { validateIsSubscribed } from "@/libs/stripe";
-import { isValidIMEI, devLog, FEATURES, KNOX_USER_GROUPS } from "@/libs/utils";
+import { isValidIMEI, devLog, describeKnoxGroups, FEATURES, KNOX_USER_GROUPS } from "@/libs/utils";
 
 export const wisephones = {
   // Create a new Wisephone
@@ -40,10 +40,15 @@ export const wisephones = {
 
         // Seed DeviceFeatureFlags from live Knox groups
         let isCspireDevice = false;
+        let isPatriotDevice = false;
         let deviceGroups: string[] = [];
         try {
           const groups = await SamsungKnoxService.getGroupsForDevice(input.imei.toString());
           deviceGroups = groups;
+          console.log(
+            `[Knox groups] device added | IMEI: ${input.imei} | ${groups.length} group(s):`,
+            describeKnoxGroups(groups)
+          );
           const flags: Record<string, number> = { SHOW_SCREEN_TIME: 0 };
           for (const [key, feature] of Object.entries(FEATURES)) {
             if (feature.isPortalOnly) continue;
@@ -59,6 +64,7 @@ export const wisephones = {
           ];
           const cspireGroupIds = [KNOX_USER_GROUPS.CSPIRE_WPII_Unpaid_v2, KNOX_USER_GROUPS.CSPIRE_WPII_Subscribed];
           isCspireDevice = groups.some(id => allCspireGroupIds.includes(id));
+          isPatriotDevice = groups.includes(KNOX_USER_GROUPS.PATRIOT);
           const phoneType = groups.some(id => cspireGroupIds.includes(id)) ? "CSPIRE" : "WPII";
           await db
             .insert(DeviceFeatureFlags)
@@ -70,6 +76,7 @@ export const wisephones = {
           devLog.log("[FeatureFlags] Seeded from Knox on device add for IMEI:", input.imei, "| phoneType:", phoneType);
         } catch (flagsError) {
           // Non-fatal — flags will be seeded on first manage page visit
+          console.error(`[Knox groups] device added | IMEI: ${input.imei} | failed to fetch/seed groups:`, flagsError);
           devLog.error("[FeatureFlags] Failed to seed on device add:", flagsError);
         }
 
@@ -110,7 +117,8 @@ export const wisephones = {
           success: "Wisephone created successfully!",
           wisephone: newWisephone,
           isSubscribed,
-          isCspire: isCspireDevice
+          isCspire: isCspireDevice,
+          isPatriot: isPatriotDevice
         };
       } catch (error: any) {
         if (error?.code === "SQLITE_CONSTRAINT_PRIMARYKEY" || error?.code === "SQLITE_CONSTRAINT") {

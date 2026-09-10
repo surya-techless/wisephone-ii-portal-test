@@ -93,9 +93,26 @@ export const KNOX_USER_GROUPS = {
   // Retail/inventory group — devices not yet sold/set up. wiseOS shows a
   // setup-only launcher while a device is in this group; removed once the
   // device is confirmed subscribed (see assignSubscriptionGroupByDeviceModel).
-  SHELF_STOCK: "fdc85e95e3574f729be74d9c2bce72b4"
+  SHELF_STOCK: "fdc85e95e3574f729be74d9c2bce72b4",
+
+  PATRIOT: "08042d3b18774ac3b9b9f9c56954a454"
 
 };
+
+/** Reverse lookup: Knox group ID -> the KNOX_USER_GROUPS key it maps to. */
+const KNOX_GROUP_ID_TO_NAME: Record<string, string> = Object.entries(KNOX_USER_GROUPS).reduce(
+  (acc, [name, id]) => {
+    // First name wins so aliased IDs (e.g. ADD_ON_TOOL_DRAWER / PRO) report the canonical key.
+    if (!acc[id]) acc[id] = name;
+    return acc;
+  },
+  {} as Record<string, string>
+);
+
+/** Turn a list of raw Knox group IDs into `NAME (id)` strings for logging. Unknown IDs are kept as-is. */
+export function describeKnoxGroups(groupIds: string[]): string[] {
+  return groupIds.map(id => (KNOX_GROUP_ID_TO_NAME[id] ? `${KNOX_GROUP_ID_TO_NAME[id]} (${id})` : `UNKNOWN (${id})`));
+}
 
 export const CSPIRE_SUBSCRIPTION_CHECK = true;
 
