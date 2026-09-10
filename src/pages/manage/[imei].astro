@@ -22,7 +22,7 @@ import Layout from "@/layouts/Layout.astro";
 import TechlessSubscriptionButton from "@/components/TechlessSubscriptionButton.astro";
 import DashboardSidebar from "@/components/DashboardSidebar.astro";
 import ScreenTimeStats from "@/components/ScreenTimeStats.astro";
-import { FEATURES, getPackageNameFromPlayStoreUrl, isValidIMEI, type Feature, devLog } from "@/libs/utils";
+import { FEATURES, getPackageNameFromPlayStoreUrl, isValidIMEI, KNOX_USER_GROUPS, type Feature, devLog } from "@/libs/utils";
 import { getCatalogApps, AppSource as CatalogAppSource } from "@/libs/app-catalog";
 import { isAdmin } from "@/lib/auth/permissions";
 import type { AppsList } from "@/types/apps";
@@ -34,6 +34,7 @@ let imei: string | undefined = Astro.params.imei;
 let wisephone: any = null;
 let features = Object.entries(FEATURES).map(([key, feature]) => ({ ...feature, featureKey: key }));
 let isSubscribed = false;
+let isPatriot = false;
 let error = "";
 let installedApps: any[] = [];
 let appsList: AppsList = {};
@@ -462,6 +463,14 @@ try {
     devLog.error("❌ [manage page] DeviceFeatureFlags read/seed failed:", flagsErr);
   }
 
+  // Patriot devices (Knox PATRIOT group) hide the "I have a Wisephone data plan" link
+  try {
+    const knoxGroups = await SamsungKnoxService.getGroupsForDevice(String(imei));
+    isPatriot = knoxGroups.includes(KNOX_USER_GROUPS.PATRIOT);
+  } catch (patriotErr) {
+    devLog.error("[Patriot] failed to fetch Knox groups for manage page:", patriotErr);
+  }
+
   // Installed apps will be fetched client-side asynchronously
   // Initialize as empty - will be populated after page loads
   installedApps = [];
@@ -669,15 +678,17 @@ try {
                         <hr class="border-gray-200 mb-4 w-full max-w-full md:w-[500px]" />
                         <h4 class="text-sm font-semibold text-gray-900 mb-4">Manage My Subscription</h4>
                         <div class="flex flex-col md:flex-row gap-3">
-                          <a
-                            href="https://plans.techless.com"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            class="px-3 py-1.5 border border-black rounded-lg text-xs font-medium text-gray-700 hover:bg-gray-50 w-fit inline-flex items-center gap-1"
-                          >
-                            I have a Wisephone data plan
-                            <Icon name="lucide:external-link" class="w-3 h-3" />
-                          </a>
+                          {!isPatriot && (
+                            <a
+                              href="https://plans.techless.com"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              class="px-3 py-1.5 border border-black rounded-lg text-xs font-medium text-gray-700 hover:bg-gray-50 w-fit inline-flex items-center gap-1"
+                            >
+                              I have a Wisephone data plan
+                              <Icon name="lucide:external-link" class="w-3 h-3" />
+                            </a>
+                          )}
                           <div
                             x-data="stripeSubscription"
                             x-init={`
