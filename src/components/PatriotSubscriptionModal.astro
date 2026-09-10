@@ -11,7 +11,7 @@ import { actions } from "astro:actions";
 >
   <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
     <div class="sticky top-0 bg-white border-b border-gray-200 p-4 md:p-6 flex justify-between items-center">
-      <h2 class="text-xl md:text-2xl font-semibold text-gray-800">Patriot Mobile</h2>
+      <h2 class="text-xl md:text-2xl font-semibold text-gray-800">WiseOS Subscription</h2>
       <button @click="closePatriotModal()" class="text-gray-400 hover:text-gray-600">
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -33,17 +33,14 @@ import { actions } from "astro:actions";
     <div class="p-4 md:p-6">
       <!-- WiseOS Subscription Card -->
       <div class="border border-gray-300 rounded-lg p-4 md:p-6 flex flex-col">
-        <h3 class="text-base md:text-lg font-semibold text-gray-900 mb-3">
-          Activate WiseOS Subscription
-        </h3>
-        <p class="text-sm md:text-base text-gray-700 mb-6 leading-snug">
-          Activate a WiseOS subscription for your Wisephone via the link below. Patriot Mobile services sold separately.
+        <p class="text-sm md:text-base text-gray-700 mb-6 leading-snug text-center">
+          Activate a WiseOS subscription for your Wisephone via the link below. Carrier services sold separately.
         </p>
         <button
           @click="proceedToByocFromPatriot()"
           class="flex items-center justify-center gap-1 w-full px-4 py-2 bg-[#C07F53] text-white rounded-md text-sm font-medium hover:bg-[#A06F43] transition-colors cursor-pointer"
         >
-          Choose a Plan
+          Activate
         </button>
       </div>
 
