@@ -90,6 +90,21 @@ const DeviceDataUsage = defineTable({
   }
 });
 
+// Append-only log of received Stripe/Gigs webhook events, so the dashboard
+// can show them without needing to tail server logs (see /api/webhooks/stripe,
+// /api/webhooks/gigs, and /api/webhooks/recent.json).
+const WebhookEvent = defineTable({
+  columns: {
+    id: column.number({ primaryKey: true, autoIncrement: true }),
+    source: column.text(), // "stripe" | "gigs"
+    type: column.text(), // e.g. "customer.subscription.deleted"
+    imei: column.text({ optional: true }),
+    status: column.text({ optional: true }), // subscription status at time of event
+    isActive: column.number({ optional: true }), // 0/1
+    receivedAt: column.date({ default: new Date() })
+  }
+});
+
 export default defineDb({
   tables: {
     App,
@@ -99,6 +114,7 @@ export default defineDb({
     OttogridCache,
     DeviceScreenTimeMetrics,
     DeviceDataUsage,
-    DeviceFeatureFlags
+    DeviceFeatureFlags,
+    WebhookEvent
   }
 });

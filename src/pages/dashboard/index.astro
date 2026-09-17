@@ -1523,6 +1523,8 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
       pollingInterval: null as ReturnType<typeof setTimeout> | null,
       shouldStartPolling: false,
       pollingImei: null as string | null,
+      webhookEventsLastId: 0,
+      webhookEventsPollInterval: null as ReturnType<typeof setInterval> | null,
       testStripe: initialData?.testStripe ?? false,
       stripeInitialCycle: 'yearly' as 'monthly' | 'yearly',
       isStripeLoaded: false,
@@ -1919,6 +1921,46 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
       /**
        * Initialize background polling for unsubscribed devices
        */
+      /**
+       * Poll /api/webhooks/recent.json and console.log any new Stripe/Gigs
+       * webhook events. Webhooks themselves are received server-to-server
+       * (Stripe/Gigs hitting the portal backend directly) — there's no
+       * browser involved in that request, so this is the bridge that surfaces
+       * them here. Admin-only endpoint; a 403 for non-admins just stops polling.
+       */
+      async pollWebhookEvents() {
+        try {
+          const response = await fetch("/api/webhooks/recent.json");
+          if (!response.ok) {
+            if (response.status === 403 || response.status === 401) {
+              devLog.log("[WEBHOOKS] Not an admin — stopping webhook event polling");
+              if (this.webhookEventsPollInterval) {
+                clearInterval(this.webhookEventsPollInterval);
+                this.webhookEventsPollInterval = null;
+              }
+            }
+            return;
+          }
+          const { events } = await response.json();
+          const newEvents = (events as Array<Record<string, unknown>>)
+            .filter((e) => (e.id as number) > this.webhookEventsLastId)
+            .sort((a, b) => (a.id as number) - (b.id as number));
+          for (const e of newEvents) {
+            console.log(
+              `[webhook] ${e.source} | ${e.type} | IMEI: ${e.imei ?? "unknown"} | status: ${e.status ?? "—"} | isActive: ${Boolean(e.isActive)} | receivedAt: ${e.receivedAt}`
+            );
+          }
+          if (newEvents.length > 0) {
+            this.webhookEventsLastId = newEvents[newEvents.length - 1].id as number;
+          }
+        } catch (error) {
+          devLog.error("[WEBHOOKS] Failed to poll recent webhook events:", error);
+        }
+      },
+      startWebhookEventPolling(): void {
+        void this.pollWebhookEvents();
+        this.webhookEventsPollInterval = setInterval(() => void this.pollWebhookEvents(), 10000);
+      },
       initializeBackgroundPolling(): void {
         devLog.log("[POLL] initializeBackgroundPolling() called");
 
@@ -2022,6 +2064,9 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
 
         // Initialize background polling for unsubscribed devices
         this.initializeBackgroundPolling();
+
+        // Poll for received Stripe/Gigs webhook events (admin-only; a 403 stops polling)
+        this.startWebhookEventPolling();
 
         // Check if a new unsubscribed device was just added
         if (initialData?.newDevice?.imei) {

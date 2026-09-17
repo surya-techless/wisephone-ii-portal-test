@@ -1,5 +1,6 @@
 import type { APIRoute } from "astro";
 import Stripe from "stripe";
+import { db, WebhookEvent } from "astro:db";
 import { STRIPE_WEBHOOK_SECRET } from "astro:env/server";
 import { stripe } from "@/libs/stripe";
 import { normalizeImei } from "@/libs/subscription-matching";
@@ -20,10 +21,11 @@ import { devLog } from "@/libs/utils";
  *   - invoice.payment_failed (optional, catches a failed renewal early)
  * Put the endpoint's signing secret in STRIPE_WEBHOOK_SECRET.
  *
- * This currently only *observes* events (verifies + logs them). Deciding what
- * the portal should actively do with an ended subscription — write to a cache
- * table, immediately revoke the Knox SUBSCRIBED group the way
- * manage/[imei].astro's syncFeatureFlagsToDb does reactively today — is a
+ * Events are logged (server-side) and recorded in the WebhookEvent table, so
+ * the dashboard can poll /api/webhooks/recent.json and show them without
+ * tailing server logs. Deciding what the portal should more actively do with
+ * an ended subscription — immediately revoke the Knox SUBSCRIBED group the
+ * way manage/[imei].astro's syncFeatureFlagsToDb does reactively today — is a
  * separate decision, deliberately not wired up here yet.
  */
 export const POST: APIRoute = async ({ request }) => {
@@ -90,6 +92,13 @@ export const POST: APIRoute = async ({ request }) => {
       console.log(
         `[stripe webhook] ${event.type} | IMEI: ${imei} | subscription: ${subscription.id} | status: ${subscription.status} | isActive: ${isActive}`
       );
+      await db.insert(WebhookEvent).values({
+        source: "stripe",
+        type: event.type,
+        imei,
+        status: subscription.status,
+        isActive: isActive ? 1 : 0
+      });
       break;
     }
 
@@ -98,6 +107,12 @@ export const POST: APIRoute = async ({ request }) => {
       console.log(
         `[stripe webhook] invoice.payment_failed | customer: ${invoice.customer} | subscription: ${invoice.subscription}`
       );
+      await db.insert(WebhookEvent).values({
+        source: "stripe",
+        type: event.type,
+        status: "payment_failed",
+        isActive: 0
+      });
       break;
     }
 

@@ -1,4 +1,5 @@
 import type { APIRoute } from "astro";
+import { db, WebhookEvent } from "astro:db";
 import { GIGS_API_KEY, GIGS_WEBHOOK_SECRET } from "astro:env/server";
 import { GIGS_ACTIVE_STATUSES, normalizeImei } from "@/libs/subscription-matching";
 import type { Device, DeviceList, Subscription } from "@/libs/types";
@@ -27,9 +28,11 @@ const GIGS_BASE_URL = "https://api.gigs.com/projects/techless";
  * /api/device-features). Swap this for Gigs' real signing mechanism once
  * confirmed — do not treat this as verified.
  *
- * This currently only *observes* events (verifies + logs them). Deciding what
- * the portal should actively do with an ended subscription is a separate
- * decision, deliberately not wired up here yet.
+ * Events are logged (server-side) and recorded in the WebhookEvent table, so
+ * the dashboard can poll /api/webhooks/recent.json and show them without
+ * tailing server logs. Deciding what the portal should more actively do with
+ * an ended subscription is a separate decision, deliberately not wired up
+ * here yet.
  */
 export const POST: APIRoute = async ({ request }) => {
   if (!GIGS_WEBHOOK_SECRET) {
@@ -110,15 +113,30 @@ export const POST: APIRoute = async ({ request }) => {
     }
   }
 
+  // If Gigs sent an event envelope (e.g. "com.gigs.subscription.canceled"), use its
+  // type for the log; otherwise fall back to a label derived from the subscription status.
+  const eventType =
+    typeof (payload as { type?: string }).type === "string"
+      ? (payload as { type: string }).type
+      : `subscription.${subscription.status}`;
+
   if (!imei) {
     console.error(
-      `[gigs webhook] subscription ${subscription.id} (status: ${subscription.status}) — no IMEI resolved, skipping`
+      `[gigs webhook] ${eventType} — subscription ${subscription.id} (status: ${subscription.status}) — no IMEI resolved, skipping`
     );
   } else {
     console.log(
-      `[gigs webhook] subscription ${subscription.id} | IMEI: ${imei} | status: ${subscription.status} | isActive: ${isActive}`
+      `[gigs webhook] ${eventType} | IMEI: ${imei} | subscription: ${subscription.id} | status: ${subscription.status} | isActive: ${isActive}`
     );
   }
+
+  await db.insert(WebhookEvent).values({
+    source: "gigs",
+    type: eventType,
+    imei: imei || undefined,
+    status: subscription.status,
+    isActive: isActive ? 1 : 0
+  });
 
   return new Response(JSON.stringify({ received: true }), {
     status: 200,
