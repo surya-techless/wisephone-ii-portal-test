@@ -52,7 +52,9 @@ export default defineConfig({
   env: {
     schema: {
       GIGS_API_KEY: envField.string({ context: "server", access: "secret" }),
+      GIGS_WEBHOOK_SECRET: envField.string({ context: "server", access: "secret", optional: true }),
       STRIPE_SECRET_KEY: envField.string({ context: "server", access: "secret" }),
+      STRIPE_WEBHOOK_SECRET: envField.string({ context: "server", access: "secret", optional: true }),
       PUBLIC_CLERK_PUBLISHABLE_KEY: envField.string({ context: "server", access: "public" }),
       CLERK_SECRET_KEY: envField.string({ context: "server", access: "secret" }),
       KNOX_REGION: envField.string({ context: "server", access: "public" }),
