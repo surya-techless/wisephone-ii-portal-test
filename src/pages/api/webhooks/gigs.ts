@@ -1,11 +1,14 @@
 import type { APIRoute } from "astro";
 import { db, WebhookEvent } from "astro:db";
 import { GIGS_API_KEY, GIGS_WEBHOOK_SECRET } from "astro:env/server";
+import { Webhook } from "svix";
 import { GIGS_ACTIVE_STATUSES, normalizeImei } from "@/libs/subscription-matching";
 import type { Device, DeviceList, Subscription } from "@/libs/types";
 import { devLog } from "@/libs/utils";
 
 const GIGS_BASE_URL = "https://api.gigs.com/projects/techless";
+
+type GigsWebhookPayload = { type?: string; data?: Subscription } | Subscription;
 
 /**
  * POST /api/webhooks/gigs
@@ -20,13 +23,10 @@ const GIGS_BASE_URL = "https://api.gigs.com/projects/techless";
  * webhook docs, pointed at this URL, subscribed to subscription status
  * changes (canceled/inactive).
  *
- * Auth: Gigs' webhook signing scheme isn't established in this codebase yet
- * (unlike Stripe's signed-header convention). This checks a shared secret in
- * a bearer Authorization header as a reasonable default, matching how this
- * app already authenticates *to* Gigs (see API_CONFIG.gigs in stripe.ts) and
- * how other device-facing endpoints authenticate incoming requests (see
- * /api/device-features). Swap this for Gigs' real signing mechanism once
- * confirmed — do not treat this as verified.
+ * Auth: Gigs delivers webhooks through Svix, so requests carry svix-id,
+ * svix-timestamp and svix-signature headers (no Authorization header).
+ * GIGS_WEBHOOK_SECRET must be the endpoint's Signing Secret (whsec_...) from
+ * the Gigs/Svix dashboard.
  *
  * Events are logged (server-side) and recorded in the WebhookEvent table, so
  * the dashboard can poll /api/webhooks/recent.json and show them without
@@ -43,17 +43,26 @@ export const POST: APIRoute = async ({ request }) => {
     });
   }
 
-  const authHeader = request.headers.get("Authorization");
-  if (!authHeader || authHeader !== `Bearer ${GIGS_WEBHOOK_SECRET}`) {
-    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+  // Signature verification needs the raw, unparsed body — do not JSON-parse first.
+  const rawBody = await request.text();
+
+  try {
+    new Webhook(GIGS_WEBHOOK_SECRET).verify(rawBody, {
+      "svix-id": request.headers.get("svix-id") ?? "",
+      "svix-timestamp": request.headers.get("svix-timestamp") ?? "",
+      "svix-signature": request.headers.get("svix-signature") ?? ""
+    });
+  } catch (err) {
+    devLog.error("[gigs webhook] signature verification failed:", err);
+    return new Response(JSON.stringify({ error: "Invalid signature" }), {
       status: 401,
       headers: { "Content-Type": "application/json" }
     });
   }
 
-  let payload: { type?: string; data?: Subscription } | Subscription;
+  let payload: GigsWebhookPayload;
   try {
-    payload = await request.json();
+    payload = JSON.parse(rawBody);
   } catch (err) {
     devLog.error("[gigs webhook] failed to parse request body:", err);
     return new Response(JSON.stringify({ error: "Invalid JSON" }), {
