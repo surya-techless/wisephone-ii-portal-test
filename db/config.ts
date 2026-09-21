@@ -1,4 +1,4 @@
-import { defineDb, defineTable, column } from "astro:db";
+import { defineDb, defineTable, column, NOW } from "astro:db";
 
 const Wisephone = defineTable({
   columns: {
@@ -101,7 +101,7 @@ const WebhookEvent = defineTable({
     imei: column.text({ optional: true }),
     status: column.text({ optional: true }), // subscription status at time of event
     isActive: column.number({ optional: true }), // 0/1
-    receivedAt: column.date({ default: new Date() })
+    receivedAt: column.date({ default: NOW })
   }
 });
 
