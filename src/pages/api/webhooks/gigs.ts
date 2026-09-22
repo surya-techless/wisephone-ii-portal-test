@@ -2,7 +2,7 @@ import type { APIRoute } from "astro";
 import { db, WebhookEvent } from "astro:db";
 import { GIGS_API_KEY, GIGS_WEBHOOK_SECRET } from "astro:env/server";
 import { Webhook } from "svix";
-import { GIGS_ACTIVE_STATUSES, normalizeImei } from "@/libs/subscription-matching";
+import { GIGS_ACTIVE_STATUSES, gigsSubscriptionMatchesDevice, normalizeImei } from "@/libs/subscription-matching";
 import type { Device, DeviceList, Subscription } from "@/libs/types";
 import { devLog } from "@/libs/utils";
 
@@ -90,35 +90,40 @@ export const POST: APIRoute = async ({ request }) => {
   // Strict path: IMEI on the subscription's own metadata, if Gigs passes it through.
   let imei = normalizeImei(String(subscription.metadata?.imei ?? ""));
 
-  // Fallback: resolve the device (and its IMEI) via the same /devices/search
-  // endpoint already used elsewhere in this codebase — just filtering by user
-  // instead of by imei. Confirm against Gigs' API docs that "user" is a valid
-  // filter key before relying on this in production.
+  // Fallback: a Gigs subscription doesn't carry a device/IMEI field directly,
+  // so resolve it via GET /devices filtered by the subscription's user (and
+  // sim, to narrow it server-side when a user has more than one device).
+  // Note: POST /devices/search only accepts an "imei" filter — it can't be
+  // used to look a device up by user, which is why this uses the list
+  // endpoint instead.
   if (!imei && subscription.user?.id) {
     try {
-      const devicesApiUrl = new URL(`${GIGS_BASE_URL}/devices/search`);
+      const devicesApiUrl = new URL(`${GIGS_BASE_URL}/devices`);
+      devicesApiUrl.searchParams.set("user", subscription.user.id);
+      if (subscription.sim?.id) {
+        devicesApiUrl.searchParams.set("sim", subscription.sim.id);
+      }
+
       const deviceResponse = await fetch(devicesApiUrl, {
-        method: "POST",
+        method: "GET",
         headers: {
-          "Content-Type": "application/json",
           Authorization: `Bearer ${GIGS_API_KEY}`,
           Accept: "application/json"
         },
-        body: JSON.stringify({ user: subscription.user.id }),
         signal: AbortSignal.timeout(15000)
       });
 
       if (deviceResponse.ok) {
         const devices = (await deviceResponse.json()) as DeviceList;
-        // Prefer the device whose SIM matches this subscription, in case a user has more than one.
+        // Prefer the device whose SIM matches this subscription, in case the user has more than one.
         const device: Device | undefined =
-          devices.items?.find((d) => d.sims?.some((sim) => sim.id === subscription.sim?.id)) ?? devices.items?.[0];
+          devices.items?.find((d) => gigsSubscriptionMatchesDevice(subscription, d)) ?? devices.items?.[0];
         imei = normalizeImei(String(device?.imei ?? ""));
       } else {
-        devLog.error(`[gigs webhook] devices/search failed with status ${deviceResponse.status}`);
+        console.error(`[gigs webhook] devices lookup by user failed with status ${deviceResponse.status}`);
       }
     } catch (err) {
-      devLog.error("[gigs webhook] failed to resolve device for IMEI fallback:", err);
+      console.error("[gigs webhook] failed to resolve device for IMEI fallback:", err);
     }
   }
 
