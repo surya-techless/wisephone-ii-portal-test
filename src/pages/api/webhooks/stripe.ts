@@ -3,7 +3,7 @@ import Stripe from "stripe";
 import { db, WebhookEvent } from "astro:db";
 import { STRIPE_WEBHOOK_SECRET } from "astro:env/server";
 import { stripe } from "@/libs/stripe";
-import { normalizeImei } from "@/libs/subscription-matching";
+import { normalizeImei, logSubscriptionWebhookEvent } from "@/libs/subscription-matching";
 import { publishSubscriptionStatus } from "@/libs/mqtt";
 import { devLog } from "@/libs/utils";
 
@@ -93,6 +93,7 @@ export const POST: APIRoute = async ({ request }) => {
       console.log(
         `[stripe webhook] ${event.type} | IMEI: ${imei} | subscription: ${subscription.id} | status: ${subscription.status} | isActive: ${isActive}`
       );
+      logSubscriptionWebhookEvent({ provider: "Stripe", isActive, imei });
       await db.insert(WebhookEvent).values({
         source: "stripe",
         type: event.type,

@@ -2,7 +2,7 @@ import type { APIRoute } from "astro";
 import { db, WebhookEvent } from "astro:db";
 import { GIGS_API_KEY, GIGS_WEBHOOK_SECRET } from "astro:env/server";
 import { Webhook } from "svix";
-import { GIGS_ACTIVE_STATUSES, gigsSubscriptionMatchesDevice, normalizeImei } from "@/libs/subscription-matching";
+import { GIGS_ACTIVE_STATUSES, gigsSubscriptionMatchesDevice, normalizeImei, logSubscriptionWebhookEvent } from "@/libs/subscription-matching";
 import type { Device, DeviceList, Subscription } from "@/libs/types";
 import { publishSubscriptionStatus } from "@/libs/mqtt";
 import { devLog } from "@/libs/utils";
@@ -143,6 +143,7 @@ export const POST: APIRoute = async ({ request }) => {
     console.log(
       `[gigs webhook] ${eventType} | IMEI: ${imei} | subscription: ${subscription.id} | status: ${subscription.status} | isActive: ${isActive}`
     );
+    logSubscriptionWebhookEvent({ provider: "Gigs", isActive, imei });
   }
 
   await db.insert(WebhookEvent).values({
