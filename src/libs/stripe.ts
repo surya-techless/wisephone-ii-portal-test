@@ -308,6 +308,16 @@ export interface DeviceSubscriptionCheckResult {
   subscriptionType?: "Stripe" | "Gigs" | "Bypass";
 }
 
+// [TEST OVERRIDE] — remove once the DeviceSubscriptionStatus cache has been
+// validated against real traffic. Until then, only these IMEIs use the new
+// cache path below; every other IMEI falls back to the original always-live
+// validateIsSubscribed() check, completely unaffected by this feature — this
+// function's callers (validateIsUserSubscribed, manage/[imei].astro's
+// completeSetup, /api/device-subscription/[imei].json) are already live and
+// used by real users today, so this limits any caching bug's blast radius to
+// just the device(s) actively being tested with.
+const SUBSCRIPTION_CACHE_TEST_IMEIS = new Set(["351944810229850"]);
+
 /**
  * Single shared "is this device subscribed" resolver — replaces the bypass +
  * validateIsSubscribed() pattern that used to be duplicated across
@@ -338,6 +348,16 @@ export async function resolveDeviceSubscriptionStatus({
 
   if (bypass) {
     return { isSubscribed: true, source: "bypass", checkedAt: new Date().toISOString(), subscriptionType: "Bypass" };
+  }
+
+  // [TEST OVERRIDE] — see SUBSCRIPTION_CACHE_TEST_IMEIS above.
+  if (!SUBSCRIPTION_CACHE_TEST_IMEIS.has(normalized)) {
+    const isSubscribed = await validateIsSubscribed({ imei: normalized, phoneNumber });
+    return {
+      isSubscribed,
+      source: isSubscribed ? "stripe_or_gigs" : "none",
+      checkedAt: new Date().toISOString()
+    };
   }
 
   const cached = await db
