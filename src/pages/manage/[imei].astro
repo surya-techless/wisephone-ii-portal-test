@@ -2592,6 +2592,19 @@ try {
                     // Step 3: Remove conflicting groups
                     await this.removeExclusiveGroups(this.features);
 
+                    // Step 3.5: Make sure DeviceSubscriptionStatus and the device's own
+                    // record are current the moment setup completes, rather than the
+                    // device having to wait for its next fallback poll or a future
+                    // webhook to learn its subscription status.
+                    try {
+                      await actions.wisephones.validateIsUserSubscribed({
+                        imei: this.imei,
+                        phoneNumber: this.devicePhone.replace(/\D/g, "")
+                      });
+                    } catch (error) {
+                      devLog.error("Failed to refresh subscription status at setup completion:", error);
+                    }
+
                     // Step 4: Set isPhoneSetUp = true
                     this.isPhoneSetUp = true;
 

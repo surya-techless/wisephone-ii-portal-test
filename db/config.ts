@@ -105,6 +105,24 @@ const WebhookEvent = defineTable({
   }
 });
 
+// One row per IMEI: the current known subscription status, kept fresh by the
+// Stripe/Gigs webhook handlers and read by resolveDeviceSubscriptionStatus()
+// (src/libs/stripe.ts) instead of hitting Stripe/Gigs live on every check —
+// see docs/mqtt-subscription-status-plan.md. subscriptionType is optional
+// because a row created via the live-check fallback (no webhook yet for this
+// IMEI) doesn't know which provider matched, only whether it's active.
+const DeviceSubscriptionStatus = defineTable({
+  columns: {
+    imei: column.text({ primaryKey: true }),
+    subscriptionType: column.text({ optional: true }), // "Stripe" | "Gigs" | undefined (unknown provenance)
+    hasActiveSubscription: column.number(), // 0/1
+    subscriptionStatus: column.text(), // "Active" | "Not Active"
+    rawStatus: column.text({ optional: true }), // raw provider status, e.g. "trialing" / "pending" / "canceled"
+    lastEventType: column.text({ optional: true }), // e.g. "customer.subscription.updated"
+    updatedAt: column.date({ default: NOW })
+  }
+});
+
 export default defineDb({
   tables: {
     App,
@@ -115,6 +133,7 @@ export default defineDb({
     DeviceScreenTimeMetrics,
     DeviceDataUsage,
     DeviceFeatureFlags,
-    WebhookEvent
+    WebhookEvent,
+    DeviceSubscriptionStatus
   }
 });

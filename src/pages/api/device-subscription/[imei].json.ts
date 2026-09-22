@@ -1,7 +1,6 @@
 import type { APIRoute } from "astro";
-import { db, Wisephone, BypassTechlessSubscription, eq } from "astro:db";
-import { validateIsSubscribed } from "@/libs/stripe";
-import { devLog } from "@/libs/utils";
+import { db, Wisephone, eq } from "astro:db";
+import { resolveDeviceSubscriptionStatus } from "@/libs/stripe";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -18,11 +17,11 @@ export const OPTIONS: APIRoute = async () => {
  * GET /api/device-subscription/[imei].json
  *
  * Live "is this IMEI subscribed right now" check for devices — same bearer-key
- * trust boundary as /api/device-features/[imei].json, but instead of returning
- * static Knox-derived flags, this runs the same check the portal itself uses
- * (bypass override, then Stripe-then-Gigs via validateIsSubscribed — see
- * src/libs/stripe.ts and /api/wisephones/[imei]/info.ts, which is Clerk-gated
- * and therefore not callable from a device).
+ * trust boundary as /api/device-features/[imei].json. Backed by
+ * resolveDeviceSubscriptionStatus() (src/libs/stripe.ts): bypass override,
+ * then the DeviceSubscriptionStatus cache kept fresh by the Stripe/Gigs
+ * webhook handlers, falling back to a live Stripe/Gigs check only when no
+ * cached row exists yet for this IMEI.
  */
 export const GET: APIRoute = async ({ params, request }) => {
   // Bearer token auth — same key used by all WiseOS device endpoints
@@ -63,44 +62,29 @@ export const GET: APIRoute = async ({ params, request }) => {
     });
   }
 
-  // Bypass override first — same as the portal's own check
-  let isSubscribed = false;
-  let source: "bypass" | "stripe_or_gigs" | "none" = "none";
-
-  const bypass = await db
-    .select()
-    .from(BypassTechlessSubscription)
-    .where(eq(BypassTechlessSubscription.imei, imeiNum))
-    .limit(1)
-    .get();
-
-  if (bypass) {
-    isSubscribed = true;
-    source = "bypass";
-  } else if (wisephone.phoneNumber) {
-    try {
-      isSubscribed = await validateIsSubscribed({
-        imei: String(wisephone.imei),
-        phoneNumber: wisephone.phoneNumber.replace(/[^0-9+]/g, "")
-      });
-      source = isSubscribed ? "stripe_or_gigs" : "none";
-    } catch (subscriptionError) {
-      // Best-effort, same as the portal's own callers — don't fail the request
-      devLog.error(`[device-subscription] validateIsSubscribed failed for IMEI ${imei}:`, subscriptionError);
-    }
-  }
+  const result = await resolveDeviceSubscriptionStatus({
+    imei: String(wisephone.imei),
+    phoneNumber: wisephone.phoneNumber ?? ""
+  });
 
   return new Response(
     JSON.stringify({
       success: true,
       imei,
-      isSubscribed,
-      source,
-      checkedAt: new Date().toISOString()
+      isSubscribed: result.isSubscribed,
+      source: result.source,
+      checkedAt: result.checkedAt
     }),
     {
       status: 200,
       headers: { "Content-Type": "application/json", ...corsHeaders }
     }
   );
+};
+
+export const ALL: APIRoute = ({ request }) => {
+  return new Response(JSON.stringify({ error: `Method ${request.method} not allowed` }), {
+    status: 405,
+    headers: { "Content-Type": "application/json" }
+  });
 };

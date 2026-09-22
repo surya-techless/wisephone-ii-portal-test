@@ -2,7 +2,8 @@ import { defineAction, ActionError } from "astro:actions";
 import { z } from "astro:schema";
 import { db, Wisephone, BypassTechlessSubscription, DeviceFeatureFlags, eq, sql } from "astro:db";
 import { SamsungKnoxService } from "@/libs/samsung-knox-service";
-import { validateIsSubscribed } from "@/libs/stripe";
+import { validateIsSubscribed, resolveDeviceSubscriptionStatus } from "@/libs/stripe";
+import { publishSubscriptionStatus } from "@/libs/mqtt";
 import { isValidIMEI, devLog, describeKnoxGroups, FEATURES, KNOX_USER_GROUPS } from "@/libs/utils";
 
 export const wisephones = {
@@ -458,22 +459,16 @@ export const wisephones = {
       phoneNumber: z.string().min(12).max(12)
     }),
     handler: async (input) => {
-      // Check bypass first, consistent with server-side subscription checks
-      const bypassSubscription = await db
-        .select()
-        .from(BypassTechlessSubscription)
-        .where(eq(BypassTechlessSubscription.imei, Number(input.imei)))
-        .limit(1);
+      const result = await resolveDeviceSubscriptionStatus({ imei: input.imei, phoneNumber: input.phoneNumber });
 
-      if (bypassSubscription.length > 0) {
-        return { success: "User is subscribed", isSubscribed: true };
-      }
-
-      const isSubscribed = await validateIsSubscribed({ phoneNumber: input.phoneNumber, imei: input.imei });
+      // Keep the device's own record current and let it know immediately,
+      // rather than waiting for its next fallback poll — harmless/idempotent
+      // to call on every check, not just at setup completion.
+      await publishSubscriptionStatus(input.imei, result.isSubscribed, result.subscriptionType ?? "Unknown");
 
       return {
         success: "User is subscribed",
-        isSubscribed
+        isSubscribed: result.isSubscribed
       };
     }
   }),

@@ -87,10 +87,16 @@ export async function publishFeatureFlags(
  * Called after a Stripe/Gigs webhook resolves an IMEI + subscription status
  * (see src/pages/api/webhooks/stripe.ts and gigs.ts). Non-fatal on failure —
  * both webhook handlers must still return 200 quickly.
+ *
+ * Payload carries both a machine-readable boolean (hasActiveSubscription, for
+ * device-side gating logic) and plain-text descriptive fields (no emojis —
+ * this is data, not a log line) mirroring what's printed by
+ * logSubscriptionWebhookEvent() in subscription-matching.ts.
  */
 export async function publishSubscriptionStatus(
   imei: string,
-  hasActiveSubscription: boolean
+  hasActiveSubscription: boolean,
+  subscriptionType: "Stripe" | "Gigs" | "Bypass" | "Unknown"
 ): Promise<void> {
   if (!client) {
     // console.* (not devLog) — this must be visible in Netlify function logs,
@@ -100,7 +106,13 @@ export async function publishSubscriptionStatus(
   }
 
   const topic = `devices/${imei}/subscription`;
-  const payload = JSON.stringify({ hasActiveSubscription, updatedAt: new Date().toISOString() });
+  const payload = JSON.stringify({
+    hasActiveSubscription,
+    subscriptionType,
+    subscriptionStatus: hasActiveSubscription ? "Active" : "Not Active",
+    date: new Date().toISOString(),
+    imei
+  });
 
   console.log(`[MQTT] Topic   : ${topic}`);
   console.log(`[MQTT] hasActiveSubscription :`, hasActiveSubscription);

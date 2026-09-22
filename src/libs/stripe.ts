@@ -1,5 +1,6 @@
 import Stripe from "stripe";
 import { STRIPE_SECRET_KEY, GIGS_API_KEY, SUBSCRIPTION_ENFORCEMENT_MODE } from "astro:env/server";
+import { db, BypassTechlessSubscription, DeviceSubscriptionStatus, eq } from "astro:db";
 import { type SubscriptionList, type DeviceList, type Subscription } from "./types";
 import { normalizeImei, stripeSubscriptionMatchesImei, gigsSubscriptionMatchesDevice } from "./subscription-matching";
 import { devLog } from "./utils";
@@ -294,4 +295,93 @@ export async function validateIsSubscribed({
   }
 
   return legacyResult;
+}
+
+export interface DeviceSubscriptionCheckResult {
+  isSubscribed: boolean;
+  source: "bypass" | "stripe_or_gigs" | "none";
+  checkedAt: string;
+  // Which provider this came from, when known — populated for bypass and for
+  // a cached row (webhooks record their own provider), left undefined for a
+  // fresh live-check fallback with no provenance. Used by callers that need
+  // to pass a subscriptionType to publishSubscriptionStatus().
+  subscriptionType?: "Stripe" | "Gigs" | "Bypass";
+}
+
+/**
+ * Single shared "is this device subscribed" resolver — replaces the bypass +
+ * validateIsSubscribed() pattern that used to be duplicated across
+ * /api/device-subscription/[imei].json, manage/[imei].astro, and the
+ * validateIsUserSubscribed action.
+ *
+ * Order: bypass override (unchanged, no DB write) → cached
+ * DeviceSubscriptionStatus row (kept fresh by the Stripe/Gigs webhook
+ * handlers — no live API call) → live validateIsSubscribed() only when no
+ * cached row exists yet (no webhook has fired for this IMEI), caching that
+ * result so it doesn't need to be repeated.
+ */
+export async function resolveDeviceSubscriptionStatus({
+  imei,
+  phoneNumber
+}: {
+  imei: string;
+  phoneNumber: string;
+}): Promise<DeviceSubscriptionCheckResult> {
+  const normalized = normalizeImei(imei);
+
+  const bypass = await db
+    .select()
+    .from(BypassTechlessSubscription)
+    .where(eq(BypassTechlessSubscription.imei, Number(normalized)))
+    .limit(1)
+    .get();
+
+  if (bypass) {
+    return { isSubscribed: true, source: "bypass", checkedAt: new Date().toISOString(), subscriptionType: "Bypass" };
+  }
+
+  const cached = await db
+    .select()
+    .from(DeviceSubscriptionStatus)
+    .where(eq(DeviceSubscriptionStatus.imei, normalized))
+    .limit(1)
+    .get();
+
+  if (cached) {
+    return {
+      isSubscribed: Boolean(cached.hasActiveSubscription),
+      source: cached.hasActiveSubscription ? "stripe_or_gigs" : "none",
+      checkedAt: new Date(cached.updatedAt).toISOString(),
+      subscriptionType: cached.subscriptionType as "Stripe" | "Gigs" | undefined
+    };
+  }
+
+  // No cached row yet — no webhook has fired for this IMEI (e.g. a device
+  // that predates this table). Fall back to a live check, and cache the
+  // result so this fallback isn't repeated on every future check.
+  const isSubscribed = await validateIsSubscribed({ imei: normalized, phoneNumber });
+  const checkedAt = new Date();
+
+  await db
+    .insert(DeviceSubscriptionStatus)
+    .values({
+      imei: normalized,
+      hasActiveSubscription: isSubscribed ? 1 : 0,
+      subscriptionStatus: isSubscribed ? "Active" : "Not Active",
+      updatedAt: checkedAt
+    })
+    .onConflictDoUpdate({
+      target: DeviceSubscriptionStatus.imei,
+      set: {
+        hasActiveSubscription: isSubscribed ? 1 : 0,
+        subscriptionStatus: isSubscribed ? "Active" : "Not Active",
+        updatedAt: checkedAt
+      }
+    });
+
+  return {
+    isSubscribed,
+    source: isSubscribed ? "stripe_or_gigs" : "none",
+    checkedAt: checkedAt.toISOString()
+  };
 }

@@ -1,5 +1,5 @@
 import type { APIRoute } from "astro";
-import { db, WebhookEvent } from "astro:db";
+import { db, WebhookEvent, DeviceSubscriptionStatus } from "astro:db";
 import { GIGS_API_KEY, GIGS_WEBHOOK_SECRET } from "astro:env/server";
 import { Webhook } from "svix";
 import { GIGS_ACTIVE_STATUSES, gigsSubscriptionMatchesDevice, normalizeImei, logSubscriptionWebhookEvent } from "@/libs/subscription-matching";
@@ -155,7 +155,29 @@ export const POST: APIRoute = async ({ request }) => {
   });
 
   if (imei) {
-    await publishSubscriptionStatus(imei, isActive);
+    await db
+      .insert(DeviceSubscriptionStatus)
+      .values({
+        imei,
+        subscriptionType: "Gigs",
+        hasActiveSubscription: isActive ? 1 : 0,
+        subscriptionStatus: isActive ? "Active" : "Not Active",
+        rawStatus: subscription.status,
+        lastEventType: eventType,
+        updatedAt: new Date()
+      })
+      .onConflictDoUpdate({
+        target: DeviceSubscriptionStatus.imei,
+        set: {
+          subscriptionType: "Gigs",
+          hasActiveSubscription: isActive ? 1 : 0,
+          subscriptionStatus: isActive ? "Active" : "Not Active",
+          rawStatus: subscription.status,
+          lastEventType: eventType,
+          updatedAt: new Date()
+        }
+      });
+    await publishSubscriptionStatus(imei, isActive, "Gigs");
   }
 
   return new Response(JSON.stringify({ received: true }), {
