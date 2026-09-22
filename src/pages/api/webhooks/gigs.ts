@@ -4,6 +4,7 @@ import { GIGS_API_KEY, GIGS_WEBHOOK_SECRET } from "astro:env/server";
 import { Webhook } from "svix";
 import { GIGS_ACTIVE_STATUSES, gigsSubscriptionMatchesDevice, normalizeImei } from "@/libs/subscription-matching";
 import type { Device, DeviceList, Subscription } from "@/libs/types";
+import { publishSubscriptionStatus } from "@/libs/mqtt";
 import { devLog } from "@/libs/utils";
 
 const GIGS_BASE_URL = "https://api.gigs.com/projects/techless";
@@ -151,6 +152,10 @@ export const POST: APIRoute = async ({ request }) => {
     status: subscription.status,
     isActive: isActive ? 1 : 0
   });
+
+  if (imei) {
+    await publishSubscriptionStatus(imei, isActive);
+  }
 
   return new Response(JSON.stringify({ received: true }), {
     status: 200,

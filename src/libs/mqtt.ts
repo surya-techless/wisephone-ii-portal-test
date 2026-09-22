@@ -81,6 +81,43 @@ export async function publishFeatureFlags(
   }
 }
 
+/**
+ * Publish subscription status to a specific device via AWS IoT Core.
+ * Topic: devices/{imei}/subscription
+ * Called after a Stripe/Gigs webhook resolves an IMEI + subscription status
+ * (see src/pages/api/webhooks/stripe.ts and gigs.ts). Non-fatal on failure —
+ * both webhook handlers must still return 200 quickly.
+ */
+export async function publishSubscriptionStatus(
+  imei: string,
+  hasActiveSubscription: boolean
+): Promise<void> {
+  if (!client) {
+    devLog.warn("[MQTT] ⚠️  Client not initialized — AWS env vars missing. Skipping publish.");
+    return;
+  }
+
+  const topic = `devices/${imei}/subscription`;
+  const payload = JSON.stringify({ hasActiveSubscription, updatedAt: new Date().toISOString() });
+
+  devLog.log(`[MQTT] Topic   : ${topic}`);
+  devLog.log(`[MQTT] hasActiveSubscription :`, hasActiveSubscription);
+
+  try {
+    await client.send(
+      new PublishCommand({
+        topic,
+        payload: new TextEncoder().encode(payload),
+        qos: 1
+      })
+    );
+    devLog.log(`[MQTT] ✅ Published successfully to ${topic}`);
+  } catch (err) {
+    // Non-fatal — device falls back to its own REST subscription check
+    devLog.error("[MQTT] ❌ Publish error:", err);
+  }
+}
+
 export async function sendSysProbe(initialSignalPayload: any) {
   const topic = `sysprobe/probe`;
 
