@@ -93,15 +93,17 @@ export async function publishSubscriptionStatus(
   hasActiveSubscription: boolean
 ): Promise<void> {
   if (!client) {
-    devLog.warn("[MQTT] ⚠️  Client not initialized — AWS env vars missing. Skipping publish.");
+    // console.* (not devLog) — this must be visible in Netlify function logs,
+    // not just local dev, so a missing-env-var skip isn't silent in production.
+    console.warn("[MQTT] ⚠️  Client not initialized — AWS env vars missing. Skipping publish.");
     return;
   }
 
   const topic = `devices/${imei}/subscription`;
   const payload = JSON.stringify({ hasActiveSubscription, updatedAt: new Date().toISOString() });
 
-  devLog.log(`[MQTT] Topic   : ${topic}`);
-  devLog.log(`[MQTT] hasActiveSubscription :`, hasActiveSubscription);
+  console.log(`[MQTT] Topic   : ${topic}`);
+  console.log(`[MQTT] hasActiveSubscription :`, hasActiveSubscription);
 
   try {
     await client.send(
@@ -111,10 +113,10 @@ export async function publishSubscriptionStatus(
         qos: 1
       })
     );
-    devLog.log(`[MQTT] ✅ Published successfully to ${topic}`);
+    console.log(`[MQTT] ✅ Published successfully to ${topic}`);
   } catch (err) {
     // Non-fatal — device falls back to its own REST subscription check
-    devLog.error("[MQTT] ❌ Publish error:", err);
+    console.error("[MQTT] ❌ Publish error:", err);
   }
 }
 
