@@ -73,6 +73,7 @@ export const GET: APIRoute = async ({ params, request }) => {
       imei,
       isSubscribed: result.isSubscribed,
       source: result.source,
+      subscriptionType: result.subscriptionType ?? "Unknown",
       checkedAt: result.checkedAt
     }),
     {
