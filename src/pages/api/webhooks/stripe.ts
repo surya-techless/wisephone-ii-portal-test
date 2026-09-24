@@ -3,7 +3,7 @@ import Stripe from "stripe";
 import { db, WebhookEvent, DeviceSubscriptionStatus } from "astro:db";
 import { STRIPE_WEBHOOK_SECRET } from "astro:env/server";
 import { stripe } from "@/libs/stripe";
-import { normalizeImei, logSubscriptionWebhookEvent } from "@/libs/subscription-matching";
+import { normalizeImei, logSubscriptionWebhookEvent, moveDeviceToKickoutGroup } from "@/libs/subscription-matching";
 import { publishSubscriptionStatus } from "@/libs/mqtt";
 import { devLog } from "@/libs/utils";
 
@@ -124,6 +124,9 @@ export const POST: APIRoute = async ({ request }) => {
           }
         });
       await publishSubscriptionStatus(imei, isActive, "Stripe");
+      if (!isActive) {
+        await moveDeviceToKickoutGroup(imei);
+      }
       break;
     }
 

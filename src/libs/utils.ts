@@ -95,7 +95,13 @@ export const KNOX_USER_GROUPS = {
   // device is confirmed subscribed (see assignSubscriptionGroupByDeviceModel).
   SHELF_STOCK: "fdc85e95e3574f729be74d9c2bce72b4",
 
-  PATRIOT: "08042d3b18774ac3b9b9f9c56954a454"
+  PATRIOT: "08042d3b18774ac3b9b9f9c56954a454",
+
+  // A device is moved to ONLY this group (all others removed) when a webhook
+  // reports its subscription is no longer active — see moveDeviceToKickoutGroup()
+  // in src/libs/subscription-matching.ts. Test group, [TEST OVERRIDE]-scoped to
+  // one IMEI for now.
+  KICKOUT_TEST: "4f99484801d34b9e987c1a987a0ed582"
 
 };
 
