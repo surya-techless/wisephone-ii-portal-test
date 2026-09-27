@@ -17,6 +17,7 @@ import { devLog } from "@/libs/utils";
  *
  * Configure in the Stripe Dashboard: Developers > Webhooks > Add endpoint,
  * pointed at this URL, subscribed to at least:
+ *   - customer.subscription.created (fires on first-time purchase)
  *   - customer.subscription.deleted
  *   - customer.subscription.updated
  *   - invoice.payment_failed (optional, catches a failed renewal early)
@@ -61,6 +62,7 @@ export const POST: APIRoute = async ({ request }) => {
   }
 
   switch (event.type) {
+    case "customer.subscription.created":
     case "customer.subscription.deleted":
     case "customer.subscription.updated": {
       const subscription = event.data.object as Stripe.Subscription;
