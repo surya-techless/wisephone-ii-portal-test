@@ -60,12 +60,24 @@ export function logSubscriptionWebhookEvent(params: {
 // showing setup-only, per its own isSubscriptionActive gate).
 const KICKOUT_TEST_IMEIS = new Set(["351944810229850"]);
 
+// Tool Drawer groups (enable + block variants, all device models) are kept
+// as-is when a device is kicked out — a lapsed subscriber's Tool Drawer
+// access/restriction shouldn't change just because their subscription did.
+const KICKOUT_PRESERVED_GROUPS = new Set([
+  KNOX_USER_GROUPS.ADD_ON_TOOL_DRAWER,
+  KNOX_USER_GROUPS.A16_ADD_ON_TOOL_DRAWER,
+  KNOX_USER_GROUPS.ADD_ON_BLOCK_TOOL_DRAWER,
+  KNOX_USER_GROUPS.A16_ADD_ON_BLOCK_TOOL_DRAWER,
+  KNOX_USER_GROUPS.CSPIRE_ADD_ON_BLOCK_TOOL_DRAWER
+]);
+
 /**
- * Moves a device to ONLY the Kickout(Test) Knox group — removes every group
- * it currently has, then applies just this one. Called from stripe.ts/gigs.ts
- * whenever a webhook reports a device's subscription is no longer active.
- * Non-fatal on failure, matching publishSubscriptionStatus's convention —
- * webhook handlers must still return 200 quickly.
+ * Moves a device to the Kickout(Test) Knox group — removes every group it
+ * currently has EXCEPT its Tool Drawer group(s), which are left untouched,
+ * then applies Kickout(Test) on top. Called from stripe.ts/gigs.ts whenever
+ * a webhook reports a device's subscription is no longer active. Non-fatal
+ * on failure, matching publishSubscriptionStatus's convention — webhook
+ * handlers must still return 200 quickly.
  */
 export async function moveDeviceToKickoutGroup(imei: string): Promise<void> {
   const normalized = normalizeImei(imei);
@@ -75,10 +87,11 @@ export async function moveDeviceToKickoutGroup(imei: string): Promise<void> {
     const currentGroups = await SamsungKnoxService.getGroupsForDevice(normalized);
     for (const groupId of currentGroups) {
       if (groupId === KNOX_USER_GROUPS.KICKOUT_TEST) continue;
+      if (KICKOUT_PRESERVED_GROUPS.has(groupId)) continue;
       await SamsungKnoxService.removeFeature(groupId, normalized);
     }
     await SamsungKnoxService.applyFeature(KNOX_USER_GROUPS.KICKOUT_TEST, normalized);
-    console.log(`[kickout] Moved IMEI ${normalized} to Kickout(Test) group only`);
+    console.log(`[kickout] Moved IMEI ${normalized} to Kickout(Test) group (Tool Drawer groups preserved)`);
   } catch (err) {
     console.error(`[kickout] Failed to move IMEI ${normalized} to Kickout(Test) group:`, err);
   }
