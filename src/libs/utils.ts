@@ -211,8 +211,8 @@ export const FEATURES: Record<string, Feature> = {
     knoxManageId: KNOX_USER_GROUPS.ADD_ON_WISEOS_PROTECT,
     a16KnoxManageId: KNOX_USER_GROUPS.A16_ADD_ON_WISEOS_PROTECT,
     lucideIcon: "shield-check",
-    name: "1.1.1.1 for Families",
-    description: "Add an additional layer of security and protection with 1.1.1.1 for Families filtering.",
+    name: "Basic explicit content filtering",
+    description: "Add an additional layer of security and protection with 1.1.1.1 for Families filtering. You may not have access to all 3rd party app functionality.",
     disclosure:
       "Filtering that checks if a website is safe and allowed before you can visit it, keeping you safe from bad sites and ensuring you only access approved ones. While Wisephone doesn't have a browser, there are third-party apps that have hidden in-app browser. This feature adds an additional layer of protection to these apps.",
     enableMessage:

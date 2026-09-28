@@ -617,7 +617,7 @@ try {
                     class="px-2 md:px-6 py-3 text-sm font-medium transition-colors relative flex-1 whitespace-nowrap"
                     :class="currentTab === 'app-management' ? 'bg-[#DBD5CD] text-gray-900' : 'text-gray-600 hover:text-gray-900'"
                   >
-                    Tool Management
+                    App Management
                     <span
                       x-show="currentTab === 'app-management'"
                       class="absolute bottom-0 left-0 right-0 h-[3px] bg-[#DBD5CD] -mb-[2px]"></span>
@@ -949,7 +949,7 @@ try {
                     <input
                       type="text"
                       x-model.debounce.300ms="appSearchQuery"
-                      placeholder="Search apps or categories (e.g, Finance, Books)"
+                      placeholder="Search apps (eg. Spotify, Bank of America)"
                       class="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-md text-sm bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-teal-500 focus:border-transparent"
                     />
                   </div>
@@ -994,7 +994,7 @@ try {
                         x-show="availableApps.length === 0 && appSearchQuery && appSearchQuery.trim().length > 0"
                         class="text-center py-8 text-sm text-gray-500"
                       >
-                        No apps found matching your search.
+                        No approved apps found matching your search.
                       </div>
                     </div>
                   </div>
