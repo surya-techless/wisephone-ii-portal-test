@@ -757,4 +757,51 @@ export class SamsungKnoxService {
 
     return data;
   }
+
+  /**
+   * Sends the Knox Manage "Unenroll device" command (added in Knox Manage
+   * 25.04). Unenrolling FACTORY RESETS the device and frees its license seat —
+   * irreversible. A device that's offline only unenrolls once it reconnects
+   * (or via its Offline Unenrollment Code). Admin-only; see
+   * wisephones.unenrollDevice.
+   */
+  public static async unenrollDevice(imei: string): Promise<{
+    resultCode: string;
+    resultMessage: string;
+    resultValue: any;
+  }> {
+    const deviceId = await this.getDeviceIdFromImei(imei);
+
+    if (!deviceId) {
+      throw new Error("Device not found");
+    }
+
+    const apiUrl = `https://${KNOX_REGION}.manage.samsungknox.com/emm/oapi/mdm/commonOTCServiceWrapper/sendDeviceControlForUnEnrollment`;
+
+    const params = new URLSearchParams({
+      deviceId
+    });
+
+    const response = await fetch(apiUrl, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${await this.getKnoxToken()}`,
+        "cache-control": "no-cache",
+        "content-type": "application/x-www-form-urlencoded"
+      },
+      body: params
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to unenroll device (HTTP ${response.status})`);
+    }
+
+    const data = await response.json();
+
+    if (!data.resultValue) {
+      throw new Error(`Failed to unenroll device: ${data.resultMessage ?? data.resultCode ?? "unknown error"}`);
+    }
+
+    return data;
+  }
 }

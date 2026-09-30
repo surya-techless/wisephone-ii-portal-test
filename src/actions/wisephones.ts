@@ -5,6 +5,7 @@ import { SamsungKnoxService } from "@/libs/samsung-knox-service";
 import { validateIsSubscribed, resolveDeviceSubscriptionStatus } from "@/libs/stripe";
 import { publishSubscriptionStatus } from "@/libs/mqtt";
 import { isValidIMEI, devLog, describeKnoxGroups, FEATURES, KNOX_USER_GROUPS } from "@/libs/utils";
+import { isAdmin } from "@/lib/auth/permissions";
 
 export const wisephones = {
   // Create a new Wisephone
@@ -501,6 +502,46 @@ export const wisephones = {
           installWiseOSUpdateResult
         }
       };
+    }
+  }),
+
+  // Unenroll a device from Knox Manage — factory resets it. Admin only.
+  unenrollDevice: defineAction({
+    accept: "form",
+    input: z.object({
+      imei: z.string()
+    }),
+    handler: async ({ imei }, context) => {
+      const user = await context.locals.currentUser();
+      if (!user || !(await isAdmin(user.id))) {
+        throw new ActionError({
+          code: "FORBIDDEN",
+          message: "Only admins can unenroll devices"
+        });
+      }
+
+      if (!isValidIMEI(imei)) {
+        throw new ActionError({
+          code: "BAD_REQUEST",
+          message: "Invalid IMEI"
+        });
+      }
+
+      try {
+        const result = await SamsungKnoxService.unenrollDevice(imei.toString());
+        console.log(`[knox] Unenroll command sent | IMEI: ${imei} | by: ${user.id} | result: ${result.resultCode}`);
+
+        return {
+          success: `Unenroll command sent for ${imei}. The device will be factory reset when it next connects to Knox.`,
+          result
+        };
+      } catch (error) {
+        console.error(`[knox] Unenroll failed | IMEI: ${imei}:`, error);
+        throw new ActionError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: error instanceof Error ? error.message : "Failed to unenroll device"
+        });
+      }
     }
   })
 };

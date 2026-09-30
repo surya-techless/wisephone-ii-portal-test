@@ -44,6 +44,7 @@ let enableScreenTime = false;
 let screenTimeData: any[] = [];
 let dataUsageData: { cycleStartDate?: Date; usageDetail?: any; lastSyncedAt?: Date } | null = null;
 let dbShowScreenTime: boolean = false;
+let userIsAdmin = false;
 
 const catalogApps = await getCatalogApps();
 devLog.log(`✅ Loaded ${catalogApps.length} catalog apps from DB`);
@@ -52,6 +53,16 @@ devLog.log(`✅ Loaded ${catalogApps.length} catalog apps from DB`);
 const deleteActionResult = Astro.getActionResult(actions.wisephones.deleteWisephone);
 if (deleteActionResult && !deleteActionResult.error) {
   return Astro.redirect("/dashboard?message=" + encodeURIComponent("Wisephone successfully removed from account."));
+}
+
+// Result of the admin-only "Unenroll Device" action (see wisephones.unenrollDevice)
+const unenrollActionResult = Astro.getActionResult(actions.wisephones.unenrollDevice);
+if (unenrollActionResult) {
+  return Astro.redirect(
+    unenrollActionResult.error
+      ? "/dashboard?error=" + encodeURIComponent(`Unenroll failed: ${unenrollActionResult.error.message}`)
+      : "/dashboard?message=" + encodeURIComponent(unenrollActionResult.data.success)
+  );
 }
 
 // Auth check
@@ -71,7 +82,7 @@ try {
   }
 
   const userId = Astro.locals.auth().userId;
-  const userIsAdmin = await isAdmin(user.id);
+  userIsAdmin = await isAdmin(user.id);
 
   if (userIsAdmin) {
     const wisephones = await db
@@ -757,6 +768,15 @@ try {
                           <Icon name="lucide:trash-2" class="w-4 h-4" />
                           Remove Device
                         </button>
+                        {userIsAdmin && (
+                          <button
+                            @click="showUnenrollModal = true"
+                            class="mt-2 px-4 py-2 bg-red-600 rounded-md text-sm font-medium text-white hover:bg-red-700 inline-flex items-center gap-2"
+                          >
+                            <Icon name="lucide:shield-off" class="w-4 h-4" />
+                            Unenroll Device
+                          </button>
+                        )}
                       </div>
                       <!-- Device Removal (Visible below 2xl when screen time is disabled) -->
                       <div class="pt-4 border-t border-gray-200 2xl:hidden" x-show="!enableScreenTime" x-cloak>
@@ -775,6 +795,15 @@ try {
                           <Icon name="lucide:trash-2" class="w-4 h-4" />
                           Remove Device
                         </button>
+                        {userIsAdmin && (
+                          <button
+                            @click="showUnenrollModal = true"
+                            class="mt-2 px-4 py-2 bg-red-600 rounded-md text-sm font-medium text-white hover:bg-red-700 inline-flex items-center gap-2"
+                          >
+                            <Icon name="lucide:shield-off" class="w-4 h-4" />
+                            Unenroll Device
+                          </button>
+                        )}
                       </div>
                     </div>
                   </template>
@@ -1130,6 +1159,15 @@ try {
                     <Icon name="lucide:trash-2" class="w-4 h-4" />
                     Remove Device
                   </button>
+                  {userIsAdmin && (
+                    <button
+                      @click="showUnenrollModal = true"
+                      class="mt-2 px-4 py-2 bg-red-600 rounded-md text-sm font-medium text-white hover:bg-red-700 inline-flex items-center gap-2"
+                    >
+                      <Icon name="lucide:shield-off" class="w-4 h-4" />
+                      Unenroll Device
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -1369,6 +1407,55 @@ try {
                 </form>
               </div>
             </div>
+            <!-- Unenroll Device Modal (admins only) -->
+            {userIsAdmin && (
+              <div
+                x-show="showUnenrollModal"
+                x-cloak
+                @click.self="showUnenrollModal = false; unenrollConfirm = ''"
+                class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4"
+              >
+                <div @click.stop class="bg-white rounded-lg shadow-xl max-w-md w-full p-6 space-y-4">
+                  <h3 class="text-lg font-semibold text-red-700">Unenroll Device from Knox?</h3>
+
+                  <p class="text-sm text-gray-700 leading-relaxed">
+                    This sends Knox Manage's unenroll command. The device will be <strong>factory reset</strong> and
+                    all data on it will be erased. This cannot be undone. If the device is offline, it will be reset
+                    the next time it connects.
+                  </p>
+
+                  <form action={actions.wisephones.unenrollDevice} method="POST" class="space-y-4">
+                    <input type="hidden" name="imei" x-bind:value="imei" />
+                    <label class="block text-sm text-gray-700">
+                      Type the IMEI <span class="font-mono" x-text="imei"></span> to confirm:
+                      <input
+                        type="text"
+                        x-model="unenrollConfirm"
+                        inputmode="numeric"
+                        autocomplete="off"
+                        class="mt-2 w-full px-3 py-2 border border-gray-300 rounded font-mono text-sm"
+                      />
+                    </label>
+                    <div class="flex justify-end gap-3 pt-2">
+                      <button
+                        type="button"
+                        @click="showUnenrollModal = false; unenrollConfirm = ''"
+                        class="px-4 py-2 text-sm font-medium text-white bg-gray-800 rounded hover:bg-gray-700 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        x-bind:disabled="unenrollConfirm.trim() !== String(imei)"
+                        class="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded hover:bg-red-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        Unenroll Device
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
           </div>
 
           <script is:inline define:vars={{ catalogApps, CatalogAppSource }}>
@@ -1454,6 +1541,8 @@ try {
                 editName: "",
                 editPhoneNumber: "",
                 showRemoveModal: false,
+                showUnenrollModal: false,
+                unenrollConfirm: "",
                 cachedTotalApps: 0,
                 installedOpen: false,
                 // @ts-ignore
