@@ -1,4 +1,5 @@
 // src/libs/subscription-matching.ts
+import type Stripe from "stripe";
 import type { Subscription, Device } from "./types";
 import { SamsungKnoxService } from "./samsung-knox-service";
 import { KNOX_USER_GROUPS } from "./utils";
@@ -17,6 +18,44 @@ export function stripeSubscriptionMatchesImei(
 }
 
 export const GIGS_ACTIVE_STATUSES = ["active", "pending"] as const;
+
+export interface SubscriptionDates {
+  canceledAt: Date | null;
+  scheduledEndAt: Date | null;
+  endedAt: Date | null;
+}
+
+/**
+ * Stripe keeps a cancelled subscription "active" until the end of the paid
+ * period: canceled_at is set when the customer cancels, cancel_at (or
+ * current_period_end, when cancel_at_period_end) is when access stops, and
+ * ended_at only once it actually has. Stripe timestamps are Unix seconds.
+ */
+export function subscriptionDatesFromStripe(sub: Stripe.Subscription): SubscriptionDates {
+  const toDate = (seconds: number | null | undefined) => (seconds ? new Date(seconds * 1000) : null);
+  return {
+    canceledAt: toDate(sub.canceled_at),
+    scheduledEndAt: toDate(sub.cancel_at ?? (sub.cancel_at_period_end ? sub.current_period_end : null)),
+    endedAt: toDate(sub.ended_at)
+  };
+}
+
+/**
+ * Gigs sets endedAt as soon as a subscription is cancelled — to the future
+ * date access stops — and the status stays "active" until then, flipping to
+ * "ended" on that date. So endedAt is the scheduled end while still active,
+ * and only counts as the actual end once the subscription is no longer active.
+ */
+export function subscriptionDatesFromGigs(sub: Subscription): SubscriptionDates {
+  const toDate = (iso: string | null | undefined) => (iso ? new Date(iso) : null);
+  const endAt = toDate(sub.endedAt);
+  const isActive = (GIGS_ACTIVE_STATUSES as readonly string[]).includes(sub.status);
+  return {
+    canceledAt: toDate(sub.canceledAt),
+    scheduledEndAt: endAt,
+    endedAt: isActive ? null : endAt
+  };
+}
 
 export function gigsSubscriptionMatchesDevice(sub: Subscription, device: Device): boolean {
   return (

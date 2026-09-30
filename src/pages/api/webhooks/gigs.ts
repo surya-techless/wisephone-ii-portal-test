@@ -2,7 +2,7 @@ import type { APIRoute } from "astro";
 import { db, WebhookEvent, DeviceSubscriptionStatus } from "astro:db";
 import { GIGS_API_KEY, GIGS_WEBHOOK_SECRET } from "astro:env/server";
 import { Webhook } from "svix";
-import { GIGS_ACTIVE_STATUSES, gigsSubscriptionMatchesDevice, normalizeImei, logSubscriptionWebhookEvent, moveDeviceToKickoutGroup, removeDeviceFromKickoutGroup } from "@/libs/subscription-matching";
+import { GIGS_ACTIVE_STATUSES, gigsSubscriptionMatchesDevice, normalizeImei, logSubscriptionWebhookEvent, moveDeviceToKickoutGroup, removeDeviceFromKickoutGroup, subscriptionDatesFromGigs } from "@/libs/subscription-matching";
 import type { Device, DeviceList, Subscription } from "@/libs/types";
 import { publishSubscriptionStatus } from "@/libs/mqtt";
 import { devLog } from "@/libs/utils";
@@ -155,6 +155,7 @@ export const POST: APIRoute = async ({ request }) => {
   });
 
   if (imei) {
+    const dates = subscriptionDatesFromGigs(subscription);
     await db
       .insert(DeviceSubscriptionStatus)
       .values({
@@ -164,6 +165,7 @@ export const POST: APIRoute = async ({ request }) => {
         subscriptionStatus: isActive ? "Active" : "Not Active",
         rawStatus: subscription.status,
         lastEventType: eventType,
+        ...dates,
         updatedAt: new Date()
       })
       .onConflictDoUpdate({
@@ -174,6 +176,7 @@ export const POST: APIRoute = async ({ request }) => {
           subscriptionStatus: isActive ? "Active" : "Not Active",
           rawStatus: subscription.status,
           lastEventType: eventType,
+          ...dates,
           updatedAt: new Date()
         }
       });

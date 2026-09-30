@@ -436,7 +436,7 @@ export type Subscription = {
   plan: Plan;
   porting: Porting;
   sim: Sim;
-  status: "pending" | "active" | "inactive" | "canceled";
+  status: "pending" | "active" | "inactive" | "canceled" | "ended";
   user: User;
   activatedAt: string;
   canceledAt: string;

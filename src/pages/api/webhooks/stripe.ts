@@ -3,7 +3,7 @@ import Stripe from "stripe";
 import { db, WebhookEvent, DeviceSubscriptionStatus } from "astro:db";
 import { STRIPE_WEBHOOK_SECRET } from "astro:env/server";
 import { stripe } from "@/libs/stripe";
-import { normalizeImei, logSubscriptionWebhookEvent, moveDeviceToKickoutGroup, removeDeviceFromKickoutGroup } from "@/libs/subscription-matching";
+import { normalizeImei, logSubscriptionWebhookEvent, moveDeviceToKickoutGroup, removeDeviceFromKickoutGroup, subscriptionDatesFromStripe } from "@/libs/subscription-matching";
 import { publishSubscriptionStatus } from "@/libs/mqtt";
 import { devLog } from "@/libs/utils";
 
@@ -96,6 +96,7 @@ export const POST: APIRoute = async ({ request }) => {
         `[stripe webhook] ${event.type} | IMEI: ${imei} | subscription: ${subscription.id} | status: ${subscription.status} | isActive: ${isActive}`
       );
       logSubscriptionWebhookEvent({ provider: "Stripe", isActive, imei });
+      const dates = subscriptionDatesFromStripe(subscription);
       await db.insert(WebhookEvent).values({
         source: "stripe",
         type: event.type,
@@ -112,6 +113,7 @@ export const POST: APIRoute = async ({ request }) => {
           subscriptionStatus: isActive ? "Active" : "Not Active",
           rawStatus: subscription.status,
           lastEventType: event.type,
+          ...dates,
           updatedAt: new Date()
         })
         .onConflictDoUpdate({
@@ -122,6 +124,7 @@ export const POST: APIRoute = async ({ request }) => {
             subscriptionStatus: isActive ? "Active" : "Not Active",
             rawStatus: subscription.status,
             lastEventType: event.type,
+            ...dates,
             updatedAt: new Date()
           }
         });

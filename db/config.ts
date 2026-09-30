@@ -119,6 +119,12 @@ const DeviceSubscriptionStatus = defineTable({
     subscriptionStatus: column.text(), // "Active" | "Not Active"
     rawStatus: column.text({ optional: true }), // raw provider status, e.g. "trialing" / "pending" / "canceled"
     lastEventType: column.text({ optional: true }), // e.g. "customer.subscription.updated"
+    // Subscription lifecycle dates, from the provider's own subscription
+    // object on every webhook (see subscriptionDatesFromStripe/Gigs in
+    // src/libs/subscription-matching.ts). All cleared again on resubscribe.
+    canceledAt: column.date({ optional: true }), // when cancellation was requested
+    scheduledEndAt: column.date({ optional: true }), // when access is set to stop (end of paid period)
+    endedAt: column.date({ optional: true }), // when it actually ended — starts the 90-day deletion clock
     updatedAt: column.date({ default: NOW })
   }
 });
