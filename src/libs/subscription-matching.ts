@@ -106,7 +106,17 @@ export function logSubscriptionWebhookEvent(params: {
 // reports their subscription inactive. Remove once the group's Knox Manage
 // policy has been verified to do the right thing on a real device (wiseOS
 // showing setup-only, per its own isSubscriptionActive gate).
-const KICKOUT_TEST_IMEIS = new Set(["351944810229850", "350256486678703", "351944811727332"]);
+const KICKOUT_TEST_IMEIS = new Set([
+  "351944810229850",
+  "350256486678703",
+  "353994918174688",
+  "350256489986988", // Aimee A15
+  "353994918206035", // Aimee A16
+  "351944811727332", // Aimee A17
+  "350256486849403", // Surya A15
+  "353994910606125", // Surya A16
+  "352648341001626" // Micah A16
+]);
 
 // Tool Drawer groups (enable + block variants, all device models) are kept
 // as-is when a device is kicked out — a lapsed subscriber's Tool Drawer
