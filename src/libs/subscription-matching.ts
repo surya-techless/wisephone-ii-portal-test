@@ -110,10 +110,14 @@ const KICKOUT_PRESERVED_GROUPS = new Set([
   KNOX_USER_GROUPS.CSPIRE_ADD_ON_BLOCK_TOOL_DRAWER
 ]);
 
+// Groups applied when a device is kicked out, and removed again when it
+// resubscribes.
+const KICKOUT_GROUPS = [KNOX_USER_GROUPS.KICKOUT_TEST, KNOX_USER_GROUPS.BLOCK_3RD_PARTY_UNSUB];
+
 /**
- * Moves a device to the Kickout(Test) Knox group — removes every group it
- * currently has EXCEPT its Tool Drawer group(s), which are left untouched,
- * then applies Kickout(Test) on top. Called from stripe.ts/gigs.ts whenever
+ * Moves a device to the Kickout(Test) and Block3rdPartyUnSub Knox groups —
+ * removes every group it currently has EXCEPT its Tool Drawer group(s), which
+ * are left untouched, then applies the KICKOUT_GROUPS on top. Called from stripe.ts/gigs.ts whenever
  * a webhook reports a device's subscription is no longer active. Non-fatal
  * on failure, matching publishSubscriptionStatus's convention — webhook
  * handlers must still return 200 quickly.
@@ -125,26 +129,32 @@ export async function moveDeviceToKickoutGroup(imei: string): Promise<void> {
   try {
     const currentGroups = await SamsungKnoxService.getGroupsForDevice(normalized);
     for (const groupId of currentGroups) {
-      if (groupId === KNOX_USER_GROUPS.KICKOUT_TEST) continue;
+      if (KICKOUT_GROUPS.includes(groupId)) continue;
       if (KICKOUT_PRESERVED_GROUPS.has(groupId)) continue;
       await SamsungKnoxService.removeFeature(groupId, normalized);
     }
-    await SamsungKnoxService.applyFeature(KNOX_USER_GROUPS.KICKOUT_TEST, normalized);
-    console.log(`[kickout] Moved IMEI ${normalized} to Kickout(Test) group (Tool Drawer groups preserved)`);
+    for (const groupId of KICKOUT_GROUPS) {
+      if (!currentGroups.includes(groupId)) {
+        await SamsungKnoxService.applyFeature(groupId, normalized);
+      }
+    }
+    console.log(
+      `[kickout] Moved IMEI ${normalized} to Kickout(Test) + Block3rdPartyUnSub groups (Tool Drawer groups preserved)`
+    );
   } catch (err) {
     console.error(`[kickout] Failed to move IMEI ${normalized} to Kickout(Test) group:`, err);
   }
 }
 
 /**
- * Removes a device from the Kickout(Test) group — the mirror of
+ * Removes a device from the Kickout(Test) and Block3rdPartyUnSub groups — the mirror of
  * moveDeviceToKickoutGroup(), called whenever a webhook reports a device's
  * subscription is active again. Without this, a device that resubscribes via
  * webhook alone (no need to redo Setup — wiseOS's own isSubscriptionActive
  * gate already auto-unlocks it) would stay stuck in Kickout(Test) forever,
  * since nothing else removes it.
  *
- * Only removes KICKOUT_TEST — does not assign SUBSCRIBED/UNPAID or any other
+ * Only removes the KICKOUT_GROUPS — does not assign SUBSCRIBED/UNPAID or any other
  * group. That reassignment already happens separately, when the user next
  * completes Setup in the portal (assignSubscriptionGroupByDeviceModel() in
  * manage/[imei].astro); this just undoes the one group this codebase added,
@@ -157,10 +167,13 @@ export async function removeDeviceFromKickoutGroup(imei: string): Promise<void> 
 
   try {
     const currentGroups = await SamsungKnoxService.getGroupsForDevice(normalized);
-    if (!currentGroups.includes(KNOX_USER_GROUPS.KICKOUT_TEST)) return;
+    const toRemove = KICKOUT_GROUPS.filter((groupId) => currentGroups.includes(groupId));
+    if (toRemove.length === 0) return;
 
-    await SamsungKnoxService.removeFeature(KNOX_USER_GROUPS.KICKOUT_TEST, normalized);
-    console.log(`[kickout] Removed IMEI ${normalized} from Kickout(Test) group`);
+    for (const groupId of toRemove) {
+      await SamsungKnoxService.removeFeature(groupId, normalized);
+    }
+    console.log(`[kickout] Removed IMEI ${normalized} from Kickout(Test) + Block3rdPartyUnSub groups`);
   } catch (err) {
     console.error(`[kickout] Failed to remove IMEI ${normalized} from Kickout(Test) group:`, err);
   }

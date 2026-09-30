@@ -101,7 +101,11 @@ export const KNOX_USER_GROUPS = {
   // reports its subscription is no longer active — see moveDeviceToKickoutGroup()
   // in src/libs/subscription-matching.ts. Test group, [TEST OVERRIDE]-scoped to
   // one IMEI for now.
-  KICKOUT_TEST: "4f99484801d34b9e987c1a987a0ed582"
+  KICKOUT_TEST: "4f99484801d34b9e987c1a987a0ed582",
+
+  // "Block3rdPartyUnSub" — applied alongside KICKOUT_TEST when a device's
+  // subscription lapses, removed again on resubscribe (same functions).
+  BLOCK_3RD_PARTY_UNSUB: "b55deb6a49de4a82a1432090c0c7d60c"
 
 };
 
