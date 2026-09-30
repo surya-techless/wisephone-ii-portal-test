@@ -17,6 +17,58 @@ const API_CONFIG = {
   }
 };
 
+/**
+ * Device-level Gigs check: does THIS phone (by IMEI) have an active/pending
+ * Gigs subscription? A Gigs subscription belongs to a user (account), not a
+ * device — the only link to a phone is its SIM. So a subscription only counts
+ * when it's active/pending AND its SIM is one of the SIMs Gigs has recorded in
+ * this phone (gigsSubscriptionMatchesDevice). Another phone's line on the same
+ * account, or an ended subscription, never counts. Checks every device record
+ * Gigs returns for the IMEI. Throws on Gigs API errors.
+ */
+async function hasGigsSubscriptionOnDevice(imei: string): Promise<boolean> {
+  const gigsHeaders = {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${API_CONFIG.gigs.apiKey}`,
+    Accept: "application/json"
+  };
+
+  const deviceResponse = await fetch(new URL(`${API_CONFIG.gigs.baseUrl}/devices/search`), {
+    method: "POST",
+    headers: gigsHeaders,
+    body: JSON.stringify({ imei }),
+    signal: AbortSignal.timeout(15000)
+  });
+  if (!deviceResponse.ok) {
+    throw new Error(`Gigs devices/search failed with status ${deviceResponse.status}`);
+  }
+
+  const devices = ((await deviceResponse.json()) as DeviceList).items ?? [];
+  const userIds = [...new Set(devices.map((device) => device.user?.id).filter(Boolean))] as string[];
+
+  for (const userId of userIds) {
+    const apiUrl = new URL(`${API_CONFIG.gigs.baseUrl}/subscriptions`);
+    apiUrl.searchParams.set("user", userId);
+
+    const subscriptionsResponse = await fetch(apiUrl, {
+      method: "GET",
+      headers: gigsHeaders,
+      signal: AbortSignal.timeout(15000)
+    });
+    if (!subscriptionsResponse.ok) {
+      throw new Error(`Gigs subscriptions list failed with status ${subscriptionsResponse.status}`);
+    }
+
+    const subscriptions = ((await subscriptionsResponse.json()) as { items: Subscription[] }).items ?? [];
+    const userDevices = devices.filter((device) => device.user?.id === userId);
+    if (userDevices.some((device) => subscriptions.some((sub) => gigsSubscriptionMatchesDevice(sub, device)))) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 export async function validateSubscriptionLegacy(
   provider: "stripe" | "gigs",
   params: { imei?: string; phoneNumber?: string }
@@ -89,39 +141,8 @@ export async function validateSubscriptionLegacy(
     }
 
     if (imei && !isSubscribed) {
-      const devicesApiUrl = new URL(`${API_CONFIG.gigs.baseUrl}/devices/search`);
-      const deviceResponse = await fetch(devicesApiUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${API_CONFIG.gigs.apiKey}`,
-          Accept: "application/json"
-        },
-        body: JSON.stringify({ imei })
-      });
-
-      const devices = (await deviceResponse.json()) as DeviceList;
-      const userId = devices.items?.[0]?.user?.id;
-
-      if (!userId) {
-        isSubscribed = false;
-        return isSubscribed;
-      }
-
-      const apiUrl = new URL(`${API_CONFIG.gigs.baseUrl}/subscriptions`);
-      apiUrl.searchParams.set("user", userId);
-
-      const subscriptionsResponse = await fetch(apiUrl, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${API_CONFIG.gigs.apiKey}`,
-          Accept: "application/json"
-        }
-      });
-
-      const subscriptions = (await subscriptionsResponse.json()) as { items: Subscription[] };
-      isSubscribed = Boolean(subscriptions?.items?.length > 0 || false);
+      // Device-level: only an active/pending subscription on a SIM in this phone counts.
+      isSubscribed = await hasGigsSubscriptionOnDevice(normalizeImei(imei));
     }
 
     return isSubscribed;
@@ -203,49 +224,7 @@ async function validateIsSubscribedStrict({ imei }: { imei: string }): Promise<b
   }
 
   devLog.log("PAY DEBUG: [L3.6] No Stripe match, checking Gigs subscription by device");
-  const devicesApiUrl = new URL(`${API_CONFIG.gigs.baseUrl}/devices/search`);
-  const deviceResponse = await fetch(devicesApiUrl, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${API_CONFIG.gigs.apiKey}`,
-      Accept: "application/json"
-    },
-    body: JSON.stringify({ imei: normalized }),
-    signal: AbortSignal.timeout(15000)
-  });
-
-  if (!deviceResponse.ok) {
-    throw new Error(`Gigs devices/search failed with status ${deviceResponse.status}`);
-  }
-
-  const devices = (await deviceResponse.json()) as DeviceList;
-  const device = devices.items?.[0];
-
-  if (!device || !device.user?.id) {
-    devLog.log("PAY DEBUG: [L3.7] No device or user found, returning false");
-    return false;
-  }
-
-  const apiUrl = new URL(`${API_CONFIG.gigs.baseUrl}/subscriptions`);
-  apiUrl.searchParams.set("user", device.user.id);
-
-  const subscriptionsResponse = await fetch(apiUrl, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${API_CONFIG.gigs.apiKey}`,
-      Accept: "application/json"
-    },
-    signal: AbortSignal.timeout(15000)
-  });
-
-  if (!subscriptionsResponse.ok) {
-    throw new Error(`Gigs subscriptions list failed with status ${subscriptionsResponse.status}`);
-  }
-
-  const subscriptions = (await subscriptionsResponse.json()) as { items: Subscription[] };
-  const gigsHit = subscriptions.items?.some((sub) => gigsSubscriptionMatchesDevice(sub, device)) ?? false;
+  const gigsHit = await hasGigsSubscriptionOnDevice(normalized);
 
   devLog.log("PAY DEBUG: [L3.8] Gigs subscription check result:", gigsHit);
   return gigsHit;

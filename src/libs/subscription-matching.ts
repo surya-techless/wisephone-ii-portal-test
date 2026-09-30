@@ -57,6 +57,15 @@ export function subscriptionDatesFromGigs(sub: Subscription): SubscriptionDates 
   };
 }
 
+/**
+ * True when the subscription's SIM is one of this device's SIMs, regardless of
+ * status — used to work out WHICH phone a subscription belongs to (e.g. an
+ * "ended" webhook), not whether it's active.
+ */
+export function gigsDeviceHasSubscriptionSim(sub: Subscription, device: Device): boolean {
+  return Boolean(sub.sim?.id) && Boolean(device.sims?.some((sim) => sim.id === sub.sim?.id));
+}
+
 export function gigsSubscriptionMatchesDevice(sub: Subscription, device: Device): boolean {
   return (
     (GIGS_ACTIVE_STATUSES as readonly string[]).includes(sub.status) &&

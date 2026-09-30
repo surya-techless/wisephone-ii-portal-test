@@ -2,7 +2,7 @@ import type { APIRoute } from "astro";
 import { db, WebhookEvent, DeviceSubscriptionStatus } from "astro:db";
 import { GIGS_API_KEY, GIGS_WEBHOOK_SECRET } from "astro:env/server";
 import { Webhook } from "svix";
-import { GIGS_ACTIVE_STATUSES, gigsSubscriptionMatchesDevice, normalizeImei, logSubscriptionWebhookEvent, moveDeviceToKickoutGroup, removeDeviceFromKickoutGroup, subscriptionDatesFromGigs } from "@/libs/subscription-matching";
+import { GIGS_ACTIVE_STATUSES, gigsDeviceHasSubscriptionSim, normalizeImei, logSubscriptionWebhookEvent, moveDeviceToKickoutGroup, removeDeviceFromKickoutGroup, subscriptionDatesFromGigs } from "@/libs/subscription-matching";
 import type { Device, DeviceList, Subscription } from "@/libs/types";
 import { publishSubscriptionStatus } from "@/libs/mqtt";
 import { devLog } from "@/libs/utils";
@@ -116,9 +116,10 @@ export const POST: APIRoute = async ({ request }) => {
 
       if (deviceResponse.ok) {
         const devices = (await deviceResponse.json()) as DeviceList;
-        // Prefer the device whose SIM matches this subscription, in case the user has more than one.
-        const device: Device | undefined =
-          devices.items?.find((d) => gigsSubscriptionMatchesDevice(subscription, d)) ?? devices.items?.[0];
+        // Only the device holding this subscription's SIM — never another phone on
+        // the same account. Status is ignored here: an "ended" event still needs
+        // to find its phone. No match → no IMEI → event is logged and skipped.
+        const device: Device | undefined = devices.items?.find((d) => gigsDeviceHasSubscriptionSim(subscription, d));
         imei = normalizeImei(String(device?.imei ?? ""));
       } else {
         console.error(`[gigs webhook] devices lookup by user failed with status ${deviceResponse.status}`);
