@@ -15,7 +15,6 @@ import { validateIsSubscribed } from "@/libs/stripe";
 import { devLog, describeKnoxGroups, KNOX_USER_GROUPS } from "@/libs/utils";
 import { SamsungKnoxService } from "@/libs/samsung-knox-service";
 import { isFeatureEnabled } from "@/config/feature-flags";
-import { isAdmin } from "@/lib/auth/permissions";
 import TypeformDeviceRegistration from "@/components/TypeformDeviceRegistration.astro";
 import CspireSubscriptionModal from "@/components/CspireSubscriptionModal.astro";
 import PatriotSubscriptionModal from "@/components/PatriotSubscriptionModal.astro";
@@ -31,18 +30,6 @@ const user = await Astro.locals.currentUser();
 
 if (!user) {
   return Astro.redirect("/");
-}
-
-const userIsAdmin = await isAdmin(user.id);
-
-// Result of the admin-only "Unenroll Device" action (see wisephones.unenrollDevice)
-const unenrollActionResult = Astro.getActionResult(actions.wisephones.unenrollDevice);
-if (unenrollActionResult) {
-  return Astro.redirect(
-    unenrollActionResult.error
-      ? "/dashboard?error=" + encodeURIComponent(`Unenroll failed: ${unenrollActionResult.error.message}`)
-      : "/dashboard?message=" + encodeURIComponent(unenrollActionResult.data.success)
-  );
 }
 
 const wisephones = await db.select().from(Wisephone).where(eq(Wisephone.userId, user.id));
@@ -498,35 +485,24 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
                     <p class="text-gray-500 text-sm">{wisephone.phoneNumber || '(111) 111-1111'}</p>
                     <p class="text-gray-500 text-sm whitespace-nowrap">IMEI: {imeiString}</p>
                   </div>
-                  <div class="flex flex-col items-stretch gap-2 flex-shrink-0">
-                    <template x-if="isSubscribed">
-                      <a
-                        href={`/manage/${imeiString}`}
-                        @click="$root.isLoading = true"
-                        class="border border-gray-300 bg-white text-gray-900 text-sm px-2.5 py-1 rounded-md hover:bg-gray-50 whitespace-nowrap flex-shrink-0 text-center"
-                      >
-                        Manage Device
-                      </a>
-                    </template>
-                    <template x-if="!isSubscribed">
-                      <button
-                        type="button"
-                        @click="openActivateModal()"
-                        class="border border-gray-300 bg-white text-gray-900 text-sm px-2.5 py-1 rounded-md hover:bg-gray-50 whitespace-nowrap flex-shrink-0"
-                      >
-                        Activate Plan
-                      </button>
-                    </template>
-                    {userIsAdmin && (
-                      <button
-                        type="button"
-                        @click={`$dispatch('open-unenroll', { imei: '${imeiString}' })`}
-                        class="border border-red-300 bg-white text-red-600 text-sm px-2.5 py-1 rounded-md hover:bg-red-50 whitespace-nowrap flex-shrink-0"
-                      >
-                        Unenroll Device
-                      </button>
-                    )}
-                  </div>
+                  <template x-if="isSubscribed">
+                    <a
+                      href={`/manage/${imeiString}`}
+                      @click="$root.isLoading = true"
+                      class="border border-gray-300 bg-white text-gray-900 text-sm px-2.5 py-1 rounded-md hover:bg-gray-50 whitespace-nowrap flex-shrink-0"
+                    >
+                      Manage Device
+                    </a>
+                  </template>
+                  <template x-if="!isSubscribed">
+                    <button
+                      type="button"
+                      @click="openActivateModal()"
+                      class="border border-gray-300 bg-white text-gray-900 text-sm px-2.5 py-1 rounded-md hover:bg-gray-50 whitespace-nowrap flex-shrink-0"
+                    >
+                      Activate Plan
+                    </button>
+                  </template>
                 </div>
               );
             })}
@@ -534,58 +510,6 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
         </div>
     </div>
   }
-
-  <!-- Unenroll Device Modal (admins only) — opened by a device card's "Unenroll Device" button -->
-  {userIsAdmin && (
-    <div
-      x-data="{ imei: '', confirm: '' }"
-      @open-unenroll.window="imei = $event.detail.imei; confirm = ''"
-      x-show="imei"
-      x-cloak
-      @click.self="imei = ''"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4"
-    >
-      <div @click.stop class="bg-white rounded-lg shadow-xl max-w-md w-full p-6 space-y-4">
-        <h3 class="text-lg font-semibold text-red-700">Unenroll Device from Knox?</h3>
-
-        <p class="text-sm text-gray-700 leading-relaxed">
-          This sends Knox Manage's unenroll command. The device will be <strong>factory reset</strong> and all data on
-          it will be erased. This cannot be undone. If the device is offline, it will be reset the next time it
-          connects.
-        </p>
-
-        <form action={actions.wisephones.unenrollDevice} method="POST" class="space-y-4">
-          <input type="hidden" name="imei" x-bind:value="imei" />
-          <label class="block text-sm text-gray-700">
-            Type the IMEI <span class="font-mono" x-text="imei"></span> to confirm:
-            <input
-              type="text"
-              x-model="confirm"
-              inputmode="numeric"
-              autocomplete="off"
-              class="mt-2 w-full px-3 py-2 border border-gray-300 rounded font-mono text-sm"
-            />
-          </label>
-          <div class="flex justify-end gap-3 pt-2">
-            <button
-              type="button"
-              @click="imei = ''"
-              class="px-4 py-2 text-sm font-medium text-white bg-gray-800 rounded hover:bg-gray-700 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              x-bind:disabled="confirm.trim() !== imei"
-              class="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded hover:bg-red-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              Unenroll Device
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  )}
 
   <!-- Modal for Add Device Form -->
   <div
