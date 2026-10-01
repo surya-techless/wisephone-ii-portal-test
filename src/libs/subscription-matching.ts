@@ -131,12 +131,28 @@ const KICKOUT_PRESERVED_GROUPS = new Set([
 
 // Groups applied when a device is kicked out, and removed again when it
 // resubscribes.
-const KICKOUT_GROUPS = [KNOX_USER_GROUPS.KICKOUT_TEST, KNOX_USER_GROUPS.BLOCK_3RD_PARTY_UNSUB];
+const KICKOUT_GROUPS = [KNOX_USER_GROUPS.KICKOUT_TEST];
 
 /**
- * Moves a device to the Kickout(Test) and Block3rdPartyUnSub Knox groups —
+ * The model-specific "Add-on- WPII - Block-Tool Drawer" group for a device,
+ * using the same rule as the manage page's isA16Device(): a Knox model name
+ * containing A16 or A17 gets the A16 variant, anything else (or an unknown
+ * model) the regular one.
+ */
+async function blockToolDrawerGroupForDevice(imei: string): Promise<string> {
+  const rv = (await SamsungKnoxService.getDeviceFromImei(imei))?.resultValue;
+  const model = String(
+    rv?.deviceModelName || rv?.modelName || rv?.deviceModel || rv?.model || rv?.deviceName || ""
+  ).toUpperCase();
+  const isA16Device = model.includes("A16") || model.includes("A17");
+  return isA16Device ? KNOX_USER_GROUPS.A16_ADD_ON_BLOCK_TOOL_DRAWER : KNOX_USER_GROUPS.ADD_ON_BLOCK_TOOL_DRAWER;
+}
+
+/**
+ * Moves a device to the Kickout(Test) Knox group —
  * removes every group it currently has EXCEPT its Tool Drawer group(s), which
- * are left untouched, then applies the KICKOUT_GROUPS on top. Called from stripe.ts/gigs.ts whenever
+ * are left untouched, then applies the KICKOUT_GROUPS on top, plus the
+ * device's Block-Tool Drawer group (A16 or regular, by model). Called from stripe.ts/gigs.ts whenever
  * a webhook reports a device's subscription is no longer active. Non-fatal
  * on failure, matching publishSubscriptionStatus's convention — webhook
  * handlers must still return 200 quickly.
@@ -152,13 +168,16 @@ export async function moveDeviceToKickoutGroup(imei: string): Promise<void> {
       if (KICKOUT_PRESERVED_GROUPS.has(groupId)) continue;
       await SamsungKnoxService.removeFeature(groupId, normalized);
     }
-    for (const groupId of KICKOUT_GROUPS) {
+    const blockToolDrawerGroup = await blockToolDrawerGroupForDevice(normalized);
+    for (const groupId of [...KICKOUT_GROUPS, blockToolDrawerGroup]) {
       if (!currentGroups.includes(groupId)) {
         await SamsungKnoxService.applyFeature(groupId, normalized);
       }
     }
+    const blockLabel =
+      blockToolDrawerGroup === KNOX_USER_GROUPS.A16_ADD_ON_BLOCK_TOOL_DRAWER ? "A16 Block-Tool Drawer" : "Block-Tool Drawer";
     console.log(
-      `[kickout] Moved IMEI ${normalized} to Kickout(Test) + Block3rdPartyUnSub groups (Tool Drawer groups preserved)`
+      `[kickout] Moved IMEI ${normalized} to Kickout(Test) + ${blockLabel} groups (Tool Drawer groups preserved)`
     );
   } catch (err) {
     console.error(`[kickout] Failed to move IMEI ${normalized} to Kickout(Test) group:`, err);
@@ -166,7 +185,7 @@ export async function moveDeviceToKickoutGroup(imei: string): Promise<void> {
 }
 
 /**
- * Removes a device from the Kickout(Test) and Block3rdPartyUnSub groups — the mirror of
+ * Removes a device from the Kickout(Test) group — the mirror of
  * moveDeviceToKickoutGroup(), called whenever a webhook reports a device's
  * subscription is active again. Without this, a device that resubscribes via
  * webhook alone (no need to redo Setup — wiseOS's own isSubscriptionActive
@@ -192,7 +211,7 @@ export async function removeDeviceFromKickoutGroup(imei: string): Promise<void> 
     for (const groupId of toRemove) {
       await SamsungKnoxService.removeFeature(groupId, normalized);
     }
-    console.log(`[kickout] Removed IMEI ${normalized} from Kickout(Test) + Block3rdPartyUnSub groups`);
+    console.log(`[kickout] Removed IMEI ${normalized} from Kickout(Test) group`);
   } catch (err) {
     console.error(`[kickout] Failed to remove IMEI ${normalized} from Kickout(Test) group:`, err);
   }
