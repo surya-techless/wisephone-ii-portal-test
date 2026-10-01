@@ -16,7 +16,7 @@ import type { UserResource } from "@clerk/types";
 import type { User } from "@clerk/astro/server";
 import { actions } from "astro:actions";
 import Icon from "astro-iconify";
-import { validateIsSubscribed } from "@/libs/stripe";
+import { resolveDeviceSubscriptionStatus } from "@/libs/stripe";
 import { SamsungKnoxService } from "@/libs/samsung-knox-service";
 import Layout from "@/layouts/Layout.astro";
 import TechlessSubscriptionButton from "@/components/TechlessSubscriptionButton.astro";
@@ -177,10 +177,10 @@ try {
         devLog.log("PAY DEBUG: [S1.5.1] Calling validateIsSubscribed function...");
 
         const startTime = Date.now();
-        isSubscribed = await validateIsSubscribed({
+        isSubscribed = (await resolveDeviceSubscriptionStatus({
           imei: imeiForCheck,
           phoneNumber: phoneForCheck
-        });
+        })).isSubscribed;
         const endTime = Date.now();
         const duration = endTime - startTime;
 

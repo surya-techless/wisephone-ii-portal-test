@@ -162,34 +162,38 @@ async function validateIsSubscribedLegacy({
   devLog.log("PAY DEBUG: [L2.1] imei:", imei);
   devLog.log("PAY DEBUG: [L2.2] phoneNumber:", phoneNumber);
 
-  try {
-    if (imei) {
-      devLog.log("PAY DEBUG: [L2.3] Checking Stripe subscription first by IMEI");
+  // A Stripe failure (e.g. Search rate-limited, 429) must not end the check
+  // before Gigs is consulted, and must not be reported as "not subscribed" —
+  // that used to lock every Gigs customer whenever Stripe Search was throttled.
+  let stripeError: unknown = null;
+  if (imei) {
+    try {
       const stripeResult = await validateSubscriptionLegacy("stripe", { imei });
       devLog.log("PAY DEBUG: [L2.4] Stripe subscription check result:", stripeResult);
-
       if (stripeResult) {
-        devLog.log("PAY DEBUG: [L2.5] Stripe subscription found, returning true");
         devLog.log(`[Device Details] IMEI: ${imei} | isSubscribed: true | provider: STRIPE`);
         return true;
       }
+    } catch (err) {
+      stripeError = err;
+      console.error(`[SUB-VALIDATION] Stripe check failed for imei=${normalizeImei(imei)}, still checking Gigs:`, err);
     }
-
-    devLog.log("PAY DEBUG: [L2.6] Stripe check returned false, checking Gigs subscription");
-    const gigsResult = await validateSubscriptionLegacy("gigs", { imei, phoneNumber });
-    devLog.log("PAY DEBUG: [L2.7] Gigs subscription check result:", gigsResult);
-    devLog.log("PAY DEBUG: [L2.8] Final result:", gigsResult);
-    devLog.log(
-      `[Device Details] IMEI: ${imei} | isSubscribed: ${gigsResult} | provider: ${gigsResult ? "GIGS" : "NONE (not subscribed)"}`
-    );
-
-    return gigsResult;
-  } catch (err: any) {
-    devLog.error("PAY DEBUG: [L2.9] ERROR validating subscription:", err);
-    // Return false on error - device will be assigned to unpaid group
-    // This prevents unsubscribed devices from getting subscribed features due to API errors
-    return false;
   }
+
+  // Gigs errors propagate: the caller must treat them as "unknown", not "unsubscribed".
+  const gigsResult = await validateSubscriptionLegacy("gigs", { imei, phoneNumber });
+  devLog.log(
+    `[Device Details] IMEI: ${imei} | isSubscribed: ${gigsResult} | provider: ${gigsResult ? "GIGS" : "NONE (not subscribed)"}`
+  );
+  if (gigsResult) {
+    return true;
+  }
+
+  // Not on Gigs, and Stripe couldn't be checked — the answer is unknown.
+  if (stripeError) {
+    throw stripeError;
+  }
+  return false;
 }
 
 async function validateIsSubscribedStrict({ imei }: { imei: string }): Promise<boolean> {
@@ -254,7 +258,7 @@ export async function validateIsSubscribed({
       return await validateIsSubscribedStrict({ imei });
     } catch (err) {
       logStrictValidationError(imei, err);
-      return false;
+      throw err;
     }
   }
 
@@ -305,27 +309,22 @@ export async function isBypassImei(imei: string): Promise<boolean> {
   return Boolean(bypass);
 }
 
-// [TEST OVERRIDE] — remove once the DeviceSubscriptionStatus cache has been
-// validated against real traffic. Until then, only these IMEIs use the new
-// cache path below; every other IMEI falls back to the original always-live
-// validateIsSubscribed() check, completely unaffected by this feature — this
-// function's callers (validateIsUserSubscribed, manage/[imei].astro's
-// completeSetup, /api/device-subscription/[imei].json) are already live and
-// used by real users today, so this limits any caching bug's blast radius to
-// just the device(s) actively being tested with.
-const SUBSCRIPTION_CACHE_TEST_IMEIS = new Set(["351944810229850"]);
-
 /**
  * Single shared "is this device subscribed" resolver — replaces the bypass +
  * validateIsSubscribed() pattern that used to be duplicated across
  * /api/device-subscription/[imei].json, manage/[imei].astro, and the
  * validateIsUserSubscribed action.
  *
- * Order: bypass override (unchanged, no DB write) → cached
- * DeviceSubscriptionStatus row (kept fresh by the Stripe/Gigs webhook
- * handlers — no live API call) → live validateIsSubscribed() only when no
- * cached row exists yet (no webhook has fired for this IMEI), caching that
- * result so it doesn't need to be repeated.
+ * Order, for every IMEI:
+ *   1. bypass list → subscribed (no API calls)
+ *   2. DeviceSubscriptionStatus row → answer from the row (no API calls).
+ *      Rows come from the backfill and are kept current by the Stripe/Gigs
+ *      webhooks, so this answers almost every check without touching Stripe
+ *      Search (which is rate-limited to ~20 req/s per account).
+ *   3. no row yet → live validateIsSubscribed(), and save the result as a row.
+ *   4. live check failed (Stripe 429, Gigs error) → THROWS. Callers must treat
+ *      that as "unknown" (the device API returns 503 so wiseOS keeps its last
+ *      known status) — never as "not subscribed". Errors are never saved.
  */
 export async function resolveDeviceSubscriptionStatus({
   imei,
@@ -338,16 +337,6 @@ export async function resolveDeviceSubscriptionStatus({
 
   if (await isBypassImei(normalized)) {
     return { isSubscribed: true, source: "bypass", checkedAt: new Date().toISOString(), subscriptionType: "Bypass" };
-  }
-
-  // [TEST OVERRIDE] — see SUBSCRIPTION_CACHE_TEST_IMEIS above.
-  if (!SUBSCRIPTION_CACHE_TEST_IMEIS.has(normalized)) {
-    const isSubscribed = await validateIsSubscribed({ imei: normalized, phoneNumber });
-    return {
-      isSubscribed,
-      source: isSubscribed ? "stripe_or_gigs" : "none",
-      checkedAt: new Date().toISOString()
-    };
   }
 
   const cached = await db
@@ -366,9 +355,9 @@ export async function resolveDeviceSubscriptionStatus({
     };
   }
 
-  // No cached row yet — no webhook has fired for this IMEI (e.g. a device
-  // that predates this table). Fall back to a live check, and cache the
-  // result so this fallback isn't repeated on every future check.
+  // No row yet — a device the backfill and webhooks haven't covered. Fall
+  // back to a live check and save the result so it isn't repeated. If the
+  // live check throws, nothing is saved and the error reaches the caller.
   const isSubscribed = await validateIsSubscribed({ imei: normalized, phoneNumber });
   const checkedAt = new Date();
 

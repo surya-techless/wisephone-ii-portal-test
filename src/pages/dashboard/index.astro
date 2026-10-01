@@ -11,7 +11,7 @@ import WisephoneLogo from "@/components/WisephoneLogo.astro";
 import DashboardSidebar from "@/components/DashboardSidebar.astro";
 import IsAdmin from "@/components/server-islands/IsAdmin.astro";
 import { SignOutButton } from "@clerk/astro/components";
-import { validateIsSubscribed } from "@/libs/stripe";
+import { resolveDeviceSubscriptionStatus } from "@/libs/stripe";
 import { devLog, describeKnoxGroups, KNOX_USER_GROUPS } from "@/libs/utils";
 import { SamsungKnoxService } from "@/libs/samsung-knox-service";
 import { isFeatureEnabled } from "@/config/feature-flags";
@@ -59,10 +59,10 @@ const wisephonesWithSubscription = await Promise.all(
     // If not bypassed, check actual subscription
     if (!isSubscribed && wisephone.phoneNumber) {
       try {
-        isSubscribed = await validateIsSubscribed({
+        isSubscribed = (await resolveDeviceSubscriptionStatus({
           imei: wisephone.imei.toString(),
           phoneNumber: `${wisephone.phoneNumber.replace(/[^0-9+]/g, "") || ""}`
-        });
+        })).isSubscribed;
       } catch (error) {
         isSubscribed = false;
       }

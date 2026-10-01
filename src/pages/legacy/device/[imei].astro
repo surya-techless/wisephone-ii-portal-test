@@ -5,7 +5,7 @@ import type { UserResource } from "@clerk/types";
 import type { User } from "@clerk/astro/server";
 import { actions, type ActionInputError } from "astro:actions";
 import Icon from "astro-iconify";
-import { validateIsSubscribed } from "@/libs/stripe";
+import { resolveDeviceSubscriptionStatus } from "@/libs/stripe";
 import { SamsungKnoxService } from "@/libs/samsung-knox-service";
 import Layout from "@/layouts/Layout.astro";
 import Header from "@/components/Header.astro";
@@ -108,10 +108,10 @@ if (!user) {
       const phoneForCheck = `${wisephone?.phoneNumber?.replace(/[^0-9+]/g, "") || ""}`;
       devLog.log(`[Device Page] Checking subscription - IMEI: ${imeiForCheck}, Phone: ${phoneForCheck}`);
 
-      isSubscribed = await validateIsSubscribed({
+      isSubscribed = (await resolveDeviceSubscriptionStatus({
         imei: imeiForCheck,
         phoneNumber: phoneForCheck
-      });
+      })).isSubscribed;
       devLog.log(`[Device Page] Subscription check result: ${isSubscribed}`);
     } catch (subscriptionError) {
       devLog.error("[Device Page] Error checking subscription status:", subscriptionError);

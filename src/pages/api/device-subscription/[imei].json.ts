@@ -62,10 +62,21 @@ export const GET: APIRoute = async ({ params, request }) => {
     });
   }
 
-  const result = await resolveDeviceSubscriptionStatus({
-    imei: String(wisephone.imei),
-    phoneNumber: wisephone.phoneNumber ?? ""
-  });
+  let result;
+  try {
+    result = await resolveDeviceSubscriptionStatus({
+      imei: String(wisephone.imei),
+      phoneNumber: wisephone.phoneNumber ?? ""
+    });
+  } catch (error) {
+    // Status unknown (e.g. Stripe rate-limited and no saved row) — answer with an
+    // error, never "not subscribed", so wiseOS keeps its last known status.
+    console.error(`[device-subscription] Lookup failed for imei=${imei}:`, error);
+    return new Response(JSON.stringify({ success: false, error: "Subscription status temporarily unavailable" }), {
+      status: 503,
+      headers: { "Content-Type": "application/json", ...corsHeaders, "Retry-After": "60" }
+    });
+  }
 
   return new Response(
     JSON.stringify({

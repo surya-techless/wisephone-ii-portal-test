@@ -1,7 +1,7 @@
 import type { APIRoute } from "astro";
 import { db, Wisephone, BypassTechlessSubscription, sql, and, eq } from "astro:db";
 import { isAdmin } from "@/lib/auth/permissions";
-import { validateIsSubscribed } from "@/libs/stripe";
+import { resolveDeviceSubscriptionStatus } from "@/libs/stripe";
 import { actions } from "astro:actions";
 import { captureException } from "@sentry/astro";
 import { devLog } from "@/libs/utils";
@@ -84,10 +84,10 @@ export const GET: APIRoute = async ({ params, locals }) => {
     // If not bypassed, check Stripe subscription
     if (!isSubscribed && wisephone?.phoneNumber) {
       try {
-        isSubscribed = await validateIsSubscribed({
+        isSubscribed = (await resolveDeviceSubscriptionStatus({
           imei: String(wisephone?.imei || ""),
           phoneNumber: `${wisephone?.phoneNumber?.replace(/[^0-9+]/g, "") || ""}`
-        });
+        })).isSubscribed;
       } catch (subscriptionError) {
         // Log but don't fail - subscription check is best effort
         devLog.error("Error checking subscription status:", subscriptionError);

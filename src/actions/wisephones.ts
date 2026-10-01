@@ -2,7 +2,7 @@ import { defineAction, ActionError } from "astro:actions";
 import { z } from "astro:schema";
 import { db, Wisephone, BypassTechlessSubscription, DeviceFeatureFlags, eq, sql } from "astro:db";
 import { SamsungKnoxService } from "@/libs/samsung-knox-service";
-import { validateIsSubscribed, resolveDeviceSubscriptionStatus } from "@/libs/stripe";
+import { resolveDeviceSubscriptionStatus } from "@/libs/stripe";
 import { publishSubscriptionStatus } from "@/libs/mqtt";
 import { isValidIMEI, devLog, describeKnoxGroups, FEATURES, KNOX_USER_GROUPS } from "@/libs/utils";
 import { isAdmin } from "@/lib/auth/permissions";
@@ -107,10 +107,10 @@ export const wisephones = {
         // If not bypassed, check actual subscription
         if (!isSubscribed && input.phoneNumber) {
           try {
-            isSubscribed = await validateIsSubscribed({
+            isSubscribed = (await resolveDeviceSubscriptionStatus({
               imei: input.imei.toString(),
               phoneNumber: input.phoneNumber.replace(/[^0-9+]/g, "")
-            });
+            })).isSubscribed;
           } catch (error) {
             // Error checking subscription
           }
