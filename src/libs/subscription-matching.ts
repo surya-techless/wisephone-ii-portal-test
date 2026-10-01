@@ -131,7 +131,7 @@ const KICKOUT_PRESERVED_GROUPS = new Set([
 
 // Groups applied when a device is kicked out, and removed again when it
 // resubscribes.
-const KICKOUT_GROUPS = [KNOX_USER_GROUPS.KICKOUT_TEST];
+const KICKOUT_GROUPS = [KNOX_USER_GROUPS.KICKOUT_TEST, KNOX_USER_GROUPS.BLOCK_3RD_PARTY_UNSUB];
 
 // Base subscription-state groups, per device variant. A device should only
 // ever be in one of these at a time.
@@ -187,7 +187,7 @@ const BLOCK_TOOL_DRAWER_GROUP_FOR: Record<DeviceVariant, string> = {
 };
 
 /**
- * Moves a device to the Kickout(Test) Knox group — removes every group it
+ * Moves a device to the Kickout(Test) and Block3rdPartyUnSub Knox groups — removes every group it
  * currently has EXCEPT its Tool Drawer group(s), which are left untouched,
  * then applies the KICKOUT_GROUPS plus the device's Unpaid group and
  * Block-Tool Drawer group (C-Spire / A16 / regular variant). Called from
@@ -215,7 +215,7 @@ export async function moveDeviceToKickoutGroup(imei: string): Promise<void> {
       }
     }
     console.log(
-      `[kickout] Moved IMEI ${normalized} (${variant}) to Kickout(Test) + Unpaid + Block-Tool Drawer groups (Tool Drawer groups preserved)`
+      `[kickout] Moved IMEI ${normalized} (${variant}) to Kickout(Test) + Block3rdPartyUnSub + Unpaid + Block-Tool Drawer groups (Tool Drawer groups preserved)`
     );
   } catch (err) {
     console.error(`[kickout] Failed to move IMEI ${normalized} to Kickout(Test) group:`, err);
@@ -224,7 +224,7 @@ export async function moveDeviceToKickoutGroup(imei: string): Promise<void> {
 
 /**
  * The mirror of moveDeviceToKickoutGroup(), called whenever a webhook reports
- * a device's subscription is active again: removes Kickout(Test) and any
+ * a device's subscription is active again: removes Kickout(Test), Block3rdPartyUnSub and any
  * Unpaid group, and adds the device's Subscribed group (C-Spire / A16 /
  * regular variant) if it doesn't have one. Without this, a device that
  * resubscribes via webhook alone (no need to redo Setup — wiseOS's own
@@ -251,7 +251,7 @@ export async function removeDeviceFromKickoutGroup(imei: string): Promise<void> 
       const variant = await deviceVariant(normalized, currentGroups);
       await SamsungKnoxService.applyFeature(SUBSCRIBED_GROUP_FOR[variant], normalized);
     }
-    console.log(`[kickout] Resubscribed IMEI ${normalized}: removed Kickout(Test)/Unpaid, ensured Subscribed group`);
+    console.log(`[kickout] Resubscribed IMEI ${normalized}: removed Kickout(Test)/Block3rdPartyUnSub/Unpaid, ensured Subscribed group`);
   } catch (err) {
     console.error(`[kickout] Failed to remove IMEI ${normalized} from Kickout(Test) group:`, err);
   }

@@ -1759,7 +1759,8 @@ try {
                     KNOX_USER_GROUPS.UNPAID,
                     KNOX_USER_GROUPS.A16_UNPAID,
                     KNOX_USER_GROUPS.CSPIRE_WPII_Unpaid_v2,
-                    KNOX_USER_GROUPS.KICKOUT_TEST
+                    KNOX_USER_GROUPS.KICKOUT_TEST,
+                    KNOX_USER_GROUPS.BLOCK_3RD_PARTY_UNSUB
                   ].filter((groupId) => this.features.includes(groupId));
                   for (const groupId of groupsToClear) {
                     await this.removeFeatureFromDevice(groupId);
