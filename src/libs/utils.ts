@@ -97,10 +97,10 @@ export const KNOX_USER_GROUPS = {
 
   PATRIOT: "08042d3b18774ac3b9b9f9c56954a454",
 
-  // A device is moved to ONLY this group (all others removed) when a webhook
-  // reports its subscription is no longer active — see moveDeviceToKickoutGroup()
-  // in src/libs/subscription-matching.ts. Test group, [TEST OVERRIDE]-scoped to
-  // one IMEI for now.
+  // A device is moved to this group (alongside its Unpaid, Block-Tool Drawer
+  // and Block3rdPartyUnSub groups) when a webhook reports its subscription is
+  // no longer active — see moveDeviceToKickoutGroup() in
+  // src/libs/subscription-matching.ts. Applies to every device.
   KICKOUT_TEST: "4f99484801d34b9e987c1a987a0ed582",
 
   // "Block3rdPartyUnSub" — applied alongside KICKOUT_TEST when a device's
