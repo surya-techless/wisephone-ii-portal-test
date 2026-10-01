@@ -5,7 +5,7 @@ import { Webhook } from "svix";
 import { GIGS_ACTIVE_STATUSES, gigsDeviceHasSubscriptionSim, normalizeImei, logSubscriptionWebhookEvent, moveDeviceToKickoutGroup, removeDeviceFromKickoutGroup, subscriptionDatesFromGigs } from "@/libs/subscription-matching";
 import type { Device, DeviceList, Subscription } from "@/libs/types";
 import { publishSubscriptionStatus } from "@/libs/mqtt";
-import { isBypassImei } from "@/libs/stripe";
+import { isBypassImei, findActiveSubscriptionForImei } from "@/libs/stripe";
 import { devLog } from "@/libs/utils";
 
 const GIGS_BASE_URL = "https://api.gigs.com/projects/techless";
@@ -163,35 +163,62 @@ export const POST: APIRoute = async ({ request }) => {
     console.log(`[gigs webhook] IMEI ${imei} is in BypassTechlessSubscription — skipping status update, MQTT push and Kickout`);
   } else if (imei) {
     const dates = subscriptionDatesFromGigs(subscription);
-    await db
-      .insert(DeviceSubscriptionStatus)
-      .values({
-        imei,
-        subscriptionType: "Gigs",
-        hasActiveSubscription: isActive ? 1 : 0,
-        subscriptionStatus: isActive ? "Active" : "Not Active",
-        rawStatus: subscription.status,
-        lastEventType: eventType,
-        ...dates,
-        updatedAt: new Date()
-      })
-      .onConflictDoUpdate({
-        target: DeviceSubscriptionStatus.imei,
-        set: {
-          subscriptionType: "Gigs",
-          hasActiveSubscription: isActive ? 1 : 0,
-          subscriptionStatus: isActive ? "Active" : "Not Active",
-          rawStatus: subscription.status,
-          lastEventType: eventType,
-          ...dates,
-          updatedAt: new Date()
-        }
-      });
-    await publishSubscriptionStatus(imei, isActive, "Gigs");
+
+    // "Not active" for THIS subscription doesn't mean the device is
+    // unsubscribed: it may have another active Gigs line on this phone, or a
+    // Stripe plan. Check before marking it unsubscribed or kicking it out.
+    let effective: { isActive: boolean; type: "Stripe" | "Gigs"; rawStatus: string; dates: typeof dates } | null = {
+      isActive,
+      type: "Gigs",
+      rawStatus: subscription.status,
+      dates
+    };
     if (!isActive) {
-      await moveDeviceToKickoutGroup(imei);
-    } else {
-      await removeDeviceFromKickoutGroup(imei);
+      try {
+        const other = await findActiveSubscriptionForImei(imei);
+        if (other) {
+          console.log(`[gigs webhook] IMEI ${imei} still has an active ${other} subscription — keeping it active`);
+          effective = { isActive: true, type: other, rawStatus: `active (${other})`, dates: { canceledAt: null, scheduledEndAt: null, endedAt: null } };
+        }
+      } catch (err) {
+        // Can't tell whether the device is still subscribed — leave its status,
+        // phone and Knox groups as they are rather than risk locking a paying customer.
+        console.error(`[gigs webhook] Couldn't check other subscriptions for IMEI ${imei}; leaving it unchanged:`, err);
+        effective = null;
+      }
+    }
+
+    if (effective) {
+      await db
+        .insert(DeviceSubscriptionStatus)
+        .values({
+          imei,
+          subscriptionType: effective.type,
+          hasActiveSubscription: effective.isActive ? 1 : 0,
+          subscriptionStatus: effective.isActive ? "Active" : "Not Active",
+          rawStatus: effective.rawStatus,
+          lastEventType: eventType,
+          ...effective.dates,
+          updatedAt: new Date()
+        })
+        .onConflictDoUpdate({
+          target: DeviceSubscriptionStatus.imei,
+          set: {
+            subscriptionType: effective.type,
+            hasActiveSubscription: effective.isActive ? 1 : 0,
+            subscriptionStatus: effective.isActive ? "Active" : "Not Active",
+            rawStatus: effective.rawStatus,
+            lastEventType: eventType,
+            ...effective.dates,
+            updatedAt: new Date()
+          }
+        });
+      await publishSubscriptionStatus(imei, effective.isActive, effective.type);
+      if (!effective.isActive) {
+        await moveDeviceToKickoutGroup(imei);
+      } else {
+        await removeDeviceFromKickoutGroup(imei);
+      }
     }
   }
 

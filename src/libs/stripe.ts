@@ -297,6 +297,45 @@ export interface DeviceSubscriptionCheckResult {
  * handlers use this to leave bypass devices alone (no Kickout, no
  * "not subscribed" MQTT push, no status overwrite).
  */
+/**
+ * Does this IMEI have an active subscription anywhere — on Stripe (a
+ * subscription stamped with the IMEI, or, for older records, any subscription
+ * of a customer stamped with it) or on Gigs (a subscription whose SIM is in
+ * this phone)? Returns the provider, or null if none. Throws when Stripe or Gigs
+ * can't be checked, so callers can tell "none" apart from "unknown".
+ *
+ * The webhook handlers call this before acting on a "not active" event: a
+ * device whose plan is on Gigs mustn't be marked unsubscribed (and kicked out)
+ * because a stray Stripe plan was cancelled, and vice versa.
+ */
+export async function findActiveSubscriptionForImei(imei: string): Promise<"Stripe" | "Gigs" | null> {
+  const normalized = normalizeImei(imei);
+  if (!normalized) return null;
+
+  // Stripe search can't mix AND/OR, so search by IMEI and filter the status here.
+  const stripeSubs = await stripe.subscriptions.search({ query: `metadata['imei']:'${normalized}'`, limit: 50 });
+  if (
+    stripeSubs.data.some(
+      (sub) => (sub.status === "active" || sub.status === "trialing") && stripeSubscriptionMatchesImei(sub.metadata, normalized)
+    )
+  ) {
+    return "Stripe";
+  }
+
+  const customers = await stripe.customers.search({ query: `metadata['imei']:'${normalized}'`, limit: 10 });
+  for (const customer of customers.data) {
+    const subs = await stripe.subscriptions.list({ customer: customer.id, status: "all", limit: 20 });
+    if (subs.data.some((sub) => sub.status === "active" || sub.status === "trialing")) {
+      return "Stripe";
+    }
+  }
+
+  if (await hasGigsSubscriptionOnDevice(normalized)) {
+    return "Gigs";
+  }
+  return null;
+}
+
 export async function isBypassImei(imei: string): Promise<boolean> {
   const normalized = normalizeImei(imei);
   if (!normalized) return false;

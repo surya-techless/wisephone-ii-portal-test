@@ -2,7 +2,7 @@ import type { APIRoute } from "astro";
 import Stripe from "stripe";
 import { db, WebhookEvent, DeviceSubscriptionStatus } from "astro:db";
 import { STRIPE_WEBHOOK_SECRET } from "astro:env/server";
-import { stripe, isBypassImei } from "@/libs/stripe";
+import { stripe, isBypassImei, findActiveSubscriptionForImei } from "@/libs/stripe";
 import { normalizeImei, logSubscriptionWebhookEvent, moveDeviceToKickoutGroup, removeDeviceFromKickoutGroup, subscriptionDatesFromStripe } from "@/libs/subscription-matching";
 import { publishSubscriptionStatus } from "@/libs/mqtt";
 import { devLog } from "@/libs/utils";
@@ -111,32 +111,62 @@ export const POST: APIRoute = async ({ request }) => {
         console.log(`[stripe webhook] IMEI ${imei} is in BypassTechlessSubscription — skipping status update, MQTT push and Kickout`);
         break;
       }
+      // "Not active" for THIS subscription doesn't mean the device is
+      // unsubscribed: it may have another active Stripe plan, or its plan may
+      // be on Gigs (e.g. a duplicate Stripe plan bought and then cancelled).
+      // Check before marking it unsubscribed or kicking it out.
+      let effective: { isActive: boolean; type: "Stripe" | "Gigs"; rawStatus: string; dates: typeof dates } = {
+        isActive,
+        type: "Stripe",
+        rawStatus: subscription.status,
+        dates
+      };
+      if (!isActive) {
+        try {
+          const other = await findActiveSubscriptionForImei(imei);
+          if (other) {
+            console.log(`[stripe webhook] IMEI ${imei} still has an active ${other} subscription — keeping it active`);
+            effective = {
+              isActive: true,
+              type: other,
+              rawStatus: `active (${other})`,
+              dates: { canceledAt: null, scheduledEndAt: null, endedAt: null }
+            };
+          }
+        } catch (err) {
+          // Can't tell whether the device is still subscribed — leave its status,
+          // phone and Knox groups as they are rather than risk locking a paying customer.
+          console.error(`[stripe webhook] Couldn't check other subscriptions for IMEI ${imei}; leaving it unchanged:`, err);
+          break;
+        }
+      }
+
       await db
         .insert(DeviceSubscriptionStatus)
         .values({
           imei,
-          subscriptionType: "Stripe",
-          hasActiveSubscription: isActive ? 1 : 0,
-          subscriptionStatus: isActive ? "Active" : "Not Active",
-          rawStatus: subscription.status,
+          subscriptionType: effective.type,
+          hasActiveSubscription: effective.isActive ? 1 : 0,
+          subscriptionStatus: effective.isActive ? "Active" : "Not Active",
+          rawStatus: effective.rawStatus,
           lastEventType: event.type,
-          ...dates,
+          ...effective.dates,
           updatedAt: new Date()
         })
         .onConflictDoUpdate({
           target: DeviceSubscriptionStatus.imei,
           set: {
-            subscriptionType: "Stripe",
-            hasActiveSubscription: isActive ? 1 : 0,
-            subscriptionStatus: isActive ? "Active" : "Not Active",
-            rawStatus: subscription.status,
+            subscriptionType: effective.type,
+            hasActiveSubscription: effective.isActive ? 1 : 0,
+            subscriptionStatus: effective.isActive ? "Active" : "Not Active",
+            rawStatus: effective.rawStatus,
             lastEventType: event.type,
-            ...dates,
+            ...effective.dates,
             updatedAt: new Date()
           }
         });
-      await publishSubscriptionStatus(imei, isActive, "Stripe");
-      if (!isActive) {
+      await publishSubscriptionStatus(imei, effective.isActive, effective.type);
+      if (!effective.isActive) {
         await moveDeviceToKickoutGroup(imei);
       } else {
         await removeDeviceFromKickoutGroup(imei);
