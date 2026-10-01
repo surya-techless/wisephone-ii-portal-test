@@ -287,6 +287,24 @@ export interface DeviceSubscriptionCheckResult {
   subscriptionType?: "Stripe" | "Gigs" | "Bypass";
 }
 
+/**
+ * True when an admin has added this IMEI to BypassTechlessSubscription — the
+ * device counts as subscribed no matter what Stripe/Gigs say. The webhook
+ * handlers use this to leave bypass devices alone (no Kickout, no
+ * "not subscribed" MQTT push, no status overwrite).
+ */
+export async function isBypassImei(imei: string): Promise<boolean> {
+  const normalized = normalizeImei(imei);
+  if (!normalized) return false;
+  const bypass = await db
+    .select()
+    .from(BypassTechlessSubscription)
+    .where(eq(BypassTechlessSubscription.imei, Number(normalized)))
+    .limit(1)
+    .get();
+  return Boolean(bypass);
+}
+
 // [TEST OVERRIDE] — remove once the DeviceSubscriptionStatus cache has been
 // validated against real traffic. Until then, only these IMEIs use the new
 // cache path below; every other IMEI falls back to the original always-live
@@ -318,14 +336,7 @@ export async function resolveDeviceSubscriptionStatus({
 }): Promise<DeviceSubscriptionCheckResult> {
   const normalized = normalizeImei(imei);
 
-  const bypass = await db
-    .select()
-    .from(BypassTechlessSubscription)
-    .where(eq(BypassTechlessSubscription.imei, Number(normalized)))
-    .limit(1)
-    .get();
-
-  if (bypass) {
+  if (await isBypassImei(normalized)) {
     return { isSubscribed: true, source: "bypass", checkedAt: new Date().toISOString(), subscriptionType: "Bypass" };
   }
 

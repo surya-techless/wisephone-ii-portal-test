@@ -2,7 +2,7 @@ import type { APIRoute } from "astro";
 import Stripe from "stripe";
 import { db, WebhookEvent, DeviceSubscriptionStatus } from "astro:db";
 import { STRIPE_WEBHOOK_SECRET } from "astro:env/server";
-import { stripe } from "@/libs/stripe";
+import { stripe, isBypassImei } from "@/libs/stripe";
 import { normalizeImei, logSubscriptionWebhookEvent, moveDeviceToKickoutGroup, removeDeviceFromKickoutGroup, subscriptionDatesFromStripe } from "@/libs/subscription-matching";
 import { publishSubscriptionStatus } from "@/libs/mqtt";
 import { devLog } from "@/libs/utils";
@@ -104,6 +104,13 @@ export const POST: APIRoute = async ({ request }) => {
         status: subscription.status,
         isActive: isActive ? 1 : 0
       });
+      // Bypass devices count as subscribed regardless of Stripe — keep the
+      // event for history, but never kick them out, push "not subscribed", or
+      // overwrite their status row.
+      if (await isBypassImei(imei)) {
+        console.log(`[stripe webhook] IMEI ${imei} is in BypassTechlessSubscription — skipping status update, MQTT push and Kickout`);
+        break;
+      }
       await db
         .insert(DeviceSubscriptionStatus)
         .values({

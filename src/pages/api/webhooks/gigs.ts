@@ -5,6 +5,7 @@ import { Webhook } from "svix";
 import { GIGS_ACTIVE_STATUSES, gigsDeviceHasSubscriptionSim, normalizeImei, logSubscriptionWebhookEvent, moveDeviceToKickoutGroup, removeDeviceFromKickoutGroup, subscriptionDatesFromGigs } from "@/libs/subscription-matching";
 import type { Device, DeviceList, Subscription } from "@/libs/types";
 import { publishSubscriptionStatus } from "@/libs/mqtt";
+import { isBypassImei } from "@/libs/stripe";
 import { devLog } from "@/libs/utils";
 
 const GIGS_BASE_URL = "https://api.gigs.com/projects/techless";
@@ -155,7 +156,12 @@ export const POST: APIRoute = async ({ request }) => {
     isActive: isActive ? 1 : 0
   });
 
-  if (imei) {
+  // Bypass devices count as subscribed regardless of Gigs — keep the event
+  // for history, but never kick them out, push "not subscribed", or overwrite
+  // their status row.
+  if (imei && (await isBypassImei(imei))) {
+    console.log(`[gigs webhook] IMEI ${imei} is in BypassTechlessSubscription — skipping status update, MQTT push and Kickout`);
+  } else if (imei) {
     const dates = subscriptionDatesFromGigs(subscription);
     await db
       .insert(DeviceSubscriptionStatus)
