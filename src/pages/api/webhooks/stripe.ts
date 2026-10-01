@@ -111,6 +111,16 @@ export const POST: APIRoute = async ({ request }) => {
         console.log(`[stripe webhook] IMEI ${imei} is in BypassTechlessSubscription — skipping status update, MQTT push and Kickout`);
         break;
       }
+      // "incomplete" is a brand-new subscription whose first payment hasn't
+      // cleared yet (customer.subscription.created arrives with it, followed
+      // by .updated → active seconds later). It isn't a lapse — keep the
+      // event, but don't mark the device unsubscribed, push "not subscribed"
+      // or kick it out mid-signup. If the payment never clears, Stripe sends
+      // "incomplete_expired", which goes through the normal path below.
+      if (subscription.status === "incomplete") {
+        console.log(`[stripe webhook] IMEI ${imei} subscription ${subscription.id} is incomplete (first payment pending) — leaving the device unchanged`);
+        break;
+      }
       // "Not active" for THIS subscription doesn't mean the device is
       // unsubscribed: it may have another active Stripe plan, or its plan may
       // be on Gigs (e.g. a duplicate Stripe plan bought and then cancelled).
