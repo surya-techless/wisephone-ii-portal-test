@@ -1430,6 +1430,9 @@ try {
                 originalDeviceName: "",
                 originalDevicePhone: "",
                 isLoading: true,
+                // True while the page is confirming a just-completed Stripe payment
+                // (returned from checkout). Knox group changes wait until it's false.
+                isConfirmingPayment: false,
                 isToolDrawerLoading: false,
                 isToolDrawerLoaded: false,
                 isAppsLoading: false,
@@ -1750,6 +1753,21 @@ try {
                     this.features = this.features.filter((g: string) => g !== KNOX_USER_GROUPS.SHELF_STOCK);
                   }
 
+                  // A subscribed device must not keep any Unpaid or Kickout group —
+                  // remove them before (or instead of) adding the Subscribed group.
+                  const groupsToClear = [
+                    KNOX_USER_GROUPS.UNPAID,
+                    KNOX_USER_GROUPS.A16_UNPAID,
+                    KNOX_USER_GROUPS.CSPIRE_WPII_Unpaid_v2,
+                    KNOX_USER_GROUPS.KICKOUT_TEST
+                  ].filter((groupId) => this.features.includes(groupId));
+                  for (const groupId of groupsToClear) {
+                    await this.removeFeatureFromDevice(groupId);
+                  }
+                  if (groupsToClear.length > 0) {
+                    this.features = this.features.filter((g: string) => !groupsToClear.includes(g));
+                  }
+
                   // Bail out early if the correct subscription group is already present —
                   // prevents duplicate Knox calls and double-push on concurrent invocations
                   const alreadyHasSubscribedGroup =
@@ -1974,10 +1992,15 @@ try {
                  */
                 async removeIncompatibleFeatures(userGroups: string[]) {
                   const featuresToRemove = this.getIncompatibleFeatures(userGroups);
+                  if (featuresToRemove.length === 0) {
+                    return;
+                  }
                   for (const knoxManageId of featuresToRemove) {
                     await this.removeFeatureFromDevice(knoxManageId);
                   }
-                  window.location.reload();
+                  // Update in place instead of reloading — a reload drops the
+                  // post-payment URL markers and can bounce the user to the dashboard.
+                  this.features = this.features.filter((g: string) => !featuresToRemove.includes(g));
                 },
 
                 /**
@@ -3736,9 +3759,30 @@ try {
                   devLog.log("PAY DEBUG: [M0.7] Final IMEI after extraction:", this.imei);
                   devLog.log("PAY DEBUG: [M0.8] Final Device Phone after extraction:", this.devicePhone);
 
+                  // Returning from Stripe checkout? Remember the session id before the
+                  // post-payment branches below clear it from the URL / sessionStorage,
+                  // and hold off all Knox group changes until the payment is confirmed —
+                  // otherwise the features watcher assigns Unpaid while the page still
+                  // thinks the device is unsubscribed.
+                  const initialParams = new URLSearchParams(window.location.search);
+                  const urlSessionId = initialParams.get("session_id");
+                  const storedCheckoutImei = sessionStorage.getItem("stripeCheckoutImei");
+                  const paymentSessionId =
+                    urlSessionId && urlSessionId !== "{CHECKOUT_SESSION_ID}"
+                      ? urlSessionId
+                      : storedCheckoutImei === this.imei
+                        ? sessionStorage.getItem("stripeCheckoutSessionId")
+                        : null;
+                  this.isConfirmingPayment = Boolean(urlSessionId) || initialParams.get("payment_status") === "checking";
+
                   // Watch for features changes to manage Knox groups and load Tool Drawer
                   // MUST be registered before getFeatures() so the watcher fires on initial load
                   this.$watch("features", async (userGroups: string[]) => {
+                    // Group changes wait for the payment confirmation below.
+                    if (this.isConfirmingPayment) {
+                      return;
+                    }
+
                     // Check if device is subscribed but doesn't have any subscription group
                     if (this.isSubscribed) {
                       const hasSubscribedGroup =
@@ -3892,6 +3936,45 @@ try {
                   }
 
                   devLog.log("PAY DEBUG: [M0.15] Final isSubscribed state after all checks:", this.isSubscribed);
+
+                  // Post-payment: keep the loading state up until the subscription is
+                  // confirmed, then set the Knox groups once, based on the result.
+                  // Checks the checkout session directly (instant), falling back to the
+                  // regular subscription check, for up to ~45s.
+                  if (this.isConfirmingPayment) {
+                    for (let attempt = 0; attempt < 15 && !this.isSubscribed; attempt++) {
+                      try {
+                        if (paymentSessionId) {
+                          const result = await actions.stripe.validateSubscription.orThrow({
+                            sessionId: paymentSessionId,
+                            imei: this.imei
+                          });
+                          if (result?.isSubscribed) this.isSubscribed = true;
+                        } else {
+                          await this.checkSubscriptionByImei();
+                        }
+                      } catch (error) {
+                        devLog.error("[payment-confirm] Subscription check failed, retrying:", error);
+                      }
+                      if (!this.isSubscribed) {
+                        await new Promise((resolve) => setTimeout(resolve, 3000));
+                      }
+                    }
+
+                    this.isConfirmingPayment = false;
+
+                    if (!this.isSubscribed) {
+                      window.location.href =
+                        "/dashboard?error=" +
+                        encodeURIComponent(
+                          "We couldn't confirm your payment yet. If you were charged, it will appear shortly — please check back in a few minutes."
+                        );
+                      return;
+                    }
+
+                    await this.assignSubscriptionGroupByDeviceModel();
+                    await this.removeExclusiveGroups(this.features);
+                  }
 
                   this.isLoading = false;
 
