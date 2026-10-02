@@ -17,6 +17,7 @@ import type { User } from "@clerk/astro/server";
 import { actions } from "astro:actions";
 import Icon from "astro-iconify";
 import { resolveDeviceSubscriptionStatus } from "@/libs/stripe";
+import { publishSubscriptionStatus } from "@/libs/mqtt";
 import { SamsungKnoxService } from "@/libs/samsung-knox-service";
 import Layout from "@/layouts/Layout.astro";
 import TechlessSubscriptionButton from "@/components/TechlessSubscriptionButton.astro";
@@ -163,6 +164,9 @@ try {
       .limit(1);
 
     isSubscribed = bypassTechlessSubscription.length > 0;
+    if (isSubscribed) {
+      await publishSubscriptionStatus(String(imei), true, "Bypass");
+    }
     devLog.log("PAY DEBUG: [S1.2] Bypass subscription check result:", isSubscribed);
     devLog.log("PAY DEBUG: [S1.2.1] wisephone exists:", !!wisephone);
     devLog.log("PAY DEBUG: [S1.2.2] wisephone phoneNumber:", wisephone?.phoneNumber);
@@ -177,10 +181,16 @@ try {
         devLog.log("PAY DEBUG: [S1.5.1] Calling validateIsSubscribed function...");
 
         const startTime = Date.now();
-        isSubscribed = (await resolveDeviceSubscriptionStatus({
+        const checkResult = await resolveDeviceSubscriptionStatus({
           imei: imeiForCheck,
-          phoneNumber: phoneForCheck
-        })).isSubscribed;
+          phoneNumber: phoneForCheck,
+          fromManagePage: true
+        });
+        isSubscribed = checkResult.isSubscribed;
+        // Subscribed → tell the phone now (unless the live re-check already did).
+        if (isSubscribed && !checkResult.pushedActive) {
+          await publishSubscriptionStatus(imeiForCheck, true, checkResult.subscriptionType ?? "Unknown");
+        }
         const endTime = Date.now();
         const duration = endTime - startTime;
 
@@ -2623,7 +2633,8 @@ try {
                     try {
                       await actions.wisephones.validateIsUserSubscribed({
                         imei: this.imei,
-                        phoneNumber: this.devicePhone.replace(/\D/g, "")
+                        fromManagePage: true,
+                        phoneNumber: this.devicePhone.replace(/\D/g, "").replace(/^(\d{3})(\d{3})(\d{4})$/, "$1-$2-$3"),
                       });
                     } catch (error) {
                       devLog.error("Failed to refresh subscription status at setup completion:", error);
@@ -2804,6 +2815,7 @@ try {
                           // This action calls validateIsSubscribed (same as page load logic)
                           const subscriptionResult = await actions.wisephones.validateIsUserSubscribed.orThrow({
                             imei: this.imei,
+                            fromManagePage: true,
                             phoneNumber: formattedPhoneNumber
                           });
 
@@ -3474,6 +3486,7 @@ try {
 
                     const subscriptionResult = await actions.wisephones.validateIsUserSubscribed.orThrow({
                       imei: this.imei,
+                      fromManagePage: true,
                       phoneNumber: formattedPhoneNumber
                     });
 
@@ -3674,6 +3687,7 @@ try {
                       // Use the same action that checks subscription status
                       const subscriptionResult = await actions.wisephones.validateIsUserSubscribed.orThrow({
                         imei: this.imei,
+                        fromManagePage: true,
                         phoneNumber: formattedPhoneNumber
                       });
 

@@ -2,8 +2,11 @@ import { defineAction, ActionError } from "astro:actions";
 import { STRIPE_SECRET_KEY } from "astro:env/server";
 import { z } from "astro:schema";
 import Stripe from "stripe";
-import { db, Wisephone, sql } from "astro:db";
+import { db, Wisephone, DeviceSubscriptionStatus, sql } from "astro:db";
 import { devLog } from "@/libs/utils";
+import { isBypassImei } from "@/libs/stripe";
+import { publishSubscriptionStatus } from "@/libs/mqtt";
+import { subscriptionDatesFromStripe } from "@/libs/subscription-matching";
 
 const stripeInstance = new Stripe(STRIPE_SECRET_KEY || STRIPE_SECRET_KEY, {
   apiVersion: "2025-02-24.acacia",
@@ -395,6 +398,28 @@ export const stripe = {
       devLog.log("PAY DEBUG: [A2.12] Customer metadata updated with IMEI:", requestedImei);
 
       const isSubscribed = subscription.status === "active" || subscription.status === "trialing";
+
+      // Paid: save it and tell the phone now instead of waiting for the Stripe
+      // webhook. Only ever writes Active (a later webhook still owns lapses),
+      // and leaves a bypass device's row alone.
+      if (isSubscribed) {
+        if (!(await isBypassImei(requestedImei))) {
+          const row = {
+            subscriptionType: "Stripe",
+            hasActiveSubscription: 1,
+            subscriptionStatus: "Active",
+            rawStatus: subscription.status,
+            lastEventType: "checkout-confirmed",
+            ...subscriptionDatesFromStripe(subscription),
+            updatedAt: new Date()
+          };
+          await db
+            .insert(DeviceSubscriptionStatus)
+            .values({ imei: requestedImei, ...row })
+            .onConflictDoUpdate({ target: DeviceSubscriptionStatus.imei, set: row });
+        }
+        await publishSubscriptionStatus(requestedImei, true, "Stripe");
+      }
       devLog.log("PAY DEBUG: [A2.13] Subscription check result - isSubscribed:", isSubscribed);
       devLog.log("PAY DEBUG: [A2.14] Subscription status check:", subscription.status, "->", isSubscribed);
 

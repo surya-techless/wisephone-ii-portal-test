@@ -290,6 +290,11 @@ export interface DeviceSubscriptionCheckResult {
   // fresh live-check fallback with no provenance. Used by callers that need
   // to pass a subscriptionType to publishSubscriptionStatus().
   subscriptionType?: "Stripe" | "Gigs" | "Bypass";
+  // True when this call checked Stripe/Gigs live (vs answering from the DB).
+  checkedLive?: boolean;
+  // True when this call already pushed "active" over MQTT, so callers that
+  // push don't send it twice.
+  pushedActive?: boolean;
 }
 
 /**
@@ -376,13 +381,19 @@ export async function isBypassImei(imei: string): Promise<boolean> {
 // device. Keeps the ~3,900 unsubscribed phones (each checks on every back press
 // / resume) well under Stripe Search's rate limit.
 const RECHECK_INACTIVE_AFTER_MS = 15 * 60 * 1000;
+// The manage page re-checks a Not Active row live right away (someone may have
+// just bought a plan), but at most once a minute per device so page reloads
+// and its post-payment retries don't add up.
+const MANAGE_PAGE_RECHECK_AFTER_MS = 60 * 1000;
 
 export async function resolveDeviceSubscriptionStatus({
   imei,
-  phoneNumber
+  phoneNumber,
+  fromManagePage = false
 }: {
   imei: string;
   phoneNumber: string;
+  fromManagePage?: boolean;
 }): Promise<DeviceSubscriptionCheckResult> {
   const normalized = normalizeImei(imei);
 
@@ -407,7 +418,8 @@ export async function resolveDeviceSubscriptionStatus({
   }
 
   if (cached) {
-    const isDueForRecheck = Date.now() - new Date(cached.updatedAt).getTime() >= RECHECK_INACTIVE_AFTER_MS;
+    const recheckAfterMs = fromManagePage ? MANAGE_PAGE_RECHECK_AFTER_MS : RECHECK_INACTIVE_AFTER_MS;
+    const isDueForRecheck = Date.now() - new Date(cached.updatedAt).getTime() >= recheckAfterMs;
     if (isDueForRecheck) {
       try {
         const provider = await findActiveSubscriptionForImei(normalized);
@@ -430,14 +442,14 @@ export async function resolveDeviceSubscriptionStatus({
             .where(and(eq(DeviceSubscriptionStatus.imei, normalized), eq(DeviceSubscriptionStatus.hasActiveSubscription, 0)));
           console.log(`[subscription] IMEI ${normalized} saved as Not Active but has an active ${provider} plan — set Active`);
           await publishSubscriptionStatus(normalized, true, provider);
-          return { isSubscribed: true, source: "stripe_or_gigs", checkedAt: checkedAt.toISOString(), subscriptionType: provider };
+          return { isSubscribed: true, source: "stripe_or_gigs", checkedAt: checkedAt.toISOString(), subscriptionType: provider, checkedLive: true, pushedActive: true };
         }
         // Confirmed still not active — record when, so the next re-check waits.
         await db
           .update(DeviceSubscriptionStatus)
           .set({ updatedAt: checkedAt })
           .where(and(eq(DeviceSubscriptionStatus.imei, normalized), eq(DeviceSubscriptionStatus.hasActiveSubscription, 0)));
-        return { isSubscribed: false, source: "none", checkedAt: checkedAt.toISOString(), subscriptionType: cached.subscriptionType as "Stripe" | "Gigs" | undefined };
+        return { isSubscribed: false, source: "none", checkedAt: checkedAt.toISOString(), subscriptionType: cached.subscriptionType as "Stripe" | "Gigs" | undefined, checkedLive: true };
       } catch (error) {
         console.error(`[subscription] Live re-check failed for IMEI ${normalized}; answering from the saved row:`, error);
       }
@@ -476,6 +488,7 @@ export async function resolveDeviceSubscriptionStatus({
   return {
     isSubscribed,
     source: isSubscribed ? "stripe_or_gigs" : "none",
-    checkedAt: checkedAt.toISOString()
+    checkedAt: checkedAt.toISOString(),
+    checkedLive: true
   };
 }

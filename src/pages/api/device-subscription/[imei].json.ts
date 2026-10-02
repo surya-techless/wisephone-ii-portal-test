@@ -1,6 +1,7 @@
 import type { APIRoute } from "astro";
 import { db, Wisephone, eq } from "astro:db";
 import { resolveDeviceSubscriptionStatus } from "@/libs/stripe";
+import { publishSubscriptionStatus } from "@/libs/mqtt";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -76,6 +77,18 @@ export const GET: APIRoute = async ({ params, request }) => {
       status: 503,
       headers: { "Content-Type": "application/json", ...corsHeaders, "Retry-After": "60" }
     });
+  }
+
+  // Push the answer over MQTT as well, so wiseOS's live state matches:
+  //   subscribed → "active" (unless the live re-check above already pushed it)
+  //   not subscribed → "not active", but only when Stripe/Gigs were just checked
+  //   live (a DB-only answer isn't fresh enough to lock a phone with).
+  if (result.isSubscribed) {
+    if (!result.pushedActive) {
+      await publishSubscriptionStatus(String(wisephone.imei), true, result.subscriptionType ?? "Unknown");
+    }
+  } else if (result.checkedLive) {
+    await publishSubscriptionStatus(String(wisephone.imei), false, result.subscriptionType ?? "Unknown");
   }
 
   return new Response(

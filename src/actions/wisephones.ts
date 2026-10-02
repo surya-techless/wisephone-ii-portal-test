@@ -457,15 +457,25 @@ export const wisephones = {
   validateIsUserSubscribed: defineAction({
     input: z.object({
       imei: z.string(),
-      phoneNumber: z.string().min(12).max(12)
+      phoneNumber: z.string().min(12).max(12),
+      // Manage page: a Not Active row is re-checked live right away (at most
+      // once a minute per device) instead of every 15 minutes.
+      fromManagePage: z.boolean().optional()
     }),
     handler: async (input) => {
-      const result = await resolveDeviceSubscriptionStatus({ imei: input.imei, phoneNumber: input.phoneNumber });
+      const result = await resolveDeviceSubscriptionStatus({
+        imei: input.imei,
+        phoneNumber: input.phoneNumber,
+        fromManagePage: input.fromManagePage ?? false
+      });
 
-      // Keep the device's own record current and let it know immediately,
-      // rather than waiting for its next fallback poll — harmless/idempotent
-      // to call on every check, not just at setup completion.
-      await publishSubscriptionStatus(input.imei, result.isSubscribed, result.subscriptionType ?? "Unknown");
+      // Let the device know it's subscribed immediately rather than waiting for
+      // its next check. Only "active" is pushed: a "not subscribed" push from a
+      // possibly stale row would lock a paying phone — the webhooks, which
+      // re-check every subscription first, are the only thing that pushes that.
+      if (result.isSubscribed && !result.pushedActive) {
+        await publishSubscriptionStatus(input.imei, true, result.subscriptionType ?? "Unknown");
+      }
 
       return {
         success: "User is subscribed",
