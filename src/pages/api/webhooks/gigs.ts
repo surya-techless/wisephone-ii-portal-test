@@ -2,8 +2,8 @@ import type { APIRoute } from "astro";
 import { db, WebhookEvent, DeviceSubscriptionStatus } from "astro:db";
 import { GIGS_API_KEY, GIGS_WEBHOOK_SECRET } from "astro:env/server";
 import { Webhook } from "svix";
-import { GIGS_ACTIVE_STATUSES, gigsDeviceHasSubscriptionSim, normalizeImei, logSubscriptionWebhookEvent, moveDeviceToKickoutGroup, removeDeviceFromKickoutGroup, subscriptionDatesFromGigs } from "@/libs/subscription-matching";
-import type { Device, DeviceList, Subscription } from "@/libs/types";
+import { GIGS_ACTIVE_STATUSES, gigsDeviceHasSubscriptionSim, gigsSubscriptionMatchesDevice, normalizeImei, logSubscriptionWebhookEvent, moveDeviceToKickoutGroup, removeDeviceFromKickoutGroup, subscriptionDatesFromGigs } from "@/libs/subscription-matching";
+import type { Device, DeviceList, Subscription, SubscriptionList } from "@/libs/types";
 import { publishSubscriptionStatus } from "@/libs/mqtt";
 import { isBypassImei, findActiveSubscriptionForImei } from "@/libs/stripe";
 import { devLog } from "@/libs/utils";
@@ -69,6 +69,18 @@ export const POST: APIRoute = async ({ request }) => {
     devLog.error("[gigs webhook] failed to parse request body:", err);
     return new Response(JSON.stringify({ error: "Invalid JSON" }), {
       status: 400,
+      headers: { "Content-Type": "application/json" }
+    });
+  }
+
+  // Device events are the moment Gigs links a SIM to a phone (IMEI). A new
+  // plan's subscription events often arrive before that link exists, so they
+  // can't find the phone and are skipped — this catches it up.
+  const envelope = payload as { type?: string; data?: { object?: string }; previousData?: Record<string, unknown> };
+  if (typeof envelope.type === "string" && envelope.type.startsWith("com.gigs.device.")) {
+    await handleDeviceEvent(envelope.type, envelope.data as Device | undefined, envelope.previousData);
+    return new Response(JSON.stringify({ received: true }), {
+      status: 200,
       headers: { "Content-Type": "application/json" }
     });
   }
@@ -227,6 +239,91 @@ export const POST: APIRoute = async ({ request }) => {
     headers: { "Content-Type": "application/json" }
   });
 };
+
+/**
+ * com.gigs.device.created / .updated: data is the Device (imei + sims + user).
+ * If one of its SIMs carries an active/pending subscription, mark the phone
+ * subscribed, push it over MQTT and lift Kickout — the same as an active
+ * subscription event. Never marks a phone unsubscribed: a device event only
+ * says the phone was seen, not that a plan ended (subscription events handle
+ * that). An update that didn't change the phone's SIMs or IMEI is ignored.
+ */
+async function handleDeviceEvent(eventType: string, device: Device | undefined, previousData?: Record<string, unknown>) {
+  const imei = normalizeImei(String(device?.imei ?? ""));
+  const simIds = (device?.sims ?? []).map((sim) => sim.id).filter(Boolean);
+  const userId = typeof device?.user === "string" ? (device.user as string) : device?.user?.id;
+
+  const record = (status: string, isActive: boolean) =>
+    db.insert(WebhookEvent).values({ source: "gigs", type: eventType, imei: imei || undefined, status, isActive: isActive ? 1 : 0 });
+
+  if (eventType === "com.gigs.device.deleted") {
+    await record("deleted", false);
+    return;
+  }
+  if (eventType === "com.gigs.device.updated" && previousData && !("sims" in previousData) && !("imei" in previousData)) {
+    return; // nothing that links a plan to this phone changed
+  }
+  if (!device || !imei || simIds.length === 0 || !userId) {
+    console.log(`[gigs webhook] ${eventType} — device ${device?.id ?? "?"} has no IMEI, SIM or user yet, skipping`);
+    await record("no_sim_link", false);
+    return;
+  }
+
+  let match: Subscription | undefined;
+  try {
+    let after: string | null = null;
+    do {
+      const url = new URL(`${GIGS_BASE_URL}/subscriptions`);
+      url.searchParams.set("user", userId);
+      url.searchParams.set("limit", "100");
+      if (after) url.searchParams.set("after", after);
+      const response = await fetch(url, {
+        headers: { Authorization: `Bearer ${GIGS_API_KEY}`, Accept: "application/json" },
+        signal: AbortSignal.timeout(15000)
+      });
+      if (!response.ok) throw new Error(`subscriptions lookup failed with status ${response.status}`);
+      const page = (await response.json()) as SubscriptionList;
+      match = page.items?.find((sub) => gigsSubscriptionMatchesDevice(sub, device));
+      after = match ? null : page.moreItemsAfter;
+    } while (after);
+  } catch (err) {
+    console.error(`[gigs webhook] ${eventType} — couldn't load subscriptions for IMEI ${imei}; leaving it unchanged:`, err);
+    await record("lookup_failed", false);
+    return;
+  }
+
+  if (!match) {
+    console.log(`[gigs webhook] ${eventType} | IMEI: ${imei} — no active Gigs subscription on this phone's SIMs, leaving it unchanged`);
+    await record("no_active_subscription", false);
+    return;
+  }
+
+  console.log(`[gigs webhook] ${eventType} | IMEI: ${imei} | subscription: ${match.id} | status: ${match.status} — marking subscribed`);
+  logSubscriptionWebhookEvent({ provider: "Gigs", isActive: true, imei });
+  await record(match.status, true);
+
+  if (await isBypassImei(imei)) {
+    console.log(`[gigs webhook] IMEI ${imei} is in BypassTechlessSubscription — skipping status update, MQTT push and Kickout`);
+    return;
+  }
+
+  const dates = subscriptionDatesFromGigs(match);
+  const row = {
+    subscriptionType: "Gigs",
+    hasActiveSubscription: 1,
+    subscriptionStatus: "Active",
+    rawStatus: match.status,
+    lastEventType: eventType,
+    ...dates,
+    updatedAt: new Date()
+  };
+  await db
+    .insert(DeviceSubscriptionStatus)
+    .values({ imei, ...row })
+    .onConflictDoUpdate({ target: DeviceSubscriptionStatus.imei, set: row });
+  await publishSubscriptionStatus(imei, true, "Gigs");
+  await removeDeviceFromKickoutGroup(imei);
+}
 
 export const ALL: APIRoute = ({ request }) => {
   return new Response(JSON.stringify({ error: `Method ${request.method} not allowed` }), {
