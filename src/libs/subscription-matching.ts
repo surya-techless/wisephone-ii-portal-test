@@ -8,6 +8,33 @@ export function normalizeImei(value: string): string {
   return value.replace(/\D/g, "");
 }
 
+// A metadata key counts as the IMEI key whatever its case or stray spacing —
+// the portal writes "imei", but keys edited by hand in the Stripe dashboard
+// turn up as "IMEI", "IMEI " or "Imei". Only spaces, "_" and "-" are ignored,
+// so unrelated keys like "imei2" or "old_imei" never match.
+function isImeiMetadataKey(key: string): boolean {
+  return key.trim().toLowerCase().replace(/[\s_-]+/g, "") === "imei";
+}
+
+/**
+ * The IMEI stored in a metadata object (digits only), or "" if there is none.
+ * The exact "imei" key wins when it has a value (read exactly as before);
+ * otherwise the first differently-spelled IMEI key whose value looks like an
+ * IMEI (14–16 digits) is used — a dashboard edit can leave "imei": "" next to
+ * "IMEI ": "35…".
+ */
+export function imeiFromMetadata(metadata: Record<string, unknown> | null | undefined): string {
+  if (!metadata) return "";
+  const exact = normalizeImei(String(metadata.imei ?? ""));
+  if (exact) return exact;
+  for (const [key, value] of Object.entries(metadata)) {
+    if (!isImeiMetadataKey(key)) continue;
+    const imei = normalizeImei(String(value ?? ""));
+    if (imei.length >= 14 && imei.length <= 16) return imei;
+  }
+  return "";
+}
+
 export function stripeSubscriptionMatchesImei(
   metadata: Record<string, string> | null | undefined,
   imei: string

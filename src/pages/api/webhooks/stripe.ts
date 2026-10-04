@@ -3,7 +3,7 @@ import Stripe from "stripe";
 import { db, WebhookEvent, DeviceSubscriptionStatus } from "astro:db";
 import { STRIPE_WEBHOOK_SECRET } from "astro:env/server";
 import { stripe, isBypassImei, findActiveSubscriptionForImei } from "@/libs/stripe";
-import { normalizeImei, logSubscriptionWebhookEvent, moveDeviceToKickoutGroup, removeDeviceFromKickoutGroup, subscriptionDatesFromStripe } from "@/libs/subscription-matching";
+import { imeiFromMetadata, logSubscriptionWebhookEvent, moveDeviceToKickoutGroup, removeDeviceFromKickoutGroup, subscriptionDatesFromStripe } from "@/libs/subscription-matching";
 import { publishSubscriptionStatus } from "@/libs/mqtt";
 import { devLog } from "@/libs/utils";
 
@@ -69,7 +69,8 @@ export const POST: APIRoute = async ({ request }) => {
 
       // Strict path: IMEI stamped directly on the subscription — "source of
       // truth for per-device validation" per src/actions/stripe.ts.
-      let imei = normalizeImei(String((subscription.metadata as Record<string, string> | null)?.imei ?? ""));
+      // The key is read whatever its case/spacing ("imei", "IMEI", "IMEI ").
+      let imei = imeiFromMetadata(subscription.metadata);
 
       // Legacy fallback: older devices only have IMEI on the customer.
       if (!imei && typeof subscription.customer === "string") {
@@ -77,7 +78,7 @@ export const POST: APIRoute = async ({ request }) => {
           const customer = await stripe.customers.retrieve(subscription.customer);
           const isDeleted = "deleted" in customer && customer.deleted;
           if (!isDeleted) {
-            imei = normalizeImei(String((customer as Stripe.Customer).metadata?.imei ?? ""));
+            imei = imeiFromMetadata((customer as Stripe.Customer).metadata);
           }
         } catch (err) {
           devLog.error("[stripe webhook] failed to retrieve customer for IMEI fallback:", err);
