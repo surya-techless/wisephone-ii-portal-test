@@ -460,7 +460,11 @@ export const wisephones = {
       phoneNumber: z.string().min(12).max(12),
       // Manage page: a Not Active row is re-checked live right away (at most
       // once a minute per device) instead of every 15 minutes.
-      fromManagePage: z.boolean().optional()
+      fromManagePage: z.boolean().optional(),
+      // Dashboard checks pass true: they only read the status for the device
+      // cards. The dashboard polls every 10 seconds, and pushing on each check
+      // turned it into a steady stream of MQTT messages to the phones.
+      skipPush: z.boolean().optional()
     }),
     handler: async (input) => {
       const result = await resolveDeviceSubscriptionStatus({
@@ -473,7 +477,8 @@ export const wisephones = {
       // its next check. Only "active" is pushed: a "not subscribed" push from a
       // possibly stale row would lock a paying phone — the webhooks, which
       // re-check every subscription first, are the only thing that pushes that.
-      if (result.isSubscribed && !result.pushedActive) {
+      // Dashboard checks (skipPush) don't push at all.
+      if (!input.skipPush && result.isSubscribed && !result.pushedActive) {
         await publishSubscriptionStatus(input.imei, true, result.subscriptionType ?? "Unknown");
       }
 

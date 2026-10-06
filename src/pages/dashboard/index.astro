@@ -1802,7 +1802,8 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
           // Call the subscription validation action
           const result = await actions.wisephones.validateIsUserSubscribed.orThrow({
             imei: normalizedImei,
-            phoneNumber: devicePhoneNumber
+            phoneNumber: devicePhoneNumber,
+            skipPush: true
           });
 
           devLog.log("PAY DEBUG: [4.12] validateIsUserSubscribed result:", result);
@@ -1975,7 +1976,8 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
                 const normalizedImei = imei.replace(/[^0-9]/g, '');
                 const result = await actions.wisephones.validateIsUserSubscribed.orThrow({
                   imei: normalizedImei,
-                  phoneNumber: phoneNumber
+                  phoneNumber: phoneNumber,
+                  skipPush: true
                 });
                 devLog.log("[POLL] Subscription check result - IMEI:", imei, "isSubscribed:", result?.isSubscribed);
                 return result?.isSubscribed === true;
@@ -2327,7 +2329,8 @@ if (actionResult?.data?.isSubscribed && actionResult?.data?.wisephone?.[0]?.imei
 
           const result = await actions.wisephones.validateIsUserSubscribed.orThrow({
             imei: this.imei.replace(/[^0-9]/g, ''),
-            phoneNumber: phoneNumber
+            phoneNumber: phoneNumber,
+            skipPush: true
           });
 
           if (result?.isSubscribed === true) {
