@@ -144,6 +144,13 @@ const KICKOUT_PRESERVED_GROUPS = new Set([
 // resubscribes.
 const KICKOUT_GROUPS = [KNOX_USER_GROUPS.KICKOUT_TEST, KNOX_USER_GROUPS.BLOCK_3RD_PARTY_UNSUB];
 
+// Testing switch: when false, the Stripe/Gigs webhooks don't move devices in or
+// out of Knox groups (Kickout(Test), Block3rdPartyUnSub, Unpaid, Subscribed,
+// Block-Tool Drawer). Status is still saved to DeviceSubscriptionStatus and
+// pushed over MQTT — only the Knox group changes are skipped. Set back to true
+// to re-enable.
+const KNOX_KICKOUT_ENABLED = false;
+
 // Base subscription-state groups, per device variant. A device should only
 // ever be in one of these at a time.
 const UNPAID_GROUPS = [
@@ -208,6 +215,10 @@ const BLOCK_TOOL_DRAWER_GROUP_FOR: Record<DeviceVariant, string> = {
  */
 export async function moveDeviceToKickoutGroup(imei: string): Promise<void> {
   const normalized = normalizeImei(imei);
+  if (!KNOX_KICKOUT_ENABLED) {
+    console.log(`[kickout] KNOX_KICKOUT_ENABLED is off — not moving IMEI ${normalized} to Kickout(Test)`);
+    return;
+  }
 
   try {
     const currentGroups = await SamsungKnoxService.getGroupsForDevice(normalized);
@@ -246,6 +257,10 @@ export async function moveDeviceToKickoutGroup(imei: string): Promise<void> {
  */
 export async function removeDeviceFromKickoutGroup(imei: string): Promise<void> {
   const normalized = normalizeImei(imei);
+  if (!KNOX_KICKOUT_ENABLED) {
+    console.log(`[kickout] KNOX_KICKOUT_ENABLED is off — not removing IMEI ${normalized} from Kickout(Test)`);
+    return;
+  }
 
   try {
     const currentGroups = await SamsungKnoxService.getGroupsForDevice(normalized);
