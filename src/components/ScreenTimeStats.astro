@@ -21,6 +21,7 @@ interface Props {
       totalTimeMs: number;
       dailyAverageMs: number;
       weekStartDate: Date | string;
+      iconUrl?: string | null; // from the App table, when the app has one
     }>;
     days?: Array<{
       id: number;
@@ -31,6 +32,7 @@ interface Props {
         packageName: string;
         appName: string;
         totalTimeMs: number;
+        iconUrl?: string | null;
       }>;
     }>;
   }>;
@@ -112,273 +114,277 @@ const serializedData = screenTimeData.map((week) => {
 ---
 
 <div
-  class="bg-[#F7F6F2] rounded-lg p-6 w-full"
+  class="bg-[#F6F5F2] rounded-lg p-6 w-full"
   x-data={`{
     currentWeekIndex: 0,
+    selectedDayIndex: 6,
+    showAllApps: false,
     screenTimeData: ${JSON.stringify(serializedData)},
     isLoading: ${serializedData.length === 0},
     imei: ${JSON.stringify(imei)},
     async init() {
-      // Device stats API call disabled
-      // If no data provided, skip fetching
-      if (this.screenTimeData.length === 0 && this.imei) {
-        this.isLoading = false;
-        devLog.log("Screen time data not available - API call disabled");
-      } else {
-        this.isLoading = false;
-      }
+      // Device stats API call disabled — data comes from the page
+      this.isLoading = false;
+      this.selectDefaultDay();
+    },
+    // Week and day dates are stored as UTC midnight, so read them in UTC
+    toIsoDate(value) {
+      return new Date(value).toISOString().slice(0, 10);
     },
     formatDuration(ms) {
       if (!ms || ms <= 0) return "0m";
-      const hours = Math.floor(ms / (1000 * 60 * 60));
-      const minutes = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
-      if (hours > 0) {
-        return hours + "hr" + (minutes > 0 ? " " + minutes + "m" : "");
-      }
+      const totalMinutes = Math.round(ms / 60000);
+      const hours = Math.floor(totalMinutes / 60);
+      const minutes = totalMinutes % 60;
+      if (hours > 0) return hours + "h" + (minutes > 0 ? " " + minutes + "m" : "");
       return minutes + "m";
     },
-    formatHours(ms) {
-      const hours = Math.floor(ms / (1000 * 60 * 60));
-      return hours + "hr";
-    },
-    getDayLabel(weekStartDate, index) {
-      const date = new Date(weekStartDate);
-      date.setDate(date.getDate() + index);
-      const day = date.getDay();
-      const labels = ["S", "M", "T", "W", "T", "F", "S"];
-      return labels[day];
-    },
-    getAppBarWidth(app) {
-      if (!this.currentWeek || !this.currentWeek.apps || this.currentWeek.apps.length === 0 || !app) return 0;
-      const maxAppTime = Math.max(...this.currentWeek.apps.map((a) => a.totalTimeMs || 0));
-      if (maxAppTime <= 0 || !app.totalTimeMs) return 0;
-      return (app.totalTimeMs / maxAppTime) * 100;
+    formatShortDate(value) {
+      return new Date(value).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
     },
     get currentWeek() {
-      if (!this.screenTimeData || this.screenTimeData.length === 0) {
-        return null;
-      }
-      if (this.currentWeekIndex < 0 || this.currentWeekIndex >= this.screenTimeData.length) {
-        return null;
-      }
-      const week = this.screenTimeData[this.currentWeekIndex];
-      if (!week) {
-        return null;
-      }
-      return week;
+      if (!this.screenTimeData || this.screenTimeData.length === 0) return null;
+      return this.screenTimeData[this.currentWeekIndex] || null;
+    },
+    get weekLabel() {
+      if (!this.currentWeek) return "";
+      return this.formatShortDate(this.currentWeek.weekStartDate) + " – " + this.formatShortDate(this.currentWeek.weekEndDate);
+    },
+    get weekDates() {
+      if (!this.currentWeek) return [];
+      const start = new Date(this.toIsoDate(this.currentWeek.weekStartDate) + "T00:00:00.000Z");
+      return Array.from({ length: 7 }, (_, i) => {
+        const date = new Date(start);
+        date.setUTCDate(start.getUTCDate() + i);
+        return date;
+      });
+    },
+    get dayLabels() {
+      const labels = ["S", "M", "T", "W", "T", "F", "S"];
+      return this.weekDates.map((date) => labels[date.getUTCDay()]);
     },
     get dailyTimes() {
-      // If we have daily breakdown data, use that; otherwise fall back to average
-      if (this.currentWeek && this.currentWeek.days && Array.isArray(this.currentWeek.days) && this.currentWeek.days.length > 0) {
-        // Sort days by date to ensure correct order
-        const sortedDays = [...this.currentWeek.days].sort((a, b) => {
-          return new Date(a.date).getTime() - new Date(b.date).getTime();
-        });
-
-        // Map days to array of 7 values (one per day of week)
-        // Use the weekStartDate to determine which day of week each date falls on
-        const weekStart = new Date(this.currentWeek.weekStartDate);
-        const weekArray = [];
-
-        for (let i = 0; i < 7; i++) {
-          const currentDate = new Date(weekStart);
-          currentDate.setDate(weekStart.getDate() + i);
-
-          // Find matching day in sortedDays
-          const matchingDay = sortedDays.find((day) => {
-            const dayDate = new Date(day.date);
-            // Compare dates more reliably by normalizing to midnight
-            const day1 = new Date(dayDate.getFullYear(), dayDate.getMonth(), dayDate.getDate());
-            const day2 = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
-            return day1.getTime() === day2.getTime();
-          });
-
-          const timeMs = matchingDay ? (matchingDay.totalScreenTimeMs || 0) : 0;
-          weekArray.push(timeMs);
-        }
-
-        return weekArray;
+      if (!this.currentWeek) return [];
+      const days = this.currentWeek.days || [];
+      if (days.length > 0) {
+        const byDate = new Map(days.map((day) => [this.toIsoDate(day.date), day.totalScreenTimeMs || 0]));
+        return this.weekDates.map((date) => byDate.get(date.toISOString().slice(0, 10)) || 0);
       }
-      // Fallback: use daily average if no daily breakdown
-      if (!this.currentWeek || !this.currentWeek.dailyAverageMs) return [];
+      // No daily breakdown: fall back to the average for every day
+      if (!this.currentWeek.dailyAverageMs) return [];
       return Array(7).fill(this.currentWeek.dailyAverageMs);
     },
     get maxTime() {
       if (this.dailyTimes.length === 0) return 0;
-      const max = Math.max(...this.dailyTimes);
-      // Use the actual max value to ensure proper scaling
-      // Add a small buffer (5%) to prevent the tallest bar from touching the top
-      return max * 1.05;
+      return Math.max(...this.dailyTimes, this.currentWeek?.dailyAverageMs || 0);
     },
-    get weekLabel() {
-      if (!this.currentWeek) return '';
-      const start = new Date(this.currentWeek.weekStartDate);
-      const end = new Date(this.currentWeek.weekEndDate);
-      return (start.getMonth() + 1) + "/" + start.getDate() + "-" + (end.getMonth() + 1) + "/" + end.getDate();
+    get hasChartData() {
+      return this.dailyTimes.length > 0 && this.maxTime > 0;
+    },
+    get averagePercent() {
+      if (!this.hasChartData || !this.currentWeek?.dailyAverageMs) return null;
+      return (this.currentWeek.dailyAverageMs / this.maxTime) * 100;
+    },
+    barPercent(time) {
+      return this.maxTime > 0 ? (time / this.maxTime) * 100 : 0;
     },
     get dailyAverageFormatted() {
-      if (!this.currentWeek || !this.currentWeek.dailyAverageMs) {
-        return '0m';
-      }
-      return this.formatDuration(this.currentWeek.dailyAverageMs);
+      return this.formatDuration(this.currentWeek?.dailyAverageMs || 0);
+    },
+    // Select the most recent day that has usage (falls back to the last day)
+    selectDefaultDay() {
+      const times = this.dailyTimes;
+      let index = times.length - 1;
+      while (index > 0 && !times[index]) index--;
+      this.selectedDayIndex = Math.max(index, 0);
+    },
+    get weekApps() {
+      if (!this.currentWeek || !this.currentWeek.apps) return [];
+      return this.currentWeek.apps
+        .filter((app) => (app.totalTimeMs || 0) > 0)
+        .sort((a, b) => (b.totalTimeMs || 0) - (a.totalTimeMs || 0));
+    },
+    get visibleApps() {
+      return this.showAllApps ? this.weekApps : this.weekApps.slice(0, 4);
+    },
+    appBarPercent(app) {
+      const top = this.weekApps.length > 0 ? this.weekApps[0].totalTimeMs || 0 : 0;
+      return top > 0 ? ((app.totalTimeMs || 0) / top) * 100 : 0;
+    },
+    appInitial(app) {
+      return ((app.appName || app.packageName || "?").trim().charAt(0) || "?").toUpperCase();
+    },
+    changeWeek(index) {
+      this.currentWeekIndex = index;
+      this.showAllApps = false;
+      this.selectDefaultDay();
     },
     prevWeek() {
-      if (this.currentWeekIndex < this.screenTimeData.length - 1) {
-        this.currentWeekIndex++;
-      }
+      if (this.currentWeekIndex < this.screenTimeData.length - 1) this.changeWeek(this.currentWeekIndex + 1);
     },
     nextWeek() {
-      if (this.currentWeekIndex > 0) {
-        this.currentWeekIndex--;
-      }
+      if (this.currentWeekIndex > 0) this.changeWeek(this.currentWeekIndex - 1);
     }
   }`}
   x-show="!isLoading"
   x-cloak
 >
-  <!-- Content - only visible when not loading and has data -->
+  <!-- Content - only visible when there is data -->
   <template x-if="screenTimeData.length > 0">
     <div class="bg-white rounded-lg border border-gray-200 p-6 w-full">
-      <h3 class="text-lg font-semibold text-gray-900 mb-4">Screen Time</h3>
-      <div class="space-y-6">
-        <!-- Week Navigation -->
-        <div class="flex items-center justify-between mb-4">
-          <h4 class="text-base font-semibold text-gray-900">
-            Week <span x-text="screenTimeData.length - currentWeekIndex"></span> of <span x-text="screenTimeData.length"
-            ></span>
-          </h4>
-          <div class="flex items-center gap-2">
-            <button
-              type="button"
-              class="p-1 hover:bg-gray-100 rounded disabled:opacity-50 disabled:cursor-not-allowed"
-              aria-label="Previous week"
-              @click="prevWeek()"
-              :disabled="currentWeekIndex >= screenTimeData.length - 1"
-            >
-              <svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
-              </svg>
-            </button>
-            <span class="text-sm text-gray-600" x-text="weekLabel"></span>
-            <button
-              type="button"
-              class="p-1 hover:bg-gray-100 rounded disabled:opacity-50 disabled:cursor-not-allowed"
-              aria-label="Next week"
-              @click="nextWeek()"
-              :disabled="currentWeekIndex <= 0"
-            >
-              <svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-              </svg>
-            </button>
+      <!-- Header: title + week caption, week navigation -->
+      <div class="flex items-start justify-between gap-4">
+        <div>
+          <h3 class="text-lg font-semibold text-gray-900 leading-tight">Screen Time</h3>
+          <p class="text-sm text-gray-500 mt-0.5">
+            Week <span x-text="screenTimeData.length - currentWeekIndex"></span> of
+            <span x-text="screenTimeData.length"></span>
+          </p>
+        </div>
+        <div class="flex items-center gap-1">
+          <button
+            type="button"
+            class="p-1.5 rounded text-gray-600 hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+            aria-label="Previous week"
+            @click="prevWeek()"
+            :disabled="currentWeekIndex >= screenTimeData.length - 1"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+            </svg>
+          </button>
+          <span class="text-sm text-gray-700 whitespace-nowrap px-1" x-text="weekLabel"></span>
+          <button
+            type="button"
+            class="p-1.5 rounded text-gray-600 hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+            aria-label="Next week"
+            @click="nextWeek()"
+            :disabled="currentWeekIndex <= 0"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Daily average -->
+      <div class="mt-5">
+        <p class="text-3xl font-bold text-gray-900 tracking-tight" x-text="dailyAverageFormatted"></p>
+        <div class="flex items-center gap-2 mt-1">
+          <span class="w-4 border-t-2 border-dashed border-[#C17F59]" aria-hidden="true"></span>
+          <span class="text-sm text-gray-500">Daily average</span>
+        </div>
+      </div>
+
+      <!-- Daily bar chart -->
+      <div class="mt-6">
+        <div class="relative h-48 pt-6 border-b border-gray-200">
+          <!-- No data message -->
+          <div class="absolute inset-0 flex items-center justify-center" x-show="!hasChartData">
+            <p class="text-sm text-gray-500">No app usage data available</p>
           </div>
-        </div>
 
-        <!-- Daily Average Pill -->
-        <div class="mb-4">
-          <span class="inline-block px-4 py-2 bg-[#C07F53] text-white text-sm font-medium rounded-full">
-            Daily Average: <span x-text="dailyAverageFormatted"></span>
-          </span>
-        </div>
-
-        <!-- Weekly Bar Chart -->
-        <div class="mb-6">
-          <!-- Chart Container -->
-          <div class="relative h-48 border-l-2 border-b-2 border-gray-300" x-show="currentWeek">
-            <!-- Y-axis labels (hours) - Inside the chart -->
-            <div class="absolute left-2 top-0 bottom-0 flex flex-col justify-between text-xs text-gray-500">
-              <template x-if="maxTime > 0">
-                <>
-                  <span x-text="formatHours(maxTime)"></span>
-                  <span x-text="formatHours(maxTime / 2)"></span>
-                  <span>0hr</span>
-                </>
-              </template>
-            </div>
-
-            <!-- Horizontal grid lines (dotted) -->
+          <div class="relative h-full" x-show="hasChartData">
+            <!-- Daily average line -->
             <div
-              class="absolute inset-0 flex flex-col justify-between pointer-events-none z-0"
-              style="left: 2rem; right: 0;"
-            >
-              <template x-if="maxTime > 0">
-                <>
-                  <!-- Top line (2hr) -->
-                  <div class="border-t border-dashed border-gray-400 w-full opacity-60"></div>
-                  <!-- Middle line (1hr) -->
-                  <div class="border-t border-dashed border-gray-400 w-full opacity-60"></div>
-                  <!-- Bottom line (0hr) - at the bottom border -->
-                  <div class="border-t border-dashed border-gray-400 w-full opacity-60"></div>
-                </>
-              </template>
-            </div>
-
-            <!-- No data message inside graph -->
-            <div
-              class="absolute inset-0 flex items-center justify-center z-10"
-              x-show="!dailyTimes || dailyTimes.length === 0 || maxTime === 0"
-            >
-              <p class="text-sm text-gray-500">No app usage data available</p>
-            </div>
+              class="absolute left-0 right-0 border-t-2 border-dashed border-[#C17F59] z-20 pointer-events-none"
+              x-show="averagePercent !== null"
+              :style="`bottom: ${averagePercent}%;`"
+            ></div>
 
             <!-- Bars -->
-            <div
-              class="absolute inset-0 flex items-end justify-around gap-1 pl-8 pr-2 pb-2 z-10"
-              x-show="dailyTimes && dailyTimes.length > 0 && maxTime > 0"
-            >
+            <div class="absolute inset-0 flex items-end gap-1.5">
               <template x-for="(time, index) in dailyTimes" :key="index">
-                <div class="flex flex-col items-center flex-1 group relative" style="min-width: 0; height: 100%;">
-                  <!-- Tooltip on hover -->
-                  <div
-                    class="absolute bottom-full mb-2 hidden group-hover:block bg-gray-900 text-white text-xs rounded px-2 py-1 whitespace-nowrap z-10 pointer-events-none"
-                  >
-                    <span x-text="formatDuration(time)"></span>
-                  </div>
-                  <!-- Bar container - grows to fill space, aligns bar to bottom -->
-                  <div class="flex-1 w-full flex items-end" style="height: 100%;">
-                    <div
-                      class="w-full bg-teal-500 rounded-t transition-all hover:bg-teal-600 cursor-pointer"
-                      :style="`height: ${maxTime > 0 ? (time / maxTime) * 100 : 0}%; min-height: ${time > 0 ? '2px' : '0'};`"
-                      :title="formatDuration(time)"
-                    >
-                    </div>
-                  </div>
-                  <!-- Day label -->
-                  <span class="text-xs text-gray-600 mt-1" x-text="getDayLabel(currentWeek.weekStartDate, index)"
+                <button
+                  type="button"
+                  class="relative flex-1 h-full flex items-end focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded-t"
+                  :aria-label="`${dayLabels[index]}: ${formatDuration(time)}`"
+                  :aria-pressed="selectedDayIndex === index"
+                  @click="selectedDayIndex = index"
+                >
+                  <!-- Every day's total, floating above its bar; the selected day is emphasised -->
+                  <span
+                    class="absolute left-1/2 -translate-x-1/2 mb-1 text-[11px] sm:text-xs whitespace-nowrap z-30"
+                    :class="selectedDayIndex === index ? 'font-semibold text-gray-900' : 'font-medium text-gray-500'"
+                    :style="`bottom: ${barPercent(time)}%;`"
+                    x-text="formatDuration(time)"
                   ></span>
-                  <!-- Time label below bar -->
-                  <span class="text-xs text-gray-500 mt-0.5" x-text="formatDuration(time)"></span>
-                </div>
+                  <div
+                    class="w-full rounded-t-md bg-[#17B8A6] transition-opacity"
+                    :class="selectedDayIndex === index ? 'opacity-100' : 'opacity-30 hover:opacity-50'"
+                    :style="`height: ${barPercent(time)}%; min-height: ${time > 0 ? '2px' : '0'};`"
+                  ></div>
+                </button>
               </template>
             </div>
           </div>
         </div>
 
-        <!-- App Usage List (Weekly Summary) -->
-        <div>
-          <h4 class="text-sm font-semibold text-gray-900 mb-3">Weekly App Usage Summary</h4>
-          <div class="space-y-2 max-h-64 overflow-y-auto">
-            <template
-              x-if="currentWeek && currentWeek.apps && currentWeek.apps.filter(app => (app.totalTimeMs || 0) > 0).length > 0"
-            >
-              <template
-                x-for="(app, index) in currentWeek.apps.filter(app => (app.totalTimeMs || 0) > 0)"
-                :key="`app-${index}-${app.packageName || app.appName || index}`"
-              >
-                <div class="flex items-center gap-3">
-                  <div class="w-8 h-8 bg-gray-300 rounded flex-shrink-0"></div>
-                  <div class="flex-1 min-w-0">
-                    <p class="text-sm font-medium text-gray-900 truncate" x-text="app.appName"></p>
-                    <div class="mt-1 h-2 bg-gray-200 rounded-full overflow-hidden">
-                      <div class="h-full bg-gray-400 rounded-full" :style="`width: ${getAppBarWidth(app)}%`"></div>
-                    </div>
-                  </div>
-                  <span class="text-sm text-gray-600 whitespace-nowrap" x-text="formatDuration(app.totalTimeMs)"></span>
-                </div>
-              </template>
-            </template>
-          </div>
+        <!-- Day letters -->
+        <div class="flex gap-1.5 mt-2" x-show="hasChartData">
+          <template x-for="(label, index) in dayLabels" :key="index">
+            <span
+              class="flex-1 text-center text-xs"
+              :class="selectedDayIndex === index ? 'font-bold text-gray-900' : 'text-gray-500'"
+              x-text="label"
+            ></span>
+          </template>
         </div>
+      </div>
+
+      <!-- Weekly app usage -->
+      <div class="mt-6">
+        <div class="flex items-baseline justify-between mb-3">
+          <h4 class="text-sm font-semibold text-gray-900">Weekly App Usage</h4>
+          <span
+            class="text-xs text-gray-500"
+            x-show="weekApps.length > 0"
+            x-text="weekApps.length + (weekApps.length === 1 ? ' app' : ' apps')"
+          ></span>
+        </div>
+
+        <p class="text-sm text-gray-500" x-show="weekApps.length === 0">No app usage this week</p>
+
+        <div class="space-y-3">
+          <template x-for="app in visibleApps" :key="app.packageName || app.appName">
+            <div class="grid grid-cols-[2rem_1fr] gap-x-3 items-center">
+              <div
+                class="w-8 h-8 rounded-md flex items-center justify-center overflow-hidden row-span-2"
+                :class="app.iconUrl ? 'bg-transparent' : 'bg-gray-200'"
+              >
+                <img
+                  x-show="app.iconUrl"
+                  :src="app.iconUrl"
+                  :alt="app.appName"
+                  class="w-8 h-8 object-cover"
+                  loading="lazy"
+                  @error="app.iconUrl = null"
+                />
+                <span
+                  x-show="!app.iconUrl"
+                  class="text-sm font-semibold text-gray-600"
+                  x-text="appInitial(app)"
+                ></span>
+              </div>
+              <div class="flex items-baseline justify-between gap-3 min-w-0">
+                <p class="text-sm font-medium text-gray-900 truncate" x-text="app.appName"></p>
+                <span class="text-sm text-gray-600 whitespace-nowrap" x-text="formatDuration(app.totalTimeMs)"></span>
+              </div>
+              <div class="mt-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                <div class="h-full bg-gray-400 rounded-full" :style="`width: ${appBarPercent(app)}%`"></div>
+              </div>
+            </div>
+          </template>
+        </div>
+
+        <button
+          type="button"
+          class="mt-4 text-sm font-semibold text-[#17B8A6] hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded"
+          x-show="weekApps.length > 4"
+          @click="showAllApps = !showAllApps"
+          x-text="showAllApps ? 'Show less' : 'Show all ' + weekApps.length"
+        ></button>
       </div>
     </div>
   </template>

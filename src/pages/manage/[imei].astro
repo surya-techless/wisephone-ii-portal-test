@@ -6,9 +6,11 @@ import {
   DeviceScreenTimeMetrics,
   DeviceDataUsage,
   DeviceFeatureFlags,
+  App,
   sql,
   and,
   eq,
+  inArray,
   db
 } from "astro:db";
 import { getUser } from "@/libs/clerk";
@@ -45,6 +47,7 @@ let enableScreenTime = false;
 let screenTimeData: any[] = [];
 let dataUsageData: { cycleStartDate?: Date; usageDetail?: any; lastSyncedAt?: Date } | null = null;
 let dbShowScreenTime: boolean = false;
+let userIsAdmin = false;
 
 const catalogApps = await getCatalogApps();
 devLog.log(`✅ Loaded ${catalogApps.length} catalog apps from DB`);
@@ -72,7 +75,7 @@ try {
   }
 
   const userId = Astro.locals.auth().userId;
-  const userIsAdmin = await isAdmin(user.id);
+  userIsAdmin = await isAdmin(user.id);
 
   if (userIsAdmin) {
     const wisephones = await db
@@ -331,6 +334,40 @@ try {
           };
         });
         devLog.log("📊 Device Screentime Details: built", screenTimeData.length, "weeks from one row");
+
+        // App icons from the App table (same iconUrl Tool Management shows). Not limited to
+        // inCatalog = 1 — screen time can include apps hidden from the catalog.
+        const packageNames = [
+          ...new Set(
+            screenTimeData.flatMap((week) => [
+              ...week.apps.map((app: { packageName: string }) => app.packageName),
+              ...week.days.flatMap((day: { apps: Array<{ packageName: string }> }) =>
+                day.apps.map((app) => app.packageName)
+              )
+            ])
+          )
+        ].filter(Boolean);
+        if (packageNames.length > 0) {
+          try {
+            const iconRows = await db
+              .select({ packageName: App.packageName, iconUrl: App.iconUrl })
+              .from(App)
+              .where(inArray(App.packageName, packageNames));
+            const iconByPackage = new Map(
+              iconRows.filter((row) => row.iconUrl).map((row) => [row.packageName, row.iconUrl])
+            );
+            for (const week of screenTimeData) {
+              for (const app of week.apps) app.iconUrl = iconByPackage.get(app.packageName) ?? null;
+              for (const day of week.days) {
+                for (const app of day.apps) app.iconUrl = iconByPackage.get(app.packageName) ?? null;
+              }
+            }
+            devLog.log(`📊 Screen time app icons: ${iconByPackage.size} of ${packageNames.length} apps`);
+          } catch (iconError) {
+            // Icons are cosmetic — show the placeholder instead of failing the page
+            devLog.warn("⚠️ Could not load screen time app icons:", iconError);
+          }
+        }
       } else {
         devLog.log("📊 No screentime data found for IMEI:", imei);
       }
@@ -902,11 +939,12 @@ try {
                     </div>
                   </template>
 
-                  <!-- Portal-only: Screen Time visibility (last option; only when server enables screen time) -->
+                  <!-- Portal-only: Screen Time visibility (admins only; only when server enables screen time) -->
+                  {userIsAdmin && (
                   <div
                     x-show="enableScreenTime"
                     x-cloak
-                    class="hidden p-4 border border-gray-300 rounded-lg transition-colors hover:bg-gray-50"
+                    class="p-4 border border-gray-300 rounded-lg transition-colors hover:bg-gray-50"
                   >
                     <div class="flex items-center justify-between gap-4">
                       <div class="flex-1 min-w-0">
@@ -929,6 +967,7 @@ try {
                       </label>
                     </div>
                   </div>
+                  )}
                 </div>
               </div>
 
@@ -1112,7 +1151,8 @@ try {
             </div>
 
 
-              <!-- Right Column: Screen Time (divider above when stacked below subscription; hidden at 2xl+ side-by-side) -->
+              <!-- Right Column: Screen Time (admins only, when the device's Screen Time toggle is on; divider above when stacked below subscription; hidden at 2xl+ side-by-side) -->
+              {userIsAdmin && (
               <div
                 class="max-2xl:mb-4 2xl:mb-6 w-full min-w-0 max-w-full md:max-w-[500px] 2xl:max-w-[600px] 2xl:ml-5 h-full order-2 2xl:order-none max-2xl:border-t max-2xl:border-gray-200 max-2xl:pt-4 max-2xl:mt-0"
                 x-show="currentTab === 'device-info' && enableScreenTime && showScreenTimeComponent"
@@ -1120,6 +1160,7 @@ try {
               >
                 <ScreenTimeStats imei={imei || ""} screenTimeData={enableScreenTime ? screenTimeData : []} />
               </div>
+              )}
 
 
               <!-- Device Removal (shown when stacked layout, below Screen Time; same max width as tabs) -->
